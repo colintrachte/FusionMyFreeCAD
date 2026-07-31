@@ -1,0 +1,153 @@
+"""Read-only FreeCAD GUI audit for FusionMyFreeCAD command and shortcut readiness."""
+
+import FreeCAD as App
+import FreeCADGui as Gui
+
+try:
+    from PySide import QtGui, QtWidgets
+except ImportError:
+    from PySide import QtGui
+
+    QtWidgets = QtGui
+
+
+TARGETS = [
+    ("L", "Sketcher_CreateLine", "Line"),
+    ("R", "Sketcher_CreateRectangle", "2-point rectangle"),
+    ("C", "Sketcher_CreateCircle", "Center circle"),
+    ("D", "Sketcher_Dimension", "Dimension"),
+    ("E", "PartDesign_Pad", "Extrude - Join"),
+    ("Shift+E", "PartDesign_Pocket", "Extrude - Cut"),
+    ("H", "PartDesign_Hole", "Hole"),
+    ("T", "Sketcher_Trimming", "Trim"),
+    ("O", "Sketcher_Offset", "Offset"),
+    ("P", "Sketcher_Projection", "Project / Include"),
+    ("X", "Sketcher_ToggleConstruction", "Construction geometry"),
+    ("I", "Std_Measure", "Measure"),
+]
+
+QAction = getattr(QtGui, "QAction", None) or QtWidgets.QAction
+
+RIBBON_COMMANDS = [
+    "PartDesign_Body",
+    "PartDesign_NewSketch",
+    "PartDesign_Pad",
+    "PartDesign_Pocket",
+    "PartDesign_Hole",
+    "PartDesign_Revolution",
+    "PartDesign_AdditivePipe",
+    "PartDesign_AdditiveLoft",
+    "PartDesign_CompPrimitiveAdditive",
+    "PartDesign_Fillet",
+    "PartDesign_Chamfer",
+    "PartDesign_Thickness",
+    "PartDesign_Draft",
+    "PartDesign_Boolean",
+    "PartDesign_Plane",
+    "PartDesign_Line",
+    "PartDesign_Point",
+    "PartDesign_CoordinateSystem",
+    "PartDesign_Mirrored",
+    "PartDesign_LinearPattern",
+    "PartDesign_PolarPattern",
+    "PartDesign_MultiTransform",
+    "Sketcher_LeaveSketch",
+    "Sketcher_CreateLine",
+    "Sketcher_CompCreateRectangles",
+    "Sketcher_CompCreateConic",
+    "Sketcher_CompCreateArc",
+    "Sketcher_CompSlot",
+    "Sketcher_ToggleConstruction",
+    "Sketcher_CompCreateFillets",
+    "Sketcher_CompCurveEdition",
+    "Sketcher_Offset",
+    "Sketcher_Translate",
+    "Sketcher_Rotate",
+    "Sketcher_Symmetry",
+    "Sketcher_RectangularArray",
+    "Sketcher_CompExternal",
+    "Sketcher_Dimension",
+    "Sketcher_CompDimensionTools",
+    "Sketcher_CompConstrainTools",
+    "Std_Measure",
+    "Part_CheckGeometry",
+    "Std_ViewFitAll",
+]
+
+
+def write(message):
+    App.Console.PrintMessage(message + "\n")
+
+
+def normalized(sequence):
+    return QtGui.QKeySequence(sequence).toString()
+
+
+write("=== FusionMyFreeCAD read-only profile audit ===")
+write("This macro does not change shortcuts, preferences, or files.")
+
+previous_workbench = ""
+try:
+    previous_workbench = Gui.activeWorkbench().name()
+except Exception:
+    pass
+
+for workbench in ("PartDesignWorkbench", "SketcherWorkbench"):
+    try:
+        Gui.activateWorkbench(workbench)
+        Gui.updateGui()
+    except Exception as exc:
+        write("WARN: could not load {}: {}".format(workbench, exc))
+
+if previous_workbench:
+    try:
+        Gui.activateWorkbench(previous_workbench)
+    except Exception:
+        pass
+
+try:
+    registered = set(Gui.listCommands())
+except Exception:
+    registered = set()
+
+actions = Gui.getMainWindow().findChildren(QAction)
+actions_by_name = {action.objectName(): action for action in actions if action.objectName()}
+available = registered | set(actions_by_name)
+
+missing = sorted(set(RIBBON_COMMANDS) - available)
+if missing:
+    write("MISSING COMMANDS (do not import the preset yet):")
+    for command in missing:
+        write("  - " + command)
+else:
+    write("PASS: all {} Ribbon commands are registered.".format(len(RIBBON_COMMANDS)))
+
+shortcut_owners = {}
+for action in actions:
+    key = action.shortcut().toString()
+    if key:
+        shortcut_owners.setdefault(normalized(key), []).append(action)
+
+write("SHORTCUT PROPOSALS:")
+for shortcut, command, label in TARGETS:
+    action = actions_by_name.get(command)
+    current = action.shortcut().toString() if action else ""
+    owners = [
+        owner
+        for owner in shortcut_owners.get(normalized(shortcut), [])
+        if owner.objectName() != command
+    ]
+    if command not in available:
+        status = "MISSING COMMAND"
+    elif owners:
+        owner_labels = [
+            "{} ({})".format(owner.text().replace("&", ""), owner.objectName()) for owner in owners
+        ]
+        status = "CONFLICT: " + ", ".join(owner_labels)
+    elif normalized(current) == normalized(shortcut):
+        status = "ALREADY SET"
+    else:
+        status = "AVAILABLE; current={!r}".format(current)
+    write("  {:8} {:36} {:24} {}".format(shortcut, command, label, status))
+
+write("Audit complete. Apply only reviewed bindings through Tools > Customize > Keyboard.")
