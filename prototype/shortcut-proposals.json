@@ -1,0 +1,18 @@
+{
+  "status": "proposal-only",
+  "note": "Audit runtime availability and conflicts before applying through Tools > Customize > Keyboard.",
+  "bindings": [
+    {"shortcut": "L", "command": "Sketcher_CreateLine", "label": "Line"},
+    {"shortcut": "R", "command": "Sketcher_CreateRectangle", "label": "2-point rectangle"},
+    {"shortcut": "C", "command": "Sketcher_CreateCircle", "label": "Center circle"},
+    {"shortcut": "D", "command": "Sketcher_Dimension", "label": "Dimension"},
+    {"shortcut": "E", "command": "PartDesign_Pad", "label": "Extrude - Join"},
+    {"shortcut": "Shift+E", "command": "PartDesign_Pocket", "label": "Extrude - Cut"},
+    {"shortcut": "H", "command": "PartDesign_Hole", "label": "Hole"},
+    {"shortcut": "T", "command": "Sketcher_Trimming", "label": "Trim"},
+    {"shortcut": "O", "command": "Sketcher_Offset", "label": "Offset"},
+    {"shortcut": "P", "command": "Sketcher_Projection", "label": "Project / Include"},
+    {"shortcut": "X", "command": "Sketcher_ToggleConstruction", "label": "Construction geometry"},
+    {"shortcut": "I", "command": "Std_Measure", "label": "Measure"}
+  ]
+}

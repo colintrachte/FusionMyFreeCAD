@@ -1,5 +1,11 @@
 # FreeCAD 1.1.1 configured for a Fusion-like workflow
 
+> **Implementation update (2026-07-30):** The original native-toolbar baseline below has been
+> superseded by a reversible FreeCAD 1.1.3 Ribbon prototype. Start with
+> [`prototype/README.md`](prototype/README.md) and the independent source review in
+> [`research/ui-architecture-independent-review-2026-07-30.md`](research/ui-architecture-independent-review-2026-07-30.md).
+> The older material remains useful as rationale and as a fallback without addons.
+
 Research date: 2026-07-30  
 Target: FreeCAD 1.1.1, primarily Sketcher and Part Design
 
