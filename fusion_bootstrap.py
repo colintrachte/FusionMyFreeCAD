@@ -269,8 +269,12 @@ def verify():
     valid, checks = _verify_layout(RIBBON_PATH)
     state = _load_json(STATE_PATH) if os.path.isfile(STATE_PATH) else {}
     checks["stateVersion"] = state.get("packageVersion") == PACKAGE_VERSION
-    checks["bundledRibbon"] = os.path.isfile(os.path.join(ADDON_ROOT, "vendor", "FreeCAD-Ribbon", "InitGui.py"))
-    checks["bundledSearch"] = os.path.isfile(os.path.join(ADDON_ROOT, "vendor", "SearchBar", "InitGui.py"))
+    checks["bundledRibbon"] = os.path.isfile(
+        os.path.join(ADDON_ROOT, "bundled-addons", "FreeCAD-Ribbon", "InitGui.py")
+    )
+    checks["bundledSearch"] = os.path.isfile(
+        os.path.join(ADDON_ROOT, "bundled-addons", "SearchBar", "InitGui.py")
+    )
     return valid and all(checks.values()), checks
 
 
