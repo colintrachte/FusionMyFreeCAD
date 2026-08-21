@@ -1,10 +1,28 @@
-# FreeCAD 1.1.1 configured for a Fusion-like workflow
+# FusionMyFreeCAD
 
-> **Implementation update (2026-07-30):** The original native-toolbar baseline below has been
-> superseded by a reversible FreeCAD 1.1.3 Ribbon prototype. Start with
-> [`prototype/README.md`](prototype/README.md) and the independent source review in
+A self-contained, Fusion-familiar adaptive interface for FreeCAD 1.1 and newer on Windows, macOS,
+and Linux.
+
+## Install
+
+In FreeCAD, open **Tools → Addon Manager**, choose **FusionMyFreeCAD**, click **Install**, and restart
+FreeCAD once. That installs the complete tested runtime: the ribbon engine, command search, layouts,
+shortcuts, Smart Dimension settings, navigation cube, adaptive FREQUENT panels, verification, and
+restoration support. There are no separate repositories, system-Python packages, .NET runtimes,
+PowerShell scripts, or configuration files to install.
+
+The package must be published to FreeCAD's add-on index before it appears in this list; the current
+repository contains the package but has not yet been submitted or released.
+
+Use **Verify UI** in an INSPECT panel to check the installation. Use **Restore UI** before removing
+FusionMyFreeCAD in Addon Manager if you want the prior ribbon and preferences restored.
+
+The former Windows setup application is retained only as a local development/migration artifact and
+is not part of the cross-platform add-on release.
+>
+> The original native-toolbar baseline below remains useful as rationale and as a fallback without
+> addons. The independent source review is in
 > [`research/ui-architecture-independent-review-2026-07-30.md`](research/ui-architecture-independent-review-2026-07-30.md).
-> The older material remains useful as rationale and as a fallback without addons.
 
 Research date: 2026-07-30  
 Target: FreeCAD 1.1.1, primarily Sketcher and Part Design
@@ -93,6 +111,7 @@ Add PieMenu only after the native setup is stable. Avoid starting with Modern UI
 
 ## Files in this folder
 
+- [MAINTAINING.md](MAINTAINING.md) — maintenance architecture, change procedures, validation, and release checklist
 - [setup-guide.md](setup-guide.md) — exact setup sequence
 - [command-map.md](command-map.md) — command and shortcut decisions
 - [open-source-projects.md](open-source-projects.md) — reusable addons, porting assessment, and recommended stack
