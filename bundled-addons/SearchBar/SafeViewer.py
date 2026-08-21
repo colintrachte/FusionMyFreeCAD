@@ -1,0 +1,226 @@
+import FreeCAD as App
+import FreeCADGui as Gui
+from PySide.QtCore import Qt
+from PySide.QtWidgets import QLabel, QSizePolicy, QTextEdit, QMdiArea, QPushButton, QVBoxLayout, QWidget
+from PySide.QtGui import QPixmap
+from zipfile import ZipFile
+import SearchBox
+import time
+import os
+import platform
+
+# Define the translation
+translate = App.Qt.translate
+
+def extract_with_permission(
+        zipfile: ZipFile, filename: str, target_dir: str, ZIP_SYSTEM=3
+    ):
+        extracted_path = ""
+        for info in zipfile.infolist():
+            if filename in info.filename:
+                extracted_path = zipfile.extract(info, target_dir)
+
+                if info.create_system == ZIP_SYSTEM:
+                    unix_attributes = info.external_attr >> 16
+                if unix_attributes:
+                    os.chmod(extracted_path, unix_attributes)
+
+        return extracted_path
+
+class SafeViewer(QWidget):
+    """FreeCAD uses a modified version of QuarterWidget, so the import pivy.quarter one will cause segfaults.
+    FreeCAD's FreeCADGui.createViewer() puts the viewer widget inside an MDI window, and detaching it without causing segfaults on exit is tricky.
+    This class contains some kludges to extract the viewer as a standalone widget and destroy it safely.
+    """
+
+    enabled = App.ParamGet("User parameter:BaseApp/Preferences/Mod/SearchBar").GetBool(
+        "PreviewEnabled", False
+    )
+    instances = []
+
+    def __init__(self, nfo, parent=None):
+        super(SafeViewer, self).__init__()
+        SafeViewer.instances.append(self)
+        self.init_parent = parent
+        self.instance_enabled = False  # Has this specific instance been enabled?
+        if SafeViewer.enabled:
+            self.displaying_warning = False
+            self.enable()
+        else:
+            self.displaying_warning = True
+            self.lbl_warning = QTextEdit()
+            self.lbl_warning.setReadOnly(True)
+            self.lbl_warning.setAlignment(Qt.AlignmentFlag.AlignTop)
+            # self.lbl_warning.setText(
+            #     translate(
+            #         "SearchBar",
+            #         "Warning: the 3D preview has some stability issues. It can cause FreeCAD to crash (usually when quitting the application) and could in theory cause data loss, inside and outside of App.",
+            #     )
+            # )
+            # 
+            # # A new text for when no thumbnail is available
+            self.lbl_warning.setText(
+                translate(
+                    "SearchBar",
+                    "No thumbnail available!",
+                )
+            )
+            self.btn_enable_for_this_session = QPushButton(
+                translate("SearchBar", "Enable 3D preview for this session")
+            )
+            self.btn_enable_for_this_session.clicked.connect(
+                self.enable_for_this_session
+            )
+            self.btn_enable_for_future_sessions = QPushButton(
+                translate("SearchBar", "Enable 3D preview for future sessions")
+            )
+            self.btn_enable_for_future_sessions.clicked.connect(
+                self.enable_for_future_sessions
+            )
+                        
+            im = None
+            self.ImageWidget = QLabel()
+            file_name = App.getDocument(str(nfo['action']['document'])).getFileName()
+            try:
+                if not platform.system() == "Darwin":
+                    with ZipFile(file_name, 'r') as zip:
+                        im = QPixmap(zip.extract("thumbnails/Thumbnail.png"))
+                        self.ImageWidget.setPixmap(im)
+                        self.ImageWidget.setScaledContents(True)
+                        self.ImageWidget.setFixedSize(102,102)
+                if platform.system() == "Darwin":
+                    im = QPixmap(extract_with_permission(
+                        ZipFile(file_name),
+                        os.path.basename("thumbnails/Thumbnail.png"),
+                        os.path.dirname(file_name),
+                        )
+                    )
+                    self.ImageWidget.setPixmap(im)
+                    self.ImageWidget.setScaledContents(True)
+                    self.ImageWidget.setFixedSize(102,102)
+            except Exception as e:
+                print(e)
+                pass
+            
+            self.setLayout(QVBoxLayout())
+            if im is not None:
+                self.layout().addWidget(self.ImageWidget)
+            else:
+                self.layout().addWidget(self.lbl_warning)
+            # self.layout().addWidget(self.btn_enable_for_this_session)
+            # self.layout().addWidget(self.btn_enable_for_future_sessions)        
+            
+            self.destroyed.connect(self.finalizer)
+
+    def enable_for_this_session(self):
+        if not SafeViewer.enabled:
+            for instance in SafeViewer.instances:
+                instance.enable()
+                SearchBox.globalIgnoreFocusOut = True
+
+    def enable_for_future_sessions(self):
+        if not SafeViewer.enabled:
+            # Store in prefs
+            App.ParamGet("User parameter:BaseApp/Preferences/Mod/SearchBar").SetBool(
+                "PreviewEnabled", True
+            )
+            # Then enable as usual
+            self.enable_for_this_session()
+
+    def enable(self):
+        if not self.instance_enabled:
+            import FreeCADGui
+
+            # TODO: use a mutex wrapping the entire method, if possible
+            SafeViewer.enabled = True
+            self.instance_enabled = True  # Has this specific instance been enabled?
+
+            if self.displaying_warning:
+                self.layout().removeWidget(self.lbl_warning)
+                self.layout().removeWidget(self.btn_enable_for_this_session)
+                self.layout().removeWidget(self.btn_enable_for_future_sessions)
+
+            self.viewer = FreeCADGui.createViewer()
+            self.graphicsView = self.viewer.graphicsView()
+            self.oldGraphicsViewParent = self.graphicsView.parent()
+            self.oldGraphicsViewParentParent = self.oldGraphicsViewParent.parent()
+            self.oldGraphicsViewParentParentParent = (
+                self.oldGraphicsViewParentParent.parent()
+            )
+
+            # Avoid segfault but still hide the undesired window by moving it to a new hidden MDI area.
+            self.hiddenQMDIArea = QMdiArea()
+            self.hiddenQMDIArea.addSubWindow(self.oldGraphicsViewParentParentParent)
+
+            self.private_widget = self.oldGraphicsViewParent
+            self.private_widget.setParent(self.init_parent)
+
+            self.setLayout(QVBoxLayout())
+            self.layout().addWidget(self.private_widget)
+            self.layout().setContentsMargins(0, 0, 0, 0)
+
+            def fin(slf):
+                slf.finalizer()
+
+            import weakref
+
+            weakref.finalize(self, fin, self)
+
+            self.destroyed.connect(self.finalizer)
+
+    def finalizer(self):
+        # Cleanup in an order that doesn't cause a segfault:
+        if SafeViewer.enabled:
+            self.private_widget.setParent(self.oldGraphicsViewParentParent)
+            self.oldGraphicsViewParentParentParent.close()
+            self.oldGraphicsViewParentParentParent = None
+            self.oldGraphicsViewParentParent = None
+            self.oldGraphicsViewParent = None
+            self.graphicsView = None
+            self.viewer = None
+            # self.parent = None
+            self.init_parent = None
+            self.hiddenQMDIArea = None
+        else:
+            self.init_parent = None
+            self.ImageWidget = None
+
+    def showSceneGraph(self, g):
+        import FreeCAD as App
+
+        if SafeViewer.enabled:
+            self.viewer.getViewer().setSceneGraph(g)
+            self.viewer.viewDefaultOrientation()
+            self.viewer.fitAll()
+            self.viewer.setCornerCrossSize(5)
+            # self.viewer.setCornerCrossVisible(False)
+            self.viewer.getViewer().setEnabledNaviCube(False)
+            
+
+
+"""
+# Example use:
+from PySide import QtGui
+import pivy
+from SafeViewer import SafeViewer
+sv = SafeViewer()
+def mk(v):
+  w = QtGui.QMainWindow()
+  oldFocus = QtGui.QApplication.focusWidget()
+  sv.widget.setParent(w)
+  oldFocus.setFocus()
+  w.show()
+  col = pivy.coin.SoBaseColor()
+  col.rgb = (1, 0, 0)
+  trans = pivy.coin.SoTranslation()
+  trans.translation.setValue([0, 0, 0])
+  cub = pivy.coin.SoCube()
+  myCustomNode = pivy.coin.SoSeparator()
+  myCustomNode.addChild(col)
+  myCustomNode.addChild(trans)
+  myCustomNode.addChild(cub)
+  sv.viewer.getViewer().setSceneGraph(myCustomNode)
+  sv.viewer.fitAll()
+  return w
+ww=mk(sv)
+"""

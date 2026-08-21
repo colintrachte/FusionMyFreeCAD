@@ -1,0 +1,102 @@
+import FreeCAD as App
+import FreeCADGui as Gui
+from PySide.QtGui import QColor
+import os
+import sys
+
+# Define the translation
+translate = App.Qt.translate
+
+preferences = App.ParamGet("User parameter:BaseApp/Preferences/Mod/SearchBar")
+
+
+class Settings:
+
+    # region -- Functions to read the settings from the FreeCAD Parameters
+    # and make sure that a None type result is ""
+    def GetStringSetting(settingName: str) -> str:
+        result = preferences.GetString(settingName)
+
+        if result.lower() == "none":
+            result = ""
+        return result
+
+    def GetIntSetting(settingName: str) -> int:
+        result = preferences.GetInt(settingName)
+        if result == "":
+            result = None
+        return result
+
+    def GetFloatSetting(settingName: str) -> int:
+        result = preferences.GetFloat(settingName)
+        if result == "":
+            result = None
+        return result
+
+    def GetBoolSetting(settingName: str, Default = False) -> bool:
+        result = preferences.GetBool(settingName)
+        
+        if not settingName in preferences.GetBools():
+            result = Default
+        return result
+
+    def GetColorSetting(settingName: str) -> object:
+        # Create a tuple from the int value of the color
+        result = QColor.fromRgba(preferences.GetUnsigned(settingName)).toTuple()
+
+        # correct the order of the tuple and divide them by 255
+        result = (result[3] / 255, result[0] / 255, result[1] / 255, result[2] / 255)
+
+        return result
+
+    # endregion
+
+    # region - Functions to write settings to the FreeCAD Parameters
+    #
+    #
+    def SetStringSetting(settingName: str, value: str):
+        if value.lower() == "none":
+            value = ""
+        preferences.SetString(settingName, value)
+        App.saveParameter()
+        return
+
+    def SetBoolSetting(settingName: str, value):
+        if str(value).lower() == "true":
+            Bool = True
+        if str(value).lower() == "none" or str(value).lower() != "true":
+            Bool = False
+        preferences.SetBool(settingName, Bool)
+        App.saveParameter()
+        return
+
+    def SetIntSetting(settingName: str, value: int):
+        if str(value).lower() != "":
+            preferences.SetInt(settingName, value)
+            App.saveParameter()
+        return
+
+
+# region - Define the resources ----------------------------------------------------------------------------------------
+ICON_LOCATION = os.path.join(os.path.dirname(__file__), "Resources", "Icons")
+IMAGE_LOCATION = os.path.join(os.path.dirname(__file__), "Resources", "Images")
+UI_LOCATION = os.path.join(os.path.dirname(__file__), "Resources", "ui")
+# endregion ------------------------------------------------------------------------------------------------------------
+
+# The pixmap for the general tool icon
+genericToolIcon_Pixmap = os.path.join(ICON_LOCATION, "Tango-Tools-spanner-hammer.svg")
+SearchIcon_Pixmap = os.path.join(ICON_LOCATION, "Tango-System-search.svg")
+
+
+DO_NOT_SHOW_AGAIN: str= Settings.GetStringSetting("DoNotShowAgain")
+if Settings.GetStringSetting("DoNotShowAgain") is None:
+    DO_NOT_SHOW_AGAIN = " "
+    Settings.SetStringSetting("DoNotShowAgain", " ")
+    Settings.SetBoolSetting("ShowChangeDialog", True)
+
+FILTER_TOOLBARS = Settings.GetBoolSetting("FilterToolbarCommands", True)
+FILTER_PARAMETERS = Settings.GetBoolSetting("FilterParameters", True)
+FILTER_DOCUMENTS = Settings.GetBoolSetting("FilterDocuments", True)
+
+ENABLE_HIGHLIGHT = Settings.GetBoolSetting("EnableHighlight", True)
+ENABLE_ACTIVATE_WB = Settings.GetBoolSetting("ActivateOnHover", True)

@@ -1,0 +1,176 @@
+RibbonApplicationButton, RibbonPanelOptionButton {
+    border: 2px solid blue;
+    border-radius: 5px;
+}
+
+QToolBar {
+    border: 2px solid blue;
+    border-radius: 5px;
+}
+
+RibbonApplicationButton::menu-indicator {
+    image: none;
+}
+
+RibbonTabBar {
+    border: 2px solid purple;
+    border-radius: 20px;
+}
+
+RibbonTitleLabel {
+    border: 2px solid purple;
+    border-radius: 20px;
+}
+
+RibbonBar {
+    border: 2px solid red;
+    border-radius: 20px;
+}
+
+RibbonCategory {
+    border: 2px solid green;
+    border-radius: 20px;
+}
+
+RibbonCategoryScrollArea {
+    border: none;
+    background-color: transparent;
+}
+
+RibbonCategoryScrollAreaContents {
+    border: none;
+    background-color: transparent;
+}
+
+RibbonPanel {
+    border: 2px solid brown;
+    border-radius: 20px;
+
+}
+
+RibbonSeparator {
+    border: 2px solid black;
+    border-radius: 20px;
+}
+
+RibbonPanelTitle {
+    border: 2px solid green;
+    border-radius: 20px;
+}
+
+RibbonPanelItemWidget {
+    border: 0px solid black;
+    border-radius: 20px;
+
+}
+
+QTabBar {
+  margin: 0px;
+  padding-bottom: 0px;
+  padding-top: 0px;}
+  QTabBar::tab {
+  	background: transparent;
+	margin-top: 4px;
+	margin-bottom: 4px;
+	padding-top: 4px;
+	padding-bottom: 4px;
+	spacing: 0px;}
+  QTabBar::scroller {
+    min-width: 40px;}
+
+QDockWidget {
+	margin: 0px;
+	padding-bottom: 0px;
+	padding-top: 0px;}
+	QDockWidget::title {
+		margin: 0px;
+		padding: 0px;
+		text-align: center; }
+
+QDockWidget::title QToolButton, QDockWidget::title QWidget#Selector > QToolButton {
+	margin: 1px; }
+
+RibbonApplicationButton::menu-indicator {
+    image: none;
+	border: none;
+}
+
+QTabBar, QDockWidget QTabBar {
+  qproperty-drawBase: 0;
+}
+
+RibbonBar {
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+RibbonCategory {
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 3px;
+	margin-left: 3px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+RibbonCategoryScrollArea {
+    background-color: transparent;
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+RibbonCategoryScrollAreaContents {
+    background-color: transparent;
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+RibbonPanel {
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+RibbonPanelTitle {
+	padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+RibbonPanelItemWidget {
+    padding-top: 0px;
+	padding-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	spacing: 0px;
+}
+
+QTabBar {
+    background-color: transparent;
+}

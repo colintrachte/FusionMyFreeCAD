@@ -20,7 +20,10 @@ __pycache__/
 .coverage.*
 coverage.xml
 htmlcov/
-*vendor
+
+# Full upstream addon checkouts are reference/update inputs only. The curated,
+# release-ready runtime payload lives in /bundled-addons/ and is tracked.
+/vendor/
 # Python environments and local package state
 .venv/
 venv/

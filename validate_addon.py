@@ -130,11 +130,11 @@ def main() -> int:
         ROOT / "Resources" / "FusionMyFreeCAD" / "layout-v3.json",
         ROOT / "Resources" / "FusionMyFreeCAD" / "layout-manifest.json",
         ROOT / "Resources" / "FusionMyFreeCAD" / "runtime.py",
-        ROOT / "vendor" / "FreeCAD-Ribbon" / "InitGui.py",
-        ROOT / "vendor" / "FreeCAD-Ribbon" / "LICENSE",
-        ROOT / "vendor" / "FreeCAD-Ribbon" / "Resources" / "FreeCAD Icons" / "PartDesign_Pad.svg",
-        ROOT / "vendor" / "SearchBar" / "InitGui.py",
-        ROOT / "vendor" / "SearchBar" / "LICENSE",
+        ROOT / "bundled-addons" / "FreeCAD-Ribbon" / "InitGui.py",
+        ROOT / "bundled-addons" / "FreeCAD-Ribbon" / "LICENSE",
+        ROOT / "bundled-addons" / "FreeCAD-Ribbon" / "Resources" / "FreeCAD Icons" / "PartDesign_Pad.svg",
+        ROOT / "bundled-addons" / "SearchBar" / "InitGui.py",
+        ROOT / "bundled-addons" / "SearchBar" / "LICENSE",
     )
     missing = [str(path.relative_to(ROOT)) for path in required if not path.is_file()]
     assert not missing, "missing add-on files: {}".format(missing)
@@ -144,7 +144,9 @@ def main() -> int:
             continue
         compile(path.read_text(encoding="utf-8-sig"), str(path), "exec")
 
-    cache_source = (ROOT / "vendor" / "FreeCAD-Ribbon" / "CacheFunctions.py").read_text(encoding="utf-8")
+    cache_source = (ROOT / "bundled-addons" / "FreeCAD-Ribbon" / "CacheFunctions.py").read_text(
+        encoding="utf-8"
+    )
     cache_tree = ast.parse(cache_source)
     startup_check = next(
         node for node in cache_tree.body if isinstance(node, ast.FunctionDef) and node.name == "CheckDataFileVersion"
@@ -174,11 +176,13 @@ def main() -> int:
     assert 'DockWindows/ComboView").SetBool("Enabled", True)' in installed_runtime
     assert 'globals().get("__file__")' in installed_runtime
     assert 'MainWindow/DockWindows").SetBool("Std_ComboView", True)' in installed_runtime
-    search_startup = (ROOT / "vendor" / "SearchBar" / "InitGui.py").read_text(encoding="utf-8")
+    search_startup = (ROOT / "bundled-addons" / "SearchBar" / "InitGui.py").read_text(encoding="utf-8")
     assert "LoadChangeDialog_SearchBar.main()" not in search_startup
     assert 'SetBoolSetting("ShowChangeDialog", False)' in search_startup
     assert 'SetStringSetting("DoNotShowAgain", "1.8")' in search_startup
-    ribbon_binding = (ROOT / "vendor" / "FreeCAD-Ribbon" / "FCBinding.py").read_text(encoding="utf-8")
+    ribbon_binding = (ROOT / "bundled-addons" / "FreeCAD-Ribbon" / "FCBinding.py").read_text(
+        encoding="utf-8"
+    )
     assert 'workbenchName in Dict.get("authoritativeWorkbenches", [])' in ribbon_binding
     assert "ListToolbars: list = []" in ribbon_binding
 
@@ -200,7 +204,7 @@ def main() -> int:
     assert [panel["title"] for panel in part_tools] == [
         "CREATE / IMPORT", "BOOLEAN", "SPLIT", "REPAIR", "FREQUENT", "INSPECT"
     ]
-    assert not list((ROOT / "vendor").rglob(".git"))
+    assert not list((ROOT / "bundled-addons").rglob(".git"))
 
     with tempfile.TemporaryDirectory() as temporary:
         bootstrap = load_bootstrap(Path(temporary))
@@ -257,7 +261,22 @@ def main() -> int:
         assert view.GetString("NavigationStyle") == "PreviousStyle"
         assert (removed / "FusionMyFreeCAD-addon-state.json").is_file()
 
-    total_bytes = sum(path.stat().st_size for path in ROOT.rglob("*") if path.is_file() and ".git" not in path.parts)
+    package_roots = (ROOT / "Resources", ROOT / "bundled-addons")
+    package_files = [
+        ROOT / "Init.py",
+        ROOT / "InitGui.py",
+        ROOT / "fusion_bootstrap.py",
+        ROOT / "package.xml",
+        ROOT / "LICENSE",
+        ROOT / "THIRD_PARTY_NOTICES.md",
+    ]
+    package_files.extend(
+        path
+        for package_root in package_roots
+        for path in package_root.rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts and path.suffix not in {".pyc", ".pyo"}
+    )
+    total_bytes = sum(path.stat().st_size for path in package_files)
     print("VALID: self-contained add-on 3.1.0; {:.1f} MiB unpacked".format(total_bytes / 1024 / 1024))
     return 0
 

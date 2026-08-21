@@ -1,0 +1,214 @@
+# *************************************************************************
+# *                                                                       *
+# * Copyright (c) 2019-2024 Paul Ebbers                                   *
+# *                                                                       *
+# * This program is free software; you can redistribute it and/or modify  *
+# * it under the terms of the GNU Lesser General Public License (LGPL)    *
+# * as published by the Free Software Foundation; either version 3 of     *
+# * the License, or (at your option) any later version.                   *
+# * for detail see the LICENCE text file.                                 *
+# *                                                                       *
+# * This program is distributed in the hope that it will be useful,       *
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+# * GNU Library General Public License for more details.                  *
+# *                                                                       *
+# * You should have received a copy of the GNU Library General Public     *
+# * License along with this program; if not, write to the Free Software   *
+# * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  *
+# * USA                                                                   *
+# *                                                                       *
+# *************************************************************************
+import FreeCAD as App
+import FreeCADGui as Gui
+import os
+from PySide.QtGui import QIcon, QPixmap, QAction
+from PySide.QtWidgets import (
+    QListWidgetItem,
+    QTableWidgetItem,
+    QListWidget,
+    QTableWidget,
+    QToolBar,
+    QToolButton,
+    QComboBox,
+    QPushButton,
+    QMenu,
+    QWidget,
+    QMainWindow,
+)
+from PySide.QtCore import Qt, SIGNAL, Signal, QObject, QThread
+
+
+def DarkMode():
+    import xml.etree.ElementTree as ET
+    import os
+
+    # Define the standard result
+    IsDarkTheme = False
+
+    # Get the current stylesheet for FreeCAD
+    FreeCAD_preferences = App.ParamGet("User parameter:BaseApp/Preferences/MainWindow")
+    currentStyleSheet = FreeCAD_preferences.GetString("StyleSheet")
+    currentTheme = FreeCAD_preferences.GetString("Theme")
+    currentOverlay = FreeCAD_preferences.GetString("OverlayActiveStyleSheet")
+
+    # if no stylesheet is selected return
+    if currentStyleSheet is None or currentStyleSheet == "":
+        return
+
+    # FreeCAD Dark is part of FreeCAD, so set the result to True manually
+    if (
+        currentStyleSheet.lower() == "freecad dark.qss"
+        or currentTheme.lower() == "freecad dark"
+        or "dark theme" in currentOverlay.lower()
+    ):
+        return True
+
+    # OpenLight and OpenDark are from one addon. Set the currentStyleSheet value to the addon folder
+    if "OpenLight.qss" in currentStyleSheet:
+        return False
+    if "OpenDark.qss" in currentStyleSheet:
+        return True
+
+    path = os.path.dirname(__file__)
+    # Get the folder with add-ons
+    for i in range(1):
+        # Starting point
+        path = os.path.dirname(path)
+
+    # Go through the sub-folders
+    for root, dirs, files in os.walk(path):
+        for name in dirs:
+            # # if the current stylesheet matches a sub directory, try to get the package.xml
+            packageXML = os.path.join(path, name, "package.xml")
+            try:
+                
+                if os.path.exists(packageXML):
+
+                    # Get the tree and root of the xml file
+                    tree = ET.parse(packageXML)
+                    treeRoot = tree.getroot()
+                    namespaces = {"i": "https://wiki.freecad.org/Package_Metadata"}
+                    pack =  treeRoot.findall(
+                        ".//i:content/i:preferencepack", namespaces
+                    )
+
+                    for element in pack:
+                        for child in element.iter():
+                            if child.text.lower() == currentStyleSheet.lower():
+                                for child2 in element.iter():
+                                    if child2.text.lower() == "dark":
+                                        return True
+                                    if child2.text.lower() == "light":
+                                        return False
+
+
+            except Exception as e:
+                if not os.path.isfile(packageXML):
+                    if "dark" in currentStyleSheet.lower():
+                        IsDarkTheme = True
+
+    return IsDarkTheme
+
+
+
+darkMode = DarkMode()
+
+
+def ReturnStyleItem(ControlName, ShowCustomIcon=False, IgnoreOverlay=False):
+    """
+    Enter one of the names below:
+
+    ControlName (string):
+        "Background_Color" returns string,
+        "FontColor" returns string,
+    """
+    # define a result holder and a dict for the StyleMapping file
+    result = "none"
+
+    # Get the current stylesheet for FreeCAD
+    FreeCAD_preferences = App.ParamGet("User parameter:BaseApp/Preferences/MainWindow")
+    currentStyleSheet = FreeCAD_preferences.GetString("StyleSheet")
+    IsInList = False
+    for key, value in StyleMapping_default["Stylesheets"].items():
+        if key == currentStyleSheet:
+            IsInList = True
+            break
+    if IsInList is False:
+        currentStyleSheet = "none"
+
+    try:
+        result = StyleMapping_default["Stylesheets"][currentStyleSheet][ControlName]
+        if result == "" or result is None:
+            result = StyleMapping_default["Stylesheets"][""][ControlName]
+        return result
+    except Exception as e:
+        print(e)
+        return None
+
+
+def ReturnFontColor():
+    fontColor = "#000000"
+    IsDarkTheme = darkMode
+
+    if IsDarkTheme is True:
+        fontColor = "#ffffff"
+
+    return fontColor
+
+
+StyleMapping_default = {
+    "Stylesheets": {
+        "": {
+            "Background_Color": "#f0f0f0",
+            "FontColor": ReturnFontColor(),
+        },
+        "none": {
+            "Background_Color": "none",
+            "FontColor": ReturnFontColor(),
+        },
+        "FreeCAD.qss": {
+            "Background_Color": "none",
+            "FontColor": "",
+        },
+        "FreeCAD Dark.qss": {
+            "Background_Color": "#333333",
+            "FontColor": "#ffffff",
+        },
+        "FreeCAD Light.qss": {
+            "Background_Color": "#f0f0f0",
+            "FontColor": "#000000",
+        },
+        "OpenLight.qss": {
+            "Background_Color": "#dee2e6",
+            "FontColor": "#000000",
+        },
+        "OpenDark.qss": {
+            "Background_Color": "#212529",
+            "FontColor": "#ffffff",
+        },
+        "Behave-dark.qss": {
+            "Background_Color": "#232932",
+            "FontColor": ReturnFontColor(),
+        },
+        "ProDark.qss": {
+            "Background_Color": "#333333",
+            "FontColor": ReturnFontColor(),
+        },
+        "Darker.qss": {
+            "Background_Color": "#444444",
+            "FontColor": ReturnFontColor(),
+        },
+        "Light-modern.qss": {
+            "Background_Color": "#f0f0f0",
+            "FontColor": ReturnFontColor(),
+        },
+        "Dark-modern.qss": {
+            "FontColor": ReturnFontColor(),
+        },
+        "Dark-contrast.qss": {
+            "Background_Color": "#444444",
+            "FontColor": ReturnFontColor(),
+        },
+    }
+}

@@ -126,8 +126,8 @@ if ($Action -eq "Verify") {
 Assert-FreeCADClosed
 
 $sources = @(
-    [ordered]@{ Name = "FreeCAD-Ribbon"; Path = Join-Path $projectRoot "vendor\FreeCAD-Ribbon"; Required = "InitGui.py" },
-    [ordered]@{ Name = "SearchBar"; Path = Join-Path $projectRoot "vendor\SearchBar"; Required = "InitGui.py" },
+    [ordered]@{ Name = "FreeCAD-Ribbon"; Path = Join-Path $projectRoot "bundled-addons\FreeCAD-Ribbon"; Required = "InitGui.py" },
+    [ordered]@{ Name = "SearchBar"; Path = Join-Path $projectRoot "bundled-addons\SearchBar"; Required = "InitGui.py" },
     [ordered]@{ Name = "FusionMyFreeCAD"; Path = Join-Path $assetRoot "FusionMyFreeCAD"; Required = "InitGui.py" }
 )
 foreach ($source in $sources) {

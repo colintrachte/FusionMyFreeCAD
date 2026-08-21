@@ -7,5 +7,5 @@ from fusion_bootstrap import ADDON_ROOT, load_vendor, prepare, register_commands
 prepare()
 register_commands()
 run_runtime()
-load_vendor("SearchBar", os.path.join(ADDON_ROOT, "vendor", "SearchBar"))
-load_vendor("FreeCAD_Ribbon", os.path.join(ADDON_ROOT, "vendor", "FreeCAD-Ribbon"))
+load_vendor("SearchBar", os.path.join(ADDON_ROOT, "bundled-addons", "SearchBar"))
+load_vendor("FreeCAD_Ribbon", os.path.join(ADDON_ROOT, "bundled-addons", "FreeCAD-Ribbon"))

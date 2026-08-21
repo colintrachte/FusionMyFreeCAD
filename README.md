@@ -5,14 +5,19 @@ and Linux.
 
 ## Install
 
-In FreeCAD, open **Tools → Addon Manager**, choose **FusionMyFreeCAD**, click **Install**, and restart
-FreeCAD once. That installs the complete tested runtime: the ribbon engine, command search, layouts,
+For the current unpublished release, install the packaged add-on archive into FreeCAD's user
+`Mod/FusionMyFreeCAD` directory and restart FreeCAD once. Detailed Windows, macOS, Linux,
+verification, update, and removal steps are in
+[`docs/INSTALL-FREECAD-ADDON.md`](docs/INSTALL-FREECAD-ADDON.md).
+
+The archive installs the complete tested runtime: the ribbon engine, command search, layouts,
 shortcuts, Smart Dimension settings, navigation cube, adaptive FREQUENT panels, verification, and
 restoration support. There are no separate repositories, system-Python packages, .NET runtimes,
 PowerShell scripts, or configuration files to install.
 
-The package must be published to FreeCAD's add-on index before it appears in this list; the current
-repository contains the package but has not yet been submitted or released.
+The package must be published to FreeCAD's add-on index before it appears in the standard Addon
+Manager catalog; the current repository contains a compatible package but has not yet been
+submitted or released.
 
 Use **Verify UI** in an INSPECT panel to check the installation. Use **Restore UI** before removing
 FusionMyFreeCAD in Addon Manager if you want the prior ribbon and preferences restored.
