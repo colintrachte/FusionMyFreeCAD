@@ -1,5 +1,8 @@
 # FusionMyFreeCAD prototype 1
 
+> **Simpler path:** This manual procedure is retained for troubleshooting. For normal use, close
+> FreeCAD and double-click `D:\Git\FusionMyFreeCAD\INSTALL.cmd`.
+
 This is a reversible FreeCAD 1.1.3 UI prototype based on native Part Design and Sketcher commands.
 
 It does **not** modify FreeCAD source, create new modeling feature types, write shortcuts, or edit `user.cfg`.
