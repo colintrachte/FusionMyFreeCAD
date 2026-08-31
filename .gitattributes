@@ -1,0 +1,11 @@
+# Normalise line endings so formatters and diffs stay stable across platforms.
+* text=auto eol=lf
+
+# Binary payloads must never be converted.
+*.png binary
+*.svg text eol=lf
+*.qm binary
+*.pdf binary
+*.zip binary
+*.exe binary
+*.pdb binary

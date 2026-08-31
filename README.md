@@ -3,121 +3,116 @@
 A self-contained, Fusion-familiar adaptive interface for FreeCAD 1.1 and newer on Windows, macOS,
 and Linux.
 
+FusionMyFreeCAD reorganises FreeCAD's Part Design, Part, Sketcher, and Surface workbenches into a
+Fusion-style ribbon, adds command search and Fusion keyboard shortcuts, and sets Fusion-like mouse
+navigation. It is a configuration layer: it does not modify FreeCAD's modelling kernel or document
+format, and everything it changes can be undone from inside FreeCAD.
+
+## Status
+
+Version **1.2.0** is available from [GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.2.0)
+as a self-contained archive. FusionMyFreeCAD has not yet been submitted to FreeCAD's add-on index;
+catalog publication remains separate work.
+
 ## Install
 
-For the current unpublished release, install the packaged add-on archive into FreeCAD's user
-`Mod/FusionMyFreeCAD` directory and restart FreeCAD once. Detailed Windows, macOS, Linux,
-verification, update, and removal steps are in
+Download `FusionMyFreeCAD-1.2.0.zip` from the
+[1.2.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.2.0), extract its
+top-level `FusionMyFreeCAD` folder into FreeCAD's user `Mod` directory, and restart FreeCAD. Full
+platform-by-platform steps, verification, update, and removal instructions are in
 [`docs/INSTALL-FREECAD-ADDON.md`](docs/INSTALL-FREECAD-ADDON.md).
 
-The archive installs the complete tested runtime: the ribbon engine, command search, layouts,
-shortcuts, Smart Dimension settings, navigation cube, adaptive FREQUENT panels, verification, and
-restoration support. There are no separate repositories, system-Python packages, .NET runtimes,
-PowerShell scripts, or configuration files to install.
+The archive contains everything needed: the ribbon engine, command search, layouts, shortcuts,
+Smart Dimension settings, the navigation cube, adaptive FREQUENT panels, verification, and
+restoration. There are no separate repositories, system-Python packages, .NET runtimes, PowerShell
+scripts, or configuration files to install.
 
-The package must be published to FreeCAD's add-on index before it appears in the standard Addon
-Manager catalog; the current repository contains a compatible package but has not yet been
-submitted or released.
+## First run
 
-Use **Verify UI** in an INSPECT panel to check the installation. Use **Restore UI** before removing
-FusionMyFreeCAD in Addon Manager if you want the prior ribbon and preferences restored.
+On first launch FusionMyFreeCAD records your existing ribbon layout and the preferences it manages,
+then applies its own. **The recorded baseline is written once and never overwritten**, so the
+original profile stays recoverable even if later state is lost.
 
-The former Windows setup application is retained only as a local development/migration artifact and
-is not part of the cross-platform add-on release.
->
-> The original native-toolbar baseline below remains useful as rationale and as a fallback without
-> addons. The independent source review is in
-> [`research/ui-architecture-independent-review-2026-07-30.md`](research/ui-architecture-independent-review-2026-07-30.md).
+Managed preferences are applied **once per installed version**, not at every launch. Changing one of
+them in FreeCAD's own preferences dialog afterwards sticks; FusionMyFreeCAD will not quietly put it
+back on the next start.
 
-Research date: 2026-07-30  
-Target: FreeCAD 1.1.1, primarily Sketcher and Part Design
+## Ribbon access and personalisation
 
-## Conclusion
+Every panel has a dropdown containing its complete command inventory, including commands that do
+not fit on the ribbon face. A normal click runs a visible command; click, hold, and drag past the
+platform's normal drag distance to reorder its icon within that panel. The new order is saved
+automatically and survives FreeCAD restarts and FusionMyFreeCAD layout updates.
 
-FreeCAD 1.1.1 can be made close enough to Fusion for the high-frequency part-creation loop that most muscle memory transfers:
+Each panel's dropdown ends with **Reset this panel**. It restores only that panel's shipped order
+and pinned commands, leaving every other panel alone. There is deliberately no top-level reset
+button. **Reapply UI** remains the explicit whole-interface reset and clears all ribbon
+personalisation along with restoring the other shipped defaults.
 
-1. Use **Part Design** as the normal home workbench.
-2. Select FreeCAD's **Revit navigation style**. It matches Fusion's mouse navigation:
-   - wheel = zoom
-   - middle-drag = pan
-   - Shift+middle-drag = orbit
-3. Put a small, ordered custom toolbar at the top:
-   - New Body
-   - Create Sketch / Close Sketch
-   - Line
-   - Rectangle
-   - Circle
-   - Dimension
-   - Mirror
-   - Move/Array Transform
-   - Rotate/Polar Transform
-   - Pad
-   - Pocket
-   - Hole
-   - Part Design Mirror
-   - Linear Pattern
-   - Polar Pattern
-4. Rebind only the commands for which Fusion has strong, memorable defaults: `L`, `R`, `C`, `D`, `E`, `H`, `T`, `O`, `P`, and `X`.
-5. Treat **Pad** as Fusion's additive Extrude and **Pocket** as its cutting Extrude. FreeCAD does not have a single native Part Design command that chooses Join/Cut/New Body the way Fusion's Extrude dialog does.
-6. Optionally use the community **PieMenu** addon as a substitute for Fusion's `S` Model Toolbox and right-click marking menu. Do not make this a prerequisite for the base setup.
+## The three UI commands
 
-This approach targets motor memory and command location. A theme alone will not reduce retraining nearly as much.
+Each lives in an **INSPECT** panel:
 
-## What can and cannot be matched
-
-| Fusion behavior | Closest FreeCAD 1.1.1 equivalent | Match |
-|---|---|---|
-| Browser at left | Combo View / Tree View docked left | Close |
-| Parametric timeline at bottom | Ordered features inside a Body in the tree | Conceptually close, visually different |
-| Design workspace | Part Design workbench | Close |
-| Contextual Sketch tab | Sketch edit mode and Sketcher toolbars/task panel | Close |
-| `L`, `R`, `C`, `D` sketch commands | Rebind FreeCAD Line, Rectangle, Circle; Dimension is already `D` | Excellent |
-| `E` Extrude with Join/Cut/New Body | Pad, Pocket, and New Body are separate commands | Partial |
-| Feature and sketch mirror/pattern | Separate Sketcher and Part Design commands | Close, but context matters |
-| `S` searchable Model Toolbox | Optional PieMenu; otherwise custom toolbar/menu | Partial |
-| Fusion mouse navigation | FreeCAD Revit navigation style | Excellent |
-| Ribbon/panel layout | Movable/custom Qt toolbars | Partial |
-| Marking menu | Optional PieMenu addon | Close |
-
-FreeCAD's feature tree is not a Fusion-style horizontal timeline. Trying to force a ribbon or timeline clone through old UI addons would add maintenance risk without improving the core modeling loop.
-
-## Recommended modeling vocabulary
-
-Use these translations consistently:
-
-| Think in Fusion | Do in FreeCAD |
+| Command | What it does |
 |---|---|
-| Component / active component | Body / active Body |
-| Create Sketch | Create Sketch |
-| Extrude: Join | Pad |
-| Extrude: Cut | Pocket |
-| Extrude: New Body | New Body, Create Sketch, then Pad |
-| Sketch Dimension | Dimension |
-| Sketch Mirror | Sketcher Mirror |
-| Rectangular Pattern in sketch | Move/Array Transform |
-| Circular Pattern in sketch | Rotate/Polar Transform |
-| Feature Mirror | Part Design Mirror |
-| Rectangular Pattern of feature | Linear Pattern |
-| Circular Pattern of feature | Polar Pattern |
-| Browser | Tree View / Combo View |
-| Timeline feature | Feature under the Body in the tree |
+| **Verify UI** | Checks the installed layout, the restore point, the bundled payload, and any startup or runtime failure, and reports what to do next |
+| **Reapply UI** | Returns the whole ribbon, managed preferences, and shortcuts to the shipped defaults; this clears all panel personalisation |
+| **Restore UI** | Undoes everything FusionMyFreeCAD changed, using the first-run baseline |
 
-## Recommended level of customization
+Run **Restore UI** *before* removing FusionMyFreeCAD in Addon Manager. If you have already removed
+it, [`tools/RestoreFusionMyFreeCAD.FCMacro`](tools/RestoreFusionMyFreeCAD.FCMacro) does the same job
+as a standalone macro.
 
-Start with native FreeCAD functionality:
+## Settings
 
-- Revit navigation style
-- Part Design as the home workbench
-- a compact custom toolbar
-- Fusion-like shortcuts
-- a light or neutral built-in theme with medium 24 px icons
+**Edit → Preferences → FusionMyFreeCAD** exposes the opt-outs:
 
-Add PieMenu only after the native setup is stable. Avoid starting with Modern UI/ribbon replacements: the research found no sufficiently current, first-party evidence that they are the best-supported route for FreeCAD 1.1.1, while FreeCAD 1.1 already has a new theme system and improved native UI.
+| Setting | Default | Effect |
+|---|---|---|
+| Start in the Part Design workbench | on | Sets Part Design as the autoload workbench |
+| Use Fusion-style navigation and the navigation cube | on | Revit navigation style, navigation cube top-right |
+| Apply Fusion keyboard shortcuts | on | `L` `R` `C` `D` `E` `H` `T` `O` `P` `X` and friends |
+| Open a starter design on launch | off | Creates an empty document and body at every start |
 
-## Files in this folder
+Applying the Fusion shortcuts takes a binding from any command already holding it. **Verify UI**
+lists every shortcut that was moved, and which command lost it.
 
-- [MAINTAINING.md](MAINTAINING.md) — maintenance architecture, change procedures, validation, and release checklist
-- [setup-guide.md](setup-guide.md) — exact setup sequence
-- [command-map.md](command-map.md) — command and shortcut decisions
-- [open-source-projects.md](open-source-projects.md) — reusable addons, porting assessment, and recommended stack
-- [sources.md](sources.md) — researched sources and evidence
+## Compatibility and licence
+
+FreeCAD 1.1.0 or newer, Python 3.11 or newer, as declared in `package.xml`.
+
+The distributed package is **GPL-3.0-or-later**, because it bundles FreeCAD-Ribbon (GPL-3.0-or-later)
+and SearchBar (LGPL-2.1). FusionMyFreeCAD's own first-party source is additionally offered under MIT;
+see [`LICENSES/FusionMyFreeCAD-MIT.txt`](LICENSES/FusionMyFreeCAD-MIT.txt) and
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+Installing or updating a user interface does not validate CAD geometry, toolpaths, or manufacturing
+output.
+
+## Documentation
+
+- [`docs/INSTALL-FREECAD-ADDON.md`](docs/INSTALL-FREECAD-ADDON.md) — install, verify, update, remove
+- [`CHANGELOG.md`](CHANGELOG.md) — user-visible release history
+- [`MAINTAINING.md`](MAINTAINING.md) — architecture, change procedures, validation, release checklist
+- [`command-map.md`](command-map.md) — Fusion-to-FreeCAD command and shortcut decisions
+- [`setup-guide.md`](setup-guide.md) — the manual, native-FreeCAD workflow baseline
+- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) — bundled component provenance and local changes
+- [`research/`](research/) — design rationale, source evidence, and independent reviews
+
+## Development
+
+```bash
+python -m pytest tests -q
+```
+
+`python validate_addon.py` runs the same suite and reports the packaged size.
+`ruff check . && ruff format --check .` matches CI.
+
+Only the FreeCAD command icons referenced by the layout are bundled; the full collection remains
+in FreeCAD's official repository. After changing a button icon, verify its name against a real
+installation and rebuild the curated subset from an official FreeCAD source checkout:
+
+```bash
+python tools/probe_freecad_icons.py --freecad "/path/to/FreeCADCmd"
+python tools/sync_bundled_addons.py --freecad-source "/path/to/FreeCAD"
+```

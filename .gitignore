@@ -1,8 +1,8 @@
 # FusionMyFreeCAD repository ignores
 #
-# Keep source layouts, manifests, icons, vendored runtime snapshots, licenses,
-# and installer source under version control. Ignore only reproducible output,
-# caches, machine-local state, and editor/OS noise.
+# Keep source layouts, manifests, icons, vendored runtime snapshots, and licenses
+# under version control. Ignore only reproducible output, caches, machine-local
+# state, and editor/OS noise.
 
 # Python bytecode and tool caches
 __pycache__/
@@ -43,23 +43,6 @@ wheels/
 *.egg
 *.whl
 .installed.cfg
-
-# .NET/Visual Studio output from the legacy Windows installer
-[Bb]in/
-[Oo]bj/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-.vs/
-
-# Local installer publication and migration artifacts
-/setup-build/
-/installer/setup-build/
-/FusionMyFreeCAD Setup.exe
-/FusionMyFreeCAD Setup.pdb
-/INSTALL.cmd
-/UNINSTALL.cmd
 
 # FreeCAD machine-local profile, runtime state, and recovery files
 /user.cfg

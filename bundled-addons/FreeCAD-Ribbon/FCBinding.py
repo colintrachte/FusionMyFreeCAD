@@ -1929,6 +1929,18 @@ class ModernMenu(RibbonBar):
             
                     
         # update the ribbonstructure before writing it to disk
+        # FusionMyFreeCAD panels declare a stable number of pinned commands. In
+        # Arrange mode every menu command is shown, so the user's final order
+        # determines which commands remain on the face of the panel.
+        for workbench in self.workBenchDict.get("authoritativeWorkbenches", []):
+            toolbars = self.workBenchDict.get("workbenches", {}).get(workbench, {}).get("toolbars", {})
+            for panelName, toolbar in toolbars.items():
+                if not isinstance(toolbar, dict) or "pinCount" not in toolbar:
+                    continue
+                order = list(toolbar.get("order", []))
+                pinCount = max(0, min(int(toolbar.get("pinCount", 0)), len(order)))
+                toolbar["overflow"] = order[pinCount:]
+                toolbar["panelMenu"] = list(order)
         if "quickAccessCommands" in self.workBenchDict:
             self.ribbonStructure["quickAccessCommands"] = self.workBenchDict["quickAccessCommands"]
         if "newPanels" in self.workBenchDict:
@@ -1945,7 +1957,7 @@ class ModernMenu(RibbonBar):
             self.ribbonStructure["customToolbars"] = self.workBenchDict["customToolbars"]
         
         for WorkBench in self.workBenchDict["workbenches"].keys():
-            self.ribbonStructure["workbenches"][WorkBench] == self.workBenchDict["workbenches"][WorkBench]
+            self.ribbonStructure["workbenches"][WorkBench] = self.workBenchDict["workbenches"][WorkBench]
         
         # CopyDict = {}
         # for WorkBench in self.workBenchDict["workbenches"].keys():
@@ -1961,6 +1973,13 @@ class ModernMenu(RibbonBar):
         JsonFile = Parameters.RIBBON_STRUCTURE_JSON
         with open(JsonFile, "w") as outfile:
             json.dump(self.ribbonStructure, outfile, indent=4)
+        try:
+            import fusion_bootstrap
+
+            fusion_bootstrap.record_customization(self.ribbonStructure)
+        except (ImportError, AttributeError):
+            # FreeCAD-Ribbon is also usable without FusionMyFreeCAD.
+            pass
                 
         # Close the temporary document
         try:
@@ -2607,9 +2626,89 @@ class ModernMenu(RibbonBar):
     AddCommand_ActionData = ""
     AddCommand_Icon = None
     AddCommand_Text = ""
+
+    def _ensureDirectDragState(self):
+        """Use the live ribbon structure as the editable model for direct dragging."""
+        if self.workBenchDict.get("workbenches") is self.ribbonStructure.get("workbenches"):
+            return
+        for key in (
+            "workbenches",
+            "quickAccessCommands",
+            "newPanels",
+            "dropdownButtons",
+            "ignoredToolbars",
+            "ignoredWorkbenches",
+            "iconOnlyToolbars",
+            "customToolbars",
+            "authoritativeWorkbenches",
+        ):
+            if key in self.ribbonStructure:
+                self.workBenchDict[key] = self.ribbonStructure[key]
+
+    def _saveDirectDragState(self):
+        """Persist a completed drop immediately; direct manipulation has no edit mode."""
+        self.ribbonStructure["workbenches"] = self.workBenchDict["workbenches"]
+        self.ribbonStructure["quickAccessCommands"] = self.workBenchDict.get(
+            "quickAccessCommands", []
+        )
+        for workbench in self.workBenchDict.get("authoritativeWorkbenches", []):
+            toolbars = self.workBenchDict["workbenches"].get(workbench, {}).get("toolbars", {})
+            for toolbar in toolbars.values():
+                if not isinstance(toolbar, dict):
+                    continue
+                order = list(toolbar.get("order", []))
+                if "panelMenu" in toolbar:
+                    toolbar["panelMenu"] = list(order)
+                if "pinCount" in toolbar:
+                    pinCount = max(0, min(int(toolbar["pinCount"]), len(order)))
+                    pinned = [item for item in order if item not in toolbar.get("overflow", [])]
+                    toolbar["overflow"] = [
+                        item for item in order if item not in pinned[:pinCount]
+                    ]
+        with open(Parameters.RIBBON_STRUCTURE_JSON, "w") as outfile:
+            json.dump(self.ribbonStructure, outfile, indent=4)
+        try:
+            import fusion_bootstrap
+
+            fusion_bootstrap.record_customization(self.ribbonStructure)
+        except (ImportError, AttributeError):
+            pass
+
+    def _resetOnePanel(self, panel):
+        """Restore one FMF panel while retaining every other customization."""
+        try:
+            import fusion_bootstrap
+
+            workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())
+            panelName = panel.objectName()
+            ribbon = fusion_bootstrap.reset_panel_customization(workbenchName, panelName)
+            self.ribbonStructure.clear()
+            self.ribbonStructure.update(ribbon)
+            self.workBenchDict.clear()
+            self._ensureDirectDragState()
+            replacement = self.CreatePanel(
+                workbenchName,
+                panelName,
+                addPanel=False,
+                Dict=self.workBenchDict,
+                ignoreColumnLimit=False,
+                showEnableControl=False,
+                enableSeparator=False,
+                ActivateButtons=True,
+            )
+            self.currentCategory().replacePanel(panel, replacement)
+            self.setPanelProperties(replacement)
+            self.currentCategory()._panels[replacement.objectName()] = replacement
+            panel.close()
+            App.Console.PrintMessage(
+                "FusionMyFreeCAD reset the {} panel.\n".format(replacement.title())
+            )
+        except (ImportError, AttributeError):
+            return
     
     def dragEnterEvent(self, event: QDragEnterEvent):         
-        if self.CustomizeEnabled is True:
+        self._ensureDirectDragState()
+        if self.CustomizeEnabled is True or self.workBenchDict:
             if self.dragIndicator_QuickAccess is None:
                 self.dragIndicator_QuickAccess = DragTargetIndicator(orientation="right")
             
@@ -2651,7 +2750,7 @@ class ModernMenu(RibbonBar):
         return
                        
     def dragLeaveEvent(self, event: QDragLeaveEvent):
-        if self.CustomizeEnabled is True:
+        if self.CustomizeEnabled is True or self.workBenchDict:
             # Hide the drag indicator when you leave the drag area
             self.dragIndicator_Buttons.close()
             self.dragIndicator_Panels.close()
@@ -2668,7 +2767,8 @@ class ModernMenu(RibbonBar):
         return
      
     def dragMoveEvent(self, event: QDragMoveEvent):
-        if self.CustomizeEnabled is True:
+        self._ensureDirectDragState()
+        if self.CustomizeEnabled is True or self.workBenchDict:
             widget = event.source()
             
              # If you drag and drop a new command, you actually dragging the complete QListWidget
@@ -3077,7 +3177,7 @@ class ModernMenu(RibbonBar):
                                         OrderList_Compare.append(self.ReturnCommand_string(Dict=self.workBenchDict, panel=panel, widget=control))
                                     if separator is not None and type(separator) is CustomSeparator:
                                         OrderList_Compare.append(separator.objectName())
-                                if OrderList != OrderList_Compare:
+                                if OrderList != OrderList_Compare and not self.workBenchDict["workbenches"][workbenchName]["toolbars"][title].get("overflow"):
                                     OrderList = OrderList_Compare
                                 
                                 # Get the indexes of the widgets
@@ -3147,7 +3247,7 @@ class ModernMenu(RibbonBar):
                                                             
                         # Create a new panel
                         workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())
-                        newPanel = self.CreatePanel(workbenchName, panel.objectName(), addPanel=False, Dict=self.workBenchDict, ignoreColumnLimit=True, showEnableControl=True, enableSeparator=True, ActivateButtons=True)
+                        newPanel = self.CreatePanel(workbenchName, panel.objectName(), addPanel=False, Dict=self.workBenchDict, ignoreColumnLimit=False, showEnableControl=False, enableSeparator=False, ActivateButtons=True)
                                                 
                         # Add the panel to the list with long panels
                         if newPanel.panelOptionButton().isVisible():
@@ -3167,6 +3267,7 @@ class ModernMenu(RibbonBar):
                         
                         # Enable all buttons, so you can access them with a right click
                         self.activateButtons()
+                        self._saveDirectDragState()
                         
                         event.accept()
                         return
@@ -3271,6 +3372,7 @@ class ModernMenu(RibbonBar):
                 
                 # Close the drag indicator
                 self.dragIndicator_Panels.close()
+                self._saveDirectDragState()
             except Exception as e:
                 if Parameters.DEBUG_MODE:
                     print(e.with_traceback(e.__traceback__))
@@ -5932,13 +6034,25 @@ class ModernMenu(RibbonBar):
         # Set the maximum columns
         maxColumns = Parameters.MAX_COLUMN_PANELS
 
-        # Define an action list of the actions that are byond the maximum columns
+        # Define an action list of the actions that are beyond the maximum columns
         ButtonList = []
+        PanelMenuButtons = []
+        panelDefinition = (
+            Dict.get("workbenches", {})
+            .get(workbenchName, {})
+            .get("toolbars", {})
+            .get(panelName, {})
+        )
+        explicitPanelMenu = set(panelDefinition.get("panelMenu", []))
+        explicitOverflow = set(panelDefinition.get("overflow", []))
 
         # Go through the button list:
         for i in range(len(allButtons)):
             button = allButtons[i]
             CommandName = button.objectName()
+
+            if CommandName in explicitPanelMenu:
+                PanelMenuButtons.append(button)
             
             # count the number of buttons per type. Needed for proper sorting the buttons later.
             buttonSize = "small"
@@ -6008,6 +6122,16 @@ class ModernMenu(RibbonBar):
             elif shadowList.__contains__(CommandName) is True:                
                 continue
             else:
+                # Explicit overflow is the user-facing command inventory for a
+                # panel. Ignore it only while arranging, when the complete panel
+                # must be visible and draggable.
+                if (
+                    CommandName in explicitOverflow
+                    and ignoreColumnLimit is False
+                ):
+                    ButtonList.append(button)
+                    panel.panelOptionButton().show()
+                    continue
                 # If the number of columns is more than allowed,
                 # Add the actions to the OptionPanel instead.
                 if maxColumns > 0 and ignoreColumnLimit is False:
@@ -6431,7 +6555,9 @@ class ModernMenu(RibbonBar):
             EnableControl.setHidden(True)
 
         # Setup the panelOptionButton
-        panel = self.PopulateOverflowMenu(panel, ButtonList)
+        panel = self.PopulateOverflowMenu(
+            panel, PanelMenuButtons if explicitPanelMenu else ButtonList
+        )
                 
         # Add a spacer. Otherwise alignment of a panel with one button will always be to the top
         # if len(allButtons) == 1:
@@ -6685,6 +6811,13 @@ class ModernMenu(RibbonBar):
             Menu = CustomControls.CustomOptionMenu(
                 OptionButton.menu(), actionList, self
             )
+            workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())
+            if workbenchName in self.ribbonStructure.get("authoritativeWorkbenches", []):
+                Menu.addSeparator()
+                resetAction = Menu.addAction(
+                    translate("FreeCAD Ribbon", "Reset this panel")
+                )
+                resetAction.triggered.connect(lambda checked=False, item=panel: self._resetOnePanel(item))
             OptionButton.setMenu(Menu)
             StyleSheet_Menu = (
                 "* {font-size: " + str(Parameters.FONTSIZE_MENUS) + "px;}"

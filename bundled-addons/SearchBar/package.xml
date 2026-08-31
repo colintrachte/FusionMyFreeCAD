@@ -21,7 +21,6 @@
 
   <icon>Resources/Icons/Tango-System-search.svg</icon>
 
-  <depend type="python">lxml</depend>
   <content>
     <workbench>
       <classname>SearchBar</classname>

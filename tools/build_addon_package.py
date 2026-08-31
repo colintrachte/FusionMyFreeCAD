@@ -7,7 +7,6 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_NAME = "FusionMyFreeCAD"
 PACKAGE_FILES = (
@@ -17,8 +16,12 @@ PACKAGE_FILES = (
     "package.xml",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
+    "CHANGELOG.md",
     "README.md",
     "docs/INSTALL-FREECAD-ADDON.md",
+    # The install guide tells users to recover with this macro after removing the
+    # add-on, so it has to travel inside the archive.
+    "tools/RestoreFusionMyFreeCAD.FCMacro",
 )
 PACKAGE_DIRECTORIES = ("Resources", "bundled-addons")
 
@@ -46,7 +49,9 @@ def package_sources() -> list[Path]:
         )
     missing = [path for path in paths if not path.is_file()]
     if missing:
-        raise FileNotFoundError("Required package files are missing: " + ", ".join(map(str, missing)))
+        raise FileNotFoundError(
+            "Required package files are missing: " + ", ".join(map(str, missing))
+        )
     return sorted(set(paths), key=lambda path: path.relative_to(ROOT).as_posix())
 
 
@@ -89,7 +94,10 @@ def main() -> None:
     digest = hashlib.sha256(output.read_bytes()).hexdigest()
     checksum = output.with_suffix(output.suffix + ".sha256")
     checksum.write_text(f"{digest}  {output.name}\n", encoding="ascii")
-    print(f"Created {output} with {len(sources)} files ({output.stat().st_size / 1024 / 1024:.2f} MiB).")
+    print(
+        f"Created {output} with {len(sources)} files "
+        f"({output.stat().st_size / 1024 / 1024:.2f} MiB)."
+    )
     print(f"SHA-256: {digest}")
 
 

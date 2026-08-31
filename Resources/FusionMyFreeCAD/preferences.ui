@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>FusionMyFreeCADPreferences</class>
+ <widget class="QWidget" name="FusionMyFreeCADPreferences">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>520</width>
+    <height>420</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>General</string>
+  </property>
+  <layout class="QVBoxLayout" name="outerLayout">
+   <item>
+    <widget class="QLabel" name="introLabel">
+     <property name="text">
+      <string>These settings take effect the next time FusionMyFreeCAD applies its defaults. Use &lt;b&gt;Reapply UI&lt;/b&gt; in an INSPECT panel to apply them now, or &lt;b&gt;Restore UI&lt;/b&gt; to undo FusionMyFreeCAD entirely.</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="managedGroup">
+     <property name="title">
+      <string>Managed defaults</string>
+     </property>
+     <layout class="QVBoxLayout" name="managedLayout">
+      <item>
+       <widget class="Gui::PrefCheckBox" name="setStartWorkbench">
+        <property name="toolTip">
+         <string>Open FreeCAD in Part Design, matching Fusion's Design workspace.</string>
+        </property>
+        <property name="text">
+         <string>Start in the Part Design workbench</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+        <property name="prefEntry" stdset="0">
+         <cstring>SetStartWorkbench</cstring>
+        </property>
+        <property name="prefPath" stdset="0">
+         <cstring>Mod/FusionMyFreeCAD</cstring>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="Gui::PrefCheckBox" name="setNavigation">
+        <property name="toolTip">
+         <string>Use the Revit navigation style and a top-right navigation cube. This is the closest match to Fusion's mouse navigation.</string>
+        </property>
+        <property name="text">
+         <string>Use Fusion-style navigation and the navigation cube</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+        <property name="prefEntry" stdset="0">
+         <cstring>SetNavigation</cstring>
+        </property>
+        <property name="prefPath" stdset="0">
+         <cstring>Mod/FusionMyFreeCAD</cstring>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="Gui::PrefCheckBox" name="setShortcuts">
+        <property name="toolTip">
+         <string>Apply the Fusion shortcut set (L, R, C, D, E, H, T, O, P, X). Any conflicting shortcut is taken from the other command; Verify UI lists what changed.</string>
+        </property>
+        <property name="text">
+         <string>Apply Fusion keyboard shortcuts</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+        <property name="prefEntry" stdset="0">
+         <cstring>SetShortcuts</cstring>
+        </property>
+        <property name="prefPath" stdset="0">
+         <cstring>Mod/FusionMyFreeCAD</cstring>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="startupGroup">
+     <property name="title">
+      <string>Startup</string>
+     </property>
+     <layout class="QVBoxLayout" name="startupLayout">
+      <item>
+       <widget class="Gui::PrefCheckBox" name="createStarterDesign">
+        <property name="toolTip">
+         <string>Create an empty document and body at every launch. Off by default, because it produces an unsaved document you did not ask for and a save prompt when you quit.</string>
+        </property>
+        <property name="text">
+         <string>Open a starter design on launch</string>
+        </property>
+        <property name="checked">
+         <bool>false</bool>
+        </property>
+        <property name="prefEntry" stdset="0">
+         <cstring>CreateStarterDesign</cstring>
+        </property>
+        <property name="prefPath" stdset="0">
+         <cstring>Mod/FusionMyFreeCAD</cstring>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>Gui::PrefCheckBox</class>
+   <extends>QCheckBox</extends>
+   <header>Gui/PrefWidgets.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

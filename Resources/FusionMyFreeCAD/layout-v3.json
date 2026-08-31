@@ -1,168 +1,1573 @@
 {
-  "layoutVersion": "3.1.0",
+  "layoutVersion": "1.2.0",
   "targetFreeCAD": "1.1.x",
   "dropdownButtons": {
-    "Fusion_MoreCreate_ddb": [["PartDesign_CompPrimitiveAdditive", "PartDesignWorkbench"], ["PartDesign_Body", "PartDesignWorkbench"]],
-    "Fusion_Pattern_ddb": [["PartDesign_Mirrored", "PartDesignWorkbench"], ["PartDesign_LinearPattern", "PartDesignWorkbench"], ["PartDesign_PolarPattern", "PartDesignWorkbench"], ["PartDesign_MultiTransform", "PartDesignWorkbench"]],
-    "Fusion_MoreSketchCreate_ddb": [["Sketcher_CompCreateArc", "SketcherWorkbench"], ["Sketcher_CompCreateRegularPolygon", "SketcherWorkbench"], ["Sketcher_CreatePoint", "SketcherWorkbench"], ["Sketcher_CreateText", "SketcherWorkbench"]],
-    "Fusion_MoreConstraints_ddb": [["Sketcher_ConstrainBlock", "SketcherWorkbench"], ["Sketcher_ConstrainSymmetric", "SketcherWorkbench"], ["Sketcher_CompDimensionTools", "SketcherWorkbench"], ["Sketcher_CompConstrainTools", "SketcherWorkbench"]]
+    "Fusion_MoreCreate_ddb": [
+      [
+        "PartDesign_CompPrimitiveAdditive",
+        "PartDesignWorkbench"
+      ],
+      [
+        "PartDesign_Body",
+        "PartDesignWorkbench"
+      ]
+    ],
+    "Fusion_Pattern_ddb": [
+      [
+        "PartDesign_Mirrored",
+        "PartDesignWorkbench"
+      ],
+      [
+        "PartDesign_LinearPattern",
+        "PartDesignWorkbench"
+      ],
+      [
+        "PartDesign_PolarPattern",
+        "PartDesignWorkbench"
+      ],
+      [
+        "PartDesign_MultiTransform",
+        "PartDesignWorkbench"
+      ]
+    ],
+    "Fusion_MoreSketchCreate_ddb": [
+      [
+        "Sketcher_CompCreateArc",
+        "SketcherWorkbench"
+      ],
+      [
+        "Sketcher_CompCreateRegularPolygon",
+        "SketcherWorkbench"
+      ],
+      [
+        "Sketcher_CreatePoint",
+        "SketcherWorkbench"
+      ],
+      [
+        "Sketcher_CreateText",
+        "SketcherWorkbench"
+      ]
+    ],
+    "Fusion_MoreConstraints_ddb": [
+      [
+        "Sketcher_ConstrainBlock",
+        "SketcherWorkbench"
+      ],
+      [
+        "Sketcher_ConstrainSymmetric",
+        "SketcherWorkbench"
+      ],
+      [
+        "Sketcher_CompDimensionTools",
+        "SketcherWorkbench"
+      ],
+      [
+        "Sketcher_CompConstrainTools",
+        "SketcherWorkbench"
+      ]
+    ]
   },
   "workbenches": {
     "PartDesignWorkbench": [
-      {"name": "Fusion Sketch Entry_newPanel", "title": "SKETCH", "commands": [
-        ["FusionMyFreeCAD_CreateSketch", "General", "large", "Create Sketch", "Sketcher_NewSketch"],
-        ["PartDesign_Body", "PartDesignWorkbench", "small", "New Body", "PartDesign_Body"]
-      ]},
-      {"name": "Fusion Create_newPanel", "title": "CREATE", "commands": [
-        ["PartDesign_Pad", "PartDesignWorkbench", "large", "Extrude", "PartDesign_Pad"],
-        ["PartDesign_Pocket", "PartDesignWorkbench", "large", "Cut", "PartDesign_Pocket"],
-        ["PartDesign_Revolution", "PartDesignWorkbench", "large", "Revolve", "PartDesign_Revolution"],
-        ["PartDesign_Hole", "PartDesignWorkbench", "large", "Hole", "PartDesign_Hole"],
-        ["PartDesign_AdditivePipe", "PartDesignWorkbench", "small", "Sweep", "PartDesign_AdditivePipe"],
-        ["PartDesign_AdditiveLoft", "PartDesignWorkbench", "small", "Loft", "PartDesign_AdditiveLoft"],
-        ["Fusion_Pattern_ddb", "General", "small", "Pattern", "PartDesign_LinearPattern"],
-        ["Fusion_MoreCreate_ddb", "General", "small", "More", "PartDesign_CompPrimitiveAdditive"]
-      ]},
-      {"name": "Fusion Modify_newPanel", "title": "MODIFY", "commands": [
-        ["PartDesign_Fillet", "PartDesignWorkbench", "large", "Fillet", "PartDesign_Fillet"],
-        ["PartDesign_Chamfer", "PartDesignWorkbench", "large", "Chamfer", "PartDesign_Chamfer"],
-        ["PartDesign_Thickness", "PartDesignWorkbench", "large", "Shell", "PartDesign_Thickness"],
-        ["PartDesign_Draft", "PartDesignWorkbench", "small", "Draft", "PartDesign_Draft"],
-        ["PartDesign_Boolean", "PartDesignWorkbench", "small", "Combine", "PartDesign_Boolean"]
-      ]},
-      {"name": "Fusion Construct_newPanel", "title": "CONSTRUCT", "commands": [
-        ["PartDesign_Plane", "PartDesignWorkbench", "large", "Plane", "PartDesign_Plane"],
-        ["PartDesign_SubShapeBinder", "PartDesignWorkbench", "large", "Linked Geometry", "PartDesign_SubShapeBinder"],
-        ["PartDesign_Line", "PartDesignWorkbench", "small", "Axis", "PartDesign_Line"],
-        ["PartDesign_Point", "PartDesignWorkbench", "small", "Point", "PartDesign_Point"],
-        ["PartDesign_CoordinateSystem", "PartDesignWorkbench", "small", "Coordinate System", "PartDesign_CoordinateSystem"]
-      ]},
-      {"name": "Fusion Parameters_newPanel", "title": "PARAMETERS", "commands": [
-        ["FusionMyFreeCAD_ParameterTable", "General", "large", "Parameter Table", "Spreadsheet"]
-      ]},
-      {"name": "Fusion Frequent_newPanel", "title": "FREQUENT", "commands": [
-        ["PartDesign_Revolution", "PartDesignWorkbench", "large", "Revolve", "PartDesign_Revolution"],
-        ["PartDesign_Mirrored", "PartDesignWorkbench", "large", "Mirror", "PartDesign_Mirrored"],
-        ["PartDesign_Plane", "PartDesignWorkbench", "small", "Plane", "PartDesign_Plane"],
-        ["Std_Measure", "Global", "small", "Measure", "Std_Measure"]
-      ]},
-      {"name": "Fusion Inspect_newPanel", "title": "INSPECT", "commands": [
-        ["Std_Measure", "Global", "large", "Measure", "Std_Measure"],
-        ["Part_CheckGeometry", "PartWorkbench", "small", "Check Geometry", "Part_CheckGeometry"],
-        ["Std_ViewFitAll", "Global", "small", "Fit All", "Std_ViewFitAll"],
-        ["FusionMyFreeCAD_Verify", "General", "small", "Verify UI", "Std_DlgParameter"],
-        ["FusionMyFreeCAD_Restore", "General", "small", "Restore UI", "Std_DlgCustomize"]
-      ]}
+      {
+        "name": "Fusion Sketch Entry_newPanel",
+        "title": "SKETCH",
+        "commands": [
+          [
+            "FusionMyFreeCAD_CreateSketch",
+            "General",
+            "large",
+            "Create Sketch",
+            "Sketcher_NewSketch"
+          ],
+          [
+            "PartDesign_Body",
+            "PartDesignWorkbench",
+            "small",
+            "New Body",
+            "PartDesign_Body"
+          ]
+        ],
+        "overflow": [
+          [
+            "PartDesign_NewSketch",
+            "PartDesignWorkbench",
+            "small",
+            "New Sketch",
+            "Sketcher_NewSketch"
+          ],
+          [
+            "Sketcher_EditSketch",
+            "SketcherWorkbench",
+            "small",
+            "Edit Sketch",
+            "Sketcher_EditSketch"
+          ],
+          [
+            "Sketcher_MapSketch",
+            "SketcherWorkbench",
+            "small",
+            "Map Sketch",
+            "Sketcher_MapSketch"
+          ],
+          [
+            "Sketcher_ReorientSketch",
+            "SketcherWorkbench",
+            "small",
+            "Reorient Sketch",
+            "Sketcher_ReorientSketch"
+          ],
+          [
+            "Sketcher_ValidateSketch",
+            "SketcherWorkbench",
+            "small",
+            "Validate Sketch",
+            "Sketcher_ValidateSketch"
+          ],
+          [
+            "Sketcher_MergeSketches",
+            "SketcherWorkbench",
+            "small",
+            "Merge Sketches",
+            "Sketcher_MergeSketch"
+          ],
+          [
+            "Sketcher_MirrorSketch",
+            "SketcherWorkbench",
+            "small",
+            "Mirror Sketch",
+            "Sketcher_MirrorSketch"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Create_newPanel",
+        "title": "CREATE",
+        "commands": [
+          [
+            "PartDesign_Pad",
+            "PartDesignWorkbench",
+            "large",
+            "Extrude",
+            "PartDesign_Pad"
+          ],
+          [
+            "PartDesign_Pocket",
+            "PartDesignWorkbench",
+            "large",
+            "Cut",
+            "PartDesign_Pocket"
+          ],
+          [
+            "PartDesign_Revolution",
+            "PartDesignWorkbench",
+            "large",
+            "Revolve",
+            "PartDesign_Revolution"
+          ],
+          [
+            "PartDesign_Hole",
+            "PartDesignWorkbench",
+            "large",
+            "Hole",
+            "PartDesign_Hole"
+          ],
+          [
+            "PartDesign_AdditivePipe",
+            "PartDesignWorkbench",
+            "small",
+            "Sweep",
+            "PartDesign_AdditivePipe"
+          ],
+          [
+            "PartDesign_AdditiveLoft",
+            "PartDesignWorkbench",
+            "small",
+            "Loft",
+            "PartDesign_AdditiveLoft"
+          ],
+          [
+            "Fusion_Pattern_ddb",
+            "General",
+            "small",
+            "Pattern",
+            "PartDesign_LinearPattern"
+          ],
+          [
+            "Fusion_MoreCreate_ddb",
+            "General",
+            "small",
+            "More",
+            "PartDesign_AdditiveBox"
+          ]
+        ],
+        "overflow": [
+          [
+            "PartDesign_AdditiveHelix",
+            "PartDesignWorkbench",
+            "small",
+            "Additive Helix",
+            "PartDesign_AdditiveHelix"
+          ],
+          [
+            "PartDesign_Groove",
+            "PartDesignWorkbench",
+            "small",
+            "Groove",
+            "PartDesign_Groove"
+          ],
+          [
+            "PartDesign_SubtractiveLoft",
+            "PartDesignWorkbench",
+            "small",
+            "Subtractive Loft",
+            "PartDesign_SubtractiveLoft"
+          ],
+          [
+            "PartDesign_SubtractivePipe",
+            "PartDesignWorkbench",
+            "small",
+            "Subtractive Sweep",
+            "PartDesign_SubtractivePipe"
+          ],
+          [
+            "PartDesign_SubtractiveHelix",
+            "PartDesignWorkbench",
+            "small",
+            "Subtractive Helix",
+            "PartDesign_SubtractiveHelix"
+          ],
+          [
+            "PartDesign_CompPrimitiveSubtractive",
+            "PartDesignWorkbench",
+            "small",
+            "Subtractive Primitive",
+            "PartDesign_SubtractiveBox"
+          ],
+          [
+            "PartDesign_ShapeBinder",
+            "PartDesignWorkbench",
+            "small",
+            "Shape Binder",
+            "PartDesign_ShapeBinder"
+          ],
+          [
+            "PartDesign_Clone",
+            "PartDesignWorkbench",
+            "small",
+            "Clone",
+            "PartDesign_Clone"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Modify_newPanel",
+        "title": "MODIFY",
+        "commands": [
+          [
+            "PartDesign_Fillet",
+            "PartDesignWorkbench",
+            "large",
+            "Fillet",
+            "PartDesign_Fillet"
+          ],
+          [
+            "PartDesign_Chamfer",
+            "PartDesignWorkbench",
+            "large",
+            "Chamfer",
+            "PartDesign_Chamfer"
+          ],
+          [
+            "PartDesign_Thickness",
+            "PartDesignWorkbench",
+            "large",
+            "Shell",
+            "PartDesign_Thickness"
+          ],
+          [
+            "PartDesign_Draft",
+            "PartDesignWorkbench",
+            "small",
+            "Draft",
+            "PartDesign_Draft"
+          ],
+          [
+            "PartDesign_Boolean",
+            "PartDesignWorkbench",
+            "small",
+            "Combine",
+            "PartDesign_Boolean"
+          ]
+        ],
+        "overflow": [
+          [
+            "PartDesign_Scaled",
+            "PartDesignWorkbench",
+            "small",
+            "Scaled Pattern",
+            "PartDesign_Scaled"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Construct_newPanel",
+        "title": "CONSTRUCT",
+        "commands": [
+          [
+            "PartDesign_Plane",
+            "PartDesignWorkbench",
+            "large",
+            "Plane",
+            "PartDesign_Plane"
+          ],
+          [
+            "PartDesign_SubShapeBinder",
+            "PartDesignWorkbench",
+            "large",
+            "Linked Geometry",
+            "PartDesign_SubShapeBinder"
+          ],
+          [
+            "PartDesign_Line",
+            "PartDesignWorkbench",
+            "small",
+            "Axis",
+            "PartDesign_Line"
+          ],
+          [
+            "PartDesign_Point",
+            "PartDesignWorkbench",
+            "small",
+            "Point",
+            "PartDesign_Point"
+          ],
+          [
+            "PartDesign_CoordinateSystem",
+            "PartDesignWorkbench",
+            "small",
+            "Coordinate System",
+            "PartDesign_CoordinateSystem"
+          ]
+        ],
+        "overflow": [
+          [
+            "PartDesign_ShapeBinder",
+            "PartDesignWorkbench",
+            "small",
+            "Shape Binder",
+            "PartDesign_ShapeBinder"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Parameters_newPanel",
+        "title": "PARAMETERS",
+        "commands": [
+          [
+            "FusionMyFreeCAD_ParameterTable",
+            "General",
+            "large",
+            "Parameter Table",
+            "Spreadsheet"
+          ]
+        ],
+        "overflow": []
+      },
+      {
+        "name": "Fusion Frequent_newPanel",
+        "title": "FREQUENT",
+        "commands": [
+          [
+            "PartDesign_Revolution",
+            "PartDesignWorkbench",
+            "large",
+            "Revolve",
+            "PartDesign_Revolution"
+          ],
+          [
+            "PartDesign_Mirrored",
+            "PartDesignWorkbench",
+            "large",
+            "Mirror",
+            "PartDesign_Mirrored"
+          ],
+          [
+            "PartDesign_Plane",
+            "PartDesignWorkbench",
+            "small",
+            "Plane",
+            "PartDesign_Plane"
+          ],
+          [
+            "Std_Measure",
+            "Global",
+            "small",
+            "Measure",
+            "umf-measurement"
+          ]
+        ],
+        "overflow": []
+      },
+      {
+        "name": "Fusion Inspect_newPanel",
+        "title": "INSPECT",
+        "commands": [
+          [
+            "Std_Measure",
+            "Global",
+            "large",
+            "Measure",
+            "umf-measurement"
+          ],
+          [
+            "Part_CheckGeometry",
+            "PartWorkbench",
+            "small",
+            "Check Geometry",
+            "Part_CheckGeometry"
+          ],
+          [
+            "Std_ViewFitAll",
+            "Global",
+            "small",
+            "Fit All",
+            "zoom-all"
+          ],
+          [
+            "FusionMyFreeCAD_Verify",
+            "General",
+            "small",
+            "Verify UI",
+            "Std_DlgParameter"
+          ],
+          [
+            "FusionMyFreeCAD_Reapply",
+            "General",
+            "small",
+            "Reapply UI",
+            "Std_DlgParameter"
+          ],
+          [
+            "FusionMyFreeCAD_Restore",
+            "General",
+            "small",
+            "Restore UI",
+            "applications-accessories"
+          ]
+        ],
+        "overflow": []
+      }
     ],
     "PartWorkbench": [
-      {"name": "Fusion Part Create_newPanel", "title": "CREATE / IMPORT", "commands": [
-        ["Part_Primitives", "PartWorkbench", "large", "Primitive", "Part_Primitives"],
-        ["Part_ShapeFromMesh", "PartWorkbench", "small", "Shape from Mesh", "Part_ShapeFromMesh"],
-        ["Part_MakeSolid", "PartWorkbench", "small", "Make Solid", "Part_MakeSolid"]
-      ]},
-      {"name": "Fusion Part Boolean_newPanel", "title": "BOOLEAN", "commands": [
-        ["Part_Fuse", "PartWorkbench", "large", "Union", "Part_Fuse"],
-        ["Part_Cut", "PartWorkbench", "large", "Subtract", "Part_Cut"],
-        ["Part_Common", "PartWorkbench", "small", "Intersect", "Part_Common"],
-        ["Part_BooleanFragments", "PartWorkbench", "large", "All Fragments", "Part_BooleanFragments"]
-      ]},
-      {"name": "Fusion Part Split_newPanel", "title": "SPLIT", "commands": [
-        ["Part_SliceApart", "PartWorkbench", "large", "Slice Apart", "Part_SliceApart"],
-        ["Part_Slice", "PartWorkbench", "small", "Slice to Compound", "Part_Slice"],
-        ["Part_ExplodeCompound", "PartWorkbench", "small", "Explode Compound", "Part_ExplodeCompound"]
-      ]},
-      {"name": "Fusion Part Repair_newPanel", "title": "REPAIR", "commands": [
-        ["Part_RefineShape", "PartWorkbench", "large", "Clean Edges", "Part_Refine_Shape"],
-        ["Part_Defeaturing", "PartWorkbench", "large", "Remove Features", "Part_Defeaturing"],
-        ["Part_CheckGeometry", "PartWorkbench", "large", "Check Geometry", "Part_CheckGeometry"]
-      ]},
-      {"name": "Fusion Part Frequent_newPanel", "title": "FREQUENT", "commands": [
-        ["Part_BooleanFragments", "PartWorkbench", "large", "All Fragments", "Part_BooleanFragments"],
-        ["Part_RefineShape", "PartWorkbench", "large", "Clean Edges", "Part_Refine_Shape"],
-        ["Part_Defeaturing", "PartWorkbench", "small", "Remove Features", "Part_Defeaturing"],
-        ["Part_CheckGeometry", "PartWorkbench", "small", "Check Geometry", "Part_CheckGeometry"]
-      ]},
-      {"name": "Fusion Part Inspect_newPanel", "title": "INSPECT", "commands": [
-        ["Std_Measure", "Global", "large", "Measure", "Std_Measure"],
-        ["Part_CheckGeometry", "PartWorkbench", "large", "Check Geometry", "Part_CheckGeometry"],
-        ["Std_ViewFitAll", "Global", "small", "Fit All", "Std_ViewFitAll"]
-      ]}
+      {
+        "name": "Fusion Part Create_newPanel",
+        "title": "CREATE / IMPORT",
+        "commands": [
+          [
+            "Part_Primitives",
+            "PartWorkbench",
+            "large",
+            "Primitive",
+            "Part_Primitives"
+          ],
+          [
+            "Part_ShapeFromMesh",
+            "PartWorkbench",
+            "small",
+            "Shape from Mesh",
+            "Part_Shape_from_Mesh"
+          ],
+          [
+            "Part_MakeSolid",
+            "PartWorkbench",
+            "small",
+            "Make Solid",
+            "Part_MakeSolid"
+          ]
+        ],
+        "overflow": [
+          [
+            "Part_Box",
+            "PartWorkbench",
+            "small",
+            "Box",
+            "Part_Box_Parametric"
+          ],
+          [
+            "Part_Cylinder",
+            "PartWorkbench",
+            "small",
+            "Cylinder",
+            "Part_Cylinder_Parametric"
+          ],
+          [
+            "Part_Sphere",
+            "PartWorkbench",
+            "small",
+            "Sphere",
+            "Part_Sphere_Parametric"
+          ],
+          [
+            "Part_Cone",
+            "PartWorkbench",
+            "small",
+            "Cone",
+            "Part_Cone_Parametric"
+          ],
+          [
+            "Part_Torus",
+            "PartWorkbench",
+            "small",
+            "Torus",
+            "Part_Torus_Parametric"
+          ],
+          [
+            "Part_Builder",
+            "PartWorkbench",
+            "small",
+            "Shape Builder",
+            "Part_Shapebuilder"
+          ],
+          [
+            "Part_PointsFromMesh",
+            "PartWorkbench",
+            "small",
+            "Points from Mesh",
+            "Part_PointsFromMesh"
+          ],
+          [
+            "Part_ReverseShape",
+            "PartWorkbench",
+            "small",
+            "Reverse Shape",
+            "Part_Reverse_Shape"
+          ],
+          [
+            "Sketcher_NewSketch",
+            "SketcherWorkbench",
+            "small",
+            "New Sketch",
+            "Sketcher_NewSketch"
+          ],
+          [
+            "Part_Extrude",
+            "PartWorkbench",
+            "small",
+            "Extrude",
+            "Part_Extrude"
+          ],
+          [
+            "Part_Revolve",
+            "PartWorkbench",
+            "small",
+            "Revolve",
+            "Part_Revolve"
+          ],
+          [
+            "Part_Loft",
+            "PartWorkbench",
+            "small",
+            "Loft",
+            "Part_Loft"
+          ],
+          [
+            "Part_Sweep",
+            "PartWorkbench",
+            "small",
+            "Sweep",
+            "Part_Sweep"
+          ],
+          [
+            "Part_MakeFace",
+            "PartWorkbench",
+            "small",
+            "Make Face",
+            "Part_MakeFace"
+          ],
+          [
+            "Part_RuledSurface",
+            "PartWorkbench",
+            "small",
+            "Ruled Surface",
+            "Part_RuledSurface"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Part Boolean_newPanel",
+        "title": "BOOLEAN",
+        "commands": [
+          [
+            "Part_Fuse",
+            "PartWorkbench",
+            "large",
+            "Union",
+            "Part_Fuse"
+          ],
+          [
+            "Part_Cut",
+            "PartWorkbench",
+            "large",
+            "Subtract",
+            "Part_Cut"
+          ],
+          [
+            "Part_Common",
+            "PartWorkbench",
+            "small",
+            "Intersect",
+            "Part_Common"
+          ],
+          [
+            "Part_BooleanFragments",
+            "PartWorkbench",
+            "large",
+            "All Fragments",
+            "Part_BooleanFragments"
+          ]
+        ],
+        "overflow": [
+          [
+            "Part_Boolean",
+            "PartWorkbench",
+            "small",
+            "Boolean",
+            "Part_Booleans"
+          ],
+          [
+            "Part_CompJoinFeatures",
+            "PartWorkbench",
+            "small",
+            "Join",
+            "Part_JoinConnect"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Part Split_newPanel",
+        "title": "SPLIT",
+        "commands": [
+          [
+            "Part_SliceApart",
+            "PartWorkbench",
+            "large",
+            "Slice Apart",
+            "Part_SliceApart"
+          ],
+          [
+            "Part_Slice",
+            "PartWorkbench",
+            "small",
+            "Slice to Compound",
+            "Part_Slice"
+          ],
+          [
+            "Part_ExplodeCompound",
+            "PartWorkbench",
+            "small",
+            "Explode Compound",
+            "Part_ExplodeCompound"
+          ]
+        ],
+        "overflow": [
+          [
+            "Part_XOR",
+            "PartWorkbench",
+            "small",
+            "XOR",
+            "Part_XOR"
+          ],
+          [
+            "Part_Compound",
+            "PartWorkbench",
+            "small",
+            "Compound",
+            "Part_Compound"
+          ],
+          [
+            "Part_CompoundFilter",
+            "PartWorkbench",
+            "small",
+            "Compound Filter",
+            "Part_CompoundFilter"
+          ],
+          [
+            "Part_ToleranceSet",
+            "PartWorkbench",
+            "small",
+            "Set Tolerance",
+            "preferences-part_design"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Part Repair_newPanel",
+        "title": "REPAIR",
+        "commands": [
+          [
+            "Part_RefineShape",
+            "PartWorkbench",
+            "large",
+            "Clean Edges",
+            "Part_Refine_Shape"
+          ],
+          [
+            "Part_Defeaturing",
+            "PartWorkbench",
+            "large",
+            "Remove Features",
+            "Part_Defeaturing"
+          ],
+          [
+            "Part_CheckGeometry",
+            "PartWorkbench",
+            "large",
+            "Check Geometry",
+            "Part_CheckGeometry"
+          ]
+        ],
+        "overflow": [
+          [
+            "Part_SimpleCopy",
+            "PartWorkbench",
+            "small",
+            "Simple Copy",
+            "Part_3D_object"
+          ],
+          [
+            "Part_TransformedCopy",
+            "PartWorkbench",
+            "small",
+            "Transformed Copy",
+            "Part_Transformed_Copy"
+          ],
+          [
+            "Part_ElementCopy",
+            "PartWorkbench",
+            "small",
+            "Element Copy",
+            "Part_Element_Copy"
+          ],
+          [
+            "Part_Mirror",
+            "PartWorkbench",
+            "small",
+            "Mirror",
+            "Part_Mirror"
+          ],
+          [
+            "Part_Scale",
+            "PartWorkbench",
+            "small",
+            "Scale",
+            "Part_Scale"
+          ],
+          [
+            "Part_Fillet",
+            "PartWorkbench",
+            "small",
+            "Fillet",
+            "Part_Fillet"
+          ],
+          [
+            "Part_Chamfer",
+            "PartWorkbench",
+            "small",
+            "Chamfer",
+            "Part_Chamfer"
+          ],
+          [
+            "Part_Section",
+            "PartWorkbench",
+            "small",
+            "Section",
+            "Part_Section"
+          ],
+          [
+            "Part_CrossSections",
+            "PartWorkbench",
+            "small",
+            "Cross Sections",
+            "Part_CrossSections"
+          ],
+          [
+            "Part_CompOffset",
+            "PartWorkbench",
+            "small",
+            "Offset",
+            "Part_Offset"
+          ],
+          [
+            "Part_Thickness",
+            "PartWorkbench",
+            "small",
+            "Thickness",
+            "Part_Thickness"
+          ],
+          [
+            "Part_ProjectionOnSurface",
+            "PartWorkbench",
+            "small",
+            "Project on Surface",
+            "Part_ProjectionOnSurface"
+          ],
+          [
+            "Part_SectionCut",
+            "PartWorkbench",
+            "small",
+            "Section Cut",
+            "Part_SectionCut"
+          ],
+          [
+            "Part_ColorPerFace",
+            "PartWorkbench",
+            "small",
+            "Color per Face",
+            "Part_ColorFace"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Part Frequent_newPanel",
+        "title": "FREQUENT",
+        "commands": [
+          [
+            "Part_BooleanFragments",
+            "PartWorkbench",
+            "large",
+            "All Fragments",
+            "Part_BooleanFragments"
+          ],
+          [
+            "Part_RefineShape",
+            "PartWorkbench",
+            "large",
+            "Clean Edges",
+            "Part_Refine_Shape"
+          ],
+          [
+            "Part_Defeaturing",
+            "PartWorkbench",
+            "small",
+            "Remove Features",
+            "Part_Defeaturing"
+          ],
+          [
+            "Part_CheckGeometry",
+            "PartWorkbench",
+            "small",
+            "Check Geometry",
+            "Part_CheckGeometry"
+          ]
+        ],
+        "overflow": []
+      },
+      {
+        "name": "Fusion Part Inspect_newPanel",
+        "title": "INSPECT",
+        "commands": [
+          [
+            "Std_Measure",
+            "Global",
+            "large",
+            "Measure",
+            "umf-measurement"
+          ],
+          [
+            "Part_CheckGeometry",
+            "PartWorkbench",
+            "large",
+            "Check Geometry",
+            "Part_CheckGeometry"
+          ],
+          [
+            "Std_ViewFitAll",
+            "Global",
+            "small",
+            "Fit All",
+            "zoom-all"
+          ]
+        ],
+        "overflow": []
+      }
     ],
     "SketcherWorkbench": [
-      {"name": "Fusion Sketch Create_newPanel", "title": "CREATE", "commands": [
-        ["Sketcher_CreateLine", "SketcherWorkbench", "large", "Line", "Sketcher_CreateLine"],
-        ["Sketcher_CreateRectangle_Center", "SketcherWorkbench", "large", "Centered Rectangle", "Sketcher_CreateRectangle_Center"],
-        ["Sketcher_CreateRectangle", "SketcherWorkbench", "small", "Corner Rectangle", "Sketcher_CreateRectangle"],
-        ["Sketcher_CompCreateConic", "SketcherWorkbench", "large", "Circle", "Sketcher_CreateCircle"],
-        ["Sketcher_CreateArc", "SketcherWorkbench", "small", "Arc", "Sketcher_CreateArc"],
-        ["Sketcher_CreateSlot", "SketcherWorkbench", "small", "Slot", "Sketcher_CreateSlot"],
-        ["Sketcher_CreatePolyline", "SketcherWorkbench", "large", "Polyline", "Sketcher_CreatePolyline"],
-        ["Sketcher_CreateBSpline", "SketcherWorkbench", "small", "Spline", "Sketcher_CreateBSpline"],
-        ["Fusion_MoreSketchCreate_ddb", "General", "small", "More", "Sketcher_CreateBSpline"]
-      ]},
-      {"name": "Fusion Sketch Modify_newPanel", "title": "MODIFY", "commands": [
-        ["Sketcher_CompCreateFillets", "SketcherWorkbench", "large", "Fillet", "Sketcher_CreateFillet"],
-        ["Sketcher_Trimming", "SketcherWorkbench", "large", "Trim", "Sketcher_Trimming"],
-        ["Sketcher_Extend", "SketcherWorkbench", "small", "Extend", "Sketcher_Extend"],
-        ["Sketcher_Offset", "SketcherWorkbench", "large", "Offset", "Sketcher_Offset"],
-        ["Sketcher_Symmetry", "SketcherWorkbench", "large", "Mirror", "Sketcher_Symmetry"],
-        ["Sketcher_RectangularArray", "SketcherWorkbench", "small", "Pattern", "Sketcher_RectangularArray"],
-        ["Sketcher_Translate", "SketcherWorkbench", "large", "Move", "Sketcher_Translate"],
-        ["Sketcher_Rotate", "SketcherWorkbench", "small", "Rotate", "Sketcher_Rotate"]
-      ]},
-      {"name": "Fusion Sketch Constraints_newPanel", "title": "CONSTRAINTS", "commands": [
-        ["Sketcher_Dimension", "SketcherWorkbench", "large", "Smart Dimension", "Sketcher_Dimension"],
-        ["Sketcher_ConstrainHorVer", "SketcherWorkbench", "small", "Horizontal / Vertical", "Sketcher_ConstrainHorVer"],
-        ["Sketcher_ConstrainCoincident", "SketcherWorkbench", "small", "Coincident", "Sketcher_ConstrainCoincident"],
-        ["Sketcher_ConstrainTangent", "SketcherWorkbench", "small", "Tangent", "Sketcher_ConstrainTangent"],
-        ["Sketcher_ConstrainEqual", "SketcherWorkbench", "small", "Equal", "Sketcher_ConstrainEqual"],
-        ["Sketcher_ConstrainParallel", "SketcherWorkbench", "small", "Parallel", "Sketcher_ConstrainParallel"],
-        ["Sketcher_ConstrainPerpendicular", "SketcherWorkbench", "small", "Perpendicular", "Sketcher_ConstrainPerpendicular"],
-        ["Fusion_MoreConstraints_ddb", "General", "small", "More", "Sketcher_CompConstrainTools"]
-      ]},
-      {"name": "Fusion Sketch Configure_newPanel", "title": "CONFIGURE", "commands": [
-        ["Sketcher_ToggleConstruction", "SketcherWorkbench", "large", "Construction", "Sketcher_ToggleConstruction"]
-      ]},
-      {"name": "Fusion Sketch Inspect_newPanel", "title": "INSPECT", "commands": [
-        ["Sketcher_SelectElementsWithDoFs", "SketcherWorkbench", "large", "Under-Constrained", "Sketcher_SelectElementsWithDoFs"],
-        ["Sketcher_SelectRedundantConstraints", "SketcherWorkbench", "small", "Redundant", "Sketcher_SelectRedundantConstraints"],
-        ["Sketcher_SelectConflictingConstraints", "SketcherWorkbench", "small", "Conflicts", "Sketcher_SelectConflictingConstraints"]
-      ]},
-      {"name": "Fusion Sketch Insert_newPanel", "title": "INSERT", "commands": [
-        ["Sketcher_CompExternal", "SketcherWorkbench", "large", "Project / Include", "Sketcher_Projection"],
-        ["Sketcher_CarbonCopy", "SketcherWorkbench", "small", "Carbon Copy", "Sketcher_CarbonCopy"]
-      ]},
-      {"name": "Fusion Sketch Select_newPanel", "title": "SELECT", "commands": [
-        ["Sketcher_SelectConstraints", "SketcherWorkbench", "large", "Constraints", "Sketcher_SelectConstraints"],
-        ["Sketcher_SelectElementsAssociatedWithConstraints", "SketcherWorkbench", "small", "Related Geometry", "Sketcher_SelectElementsAssociatedWithConstraints"]
-      ]},
-      {"name": "Fusion Finish_newPanel", "title": "SKETCH", "commands": [
-        ["Sketcher_LeaveSketch", "SketcherWorkbench", "large", "Finish Sketch", "Sketcher_LeaveSketch"]
-      ]}
+      {
+        "name": "Fusion Sketch Create_newPanel",
+        "title": "CREATE",
+        "commands": [
+          [
+            "Sketcher_CreateLine",
+            "SketcherWorkbench",
+            "large",
+            "Line",
+            "Sketcher_CreateLine"
+          ],
+          [
+            "Sketcher_CreateRectangle_Center",
+            "SketcherWorkbench",
+            "large",
+            "Centered Rectangle",
+            "Sketcher_CreateRectangle_Center"
+          ],
+          [
+            "Sketcher_CreateRectangle",
+            "SketcherWorkbench",
+            "small",
+            "Corner Rectangle",
+            "Sketcher_CreateRectangle"
+          ],
+          [
+            "Sketcher_CompCreateConic",
+            "SketcherWorkbench",
+            "large",
+            "Circle",
+            "Sketcher_CreateCircle"
+          ],
+          [
+            "Sketcher_CreateArc",
+            "SketcherWorkbench",
+            "small",
+            "Arc",
+            "Sketcher_CreateArc"
+          ],
+          [
+            "Sketcher_CreateSlot",
+            "SketcherWorkbench",
+            "small",
+            "Slot",
+            "Sketcher_CreateSlot"
+          ],
+          [
+            "Sketcher_CreatePolyline",
+            "SketcherWorkbench",
+            "large",
+            "Polyline",
+            "Sketcher_CreatePolyline"
+          ],
+          [
+            "Sketcher_CreateBSpline",
+            "SketcherWorkbench",
+            "small",
+            "Spline",
+            "Sketcher_CreateBSpline"
+          ],
+          [
+            "Fusion_MoreSketchCreate_ddb",
+            "General",
+            "small",
+            "More",
+            "Sketcher_CreateBSpline"
+          ]
+        ],
+        "overflow": [
+          [
+            "Sketcher_CompLine",
+            "SketcherWorkbench",
+            "small",
+            "Lines",
+            "Sketcher_CreateLine"
+          ],
+          [
+            "Sketcher_CompCreateRectangles",
+            "SketcherWorkbench",
+            "small",
+            "Rectangles",
+            "Sketcher_CreateRectangle"
+          ],
+          [
+            "Sketcher_CompSlot",
+            "SketcherWorkbench",
+            "small",
+            "Slots",
+            "Sketcher_CreateSlot"
+          ],
+          [
+            "Sketcher_CompCreateBSpline",
+            "SketcherWorkbench",
+            "small",
+            "B-Splines",
+            "Sketcher_CreateBSpline"
+          ],
+          [
+            "Sketcher_CreatePoint",
+            "SketcherWorkbench",
+            "small",
+            "Point",
+            "Sketcher_CreatePoint"
+          ],
+          [
+            "Sketcher_CreateText",
+            "SketcherWorkbench",
+            "small",
+            "Text",
+            "Sketcher_CreateText"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Sketch Modify_newPanel",
+        "title": "MODIFY",
+        "commands": [
+          [
+            "Sketcher_CompCreateFillets",
+            "SketcherWorkbench",
+            "large",
+            "Fillet",
+            "Sketcher_CreateFillet"
+          ],
+          [
+            "Sketcher_Trimming",
+            "SketcherWorkbench",
+            "large",
+            "Trim",
+            "Sketcher_Trimming"
+          ],
+          [
+            "Sketcher_Extend",
+            "SketcherWorkbench",
+            "small",
+            "Extend",
+            "Sketcher_Extend"
+          ],
+          [
+            "Sketcher_Offset",
+            "SketcherWorkbench",
+            "large",
+            "Offset",
+            "Sketcher_Offset"
+          ],
+          [
+            "Sketcher_Symmetry",
+            "SketcherWorkbench",
+            "large",
+            "Mirror",
+            "Sketcher_Symmetry"
+          ],
+          [
+            "Sketcher_RectangularArray",
+            "SketcherWorkbench",
+            "small",
+            "Pattern",
+            "Sketcher_RectangularArray"
+          ],
+          [
+            "Sketcher_Translate",
+            "SketcherWorkbench",
+            "large",
+            "Move",
+            "Sketcher_Translate"
+          ],
+          [
+            "Sketcher_Rotate",
+            "SketcherWorkbench",
+            "small",
+            "Rotate",
+            "Sketcher_Rotate"
+          ]
+        ],
+        "overflow": [
+          [
+            "Sketcher_CompCurveEdition",
+            "SketcherWorkbench",
+            "small",
+            "Trim / Extend / Split",
+            "Sketcher_Trimming"
+          ],
+          [
+            "Sketcher_Scale",
+            "SketcherWorkbench",
+            "small",
+            "Scale",
+            "Sketcher_Scale"
+          ],
+          [
+            "Sketcher_RemoveAxesAlignment",
+            "SketcherWorkbench",
+            "small",
+            "Remove Axes Alignment",
+            "Sketcher_RemoveAxesAlignment"
+          ],
+          [
+            "Sketcher_DeleteAllGeometry",
+            "SketcherWorkbench",
+            "small",
+            "Delete All Geometry",
+            "Sketcher_DeleteGeometry"
+          ],
+          [
+            "Sketcher_DeleteAllConstraints",
+            "SketcherWorkbench",
+            "small",
+            "Delete All Constraints",
+            "Sketcher_DeleteConstraints"
+          ],
+          [
+            "Sketcher_CopyClipboard",
+            "SketcherWorkbench",
+            "small",
+            "Copy",
+            "edit-copy"
+          ],
+          [
+            "Sketcher_Cut",
+            "SketcherWorkbench",
+            "small",
+            "Cut",
+            "edit-cut"
+          ],
+          [
+            "Sketcher_Paste",
+            "SketcherWorkbench",
+            "small",
+            "Paste",
+            "edit-paste"
+          ],
+          [
+            "Sketcher_BSplineConvertToNURBS",
+            "SketcherWorkbench",
+            "small",
+            "Convert B-Spline to NURBS",
+            "Sketcher_BSplineConvertToNURBS"
+          ],
+          [
+            "Sketcher_BSplineIncreaseDegree",
+            "SketcherWorkbench",
+            "small",
+            "Increase B-Spline Degree",
+            "Sketcher_BSplineIncreaseDegree"
+          ],
+          [
+            "Sketcher_BSplineDecreaseDegree",
+            "SketcherWorkbench",
+            "small",
+            "Decrease B-Spline Degree",
+            "Sketcher_BSplineDecreaseDegree"
+          ],
+          [
+            "Sketcher_CompModifyKnotMultiplicity",
+            "SketcherWorkbench",
+            "small",
+            "Knot Multiplicity",
+            "Sketcher_BSplineKnotMultiplicity"
+          ],
+          [
+            "Sketcher_BSplineInsertKnot",
+            "SketcherWorkbench",
+            "small",
+            "Insert Knot",
+            "Sketcher_BSplineInsertKnot"
+          ],
+          [
+            "Sketcher_JoinCurves",
+            "SketcherWorkbench",
+            "small",
+            "Join Curves",
+            "Sketcher_JoinCurves"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Sketch Constraints_newPanel",
+        "title": "CONSTRAINTS",
+        "commands": [
+          [
+            "Sketcher_Dimension",
+            "SketcherWorkbench",
+            "large",
+            "Smart Dimension",
+            "Constraint_Dimension"
+          ],
+          [
+            "Sketcher_ConstrainHorVer",
+            "SketcherWorkbench",
+            "small",
+            "Horizontal / Vertical",
+            "Constraint_HorVer"
+          ],
+          [
+            "Sketcher_ConstrainCoincident",
+            "SketcherWorkbench",
+            "small",
+            "Coincident",
+            "Constraint_PointOnPoint"
+          ],
+          [
+            "Sketcher_ConstrainTangent",
+            "SketcherWorkbench",
+            "small",
+            "Tangent",
+            "Constraint_Tangent"
+          ],
+          [
+            "Sketcher_ConstrainEqual",
+            "SketcherWorkbench",
+            "small",
+            "Equal",
+            "Constraint_EqualLength"
+          ],
+          [
+            "Sketcher_ConstrainParallel",
+            "SketcherWorkbench",
+            "small",
+            "Parallel",
+            "Constraint_Parallel"
+          ],
+          [
+            "Sketcher_ConstrainPerpendicular",
+            "SketcherWorkbench",
+            "small",
+            "Perpendicular",
+            "Constraint_Perpendicular"
+          ],
+          [
+            "Fusion_MoreConstraints_ddb",
+            "General",
+            "small",
+            "More",
+            "Constraint_Block"
+          ]
+        ],
+        "overflow": [
+          [
+            "Sketcher_CompDimensionTools",
+            "SketcherWorkbench",
+            "small",
+            "Dimension Tools",
+            "Constraint_Dimension"
+          ],
+          [
+            "Sketcher_CompConstrainTools",
+            "SketcherWorkbench",
+            "small",
+            "Constraint Tools",
+            "Constraint_PointOnPoint"
+          ],
+          [
+            "Sketcher_CompToggleConstraints",
+            "SketcherWorkbench",
+            "small",
+            "Toggle Constraints",
+            "Sketcher_ToggleConstraint"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Sketch Configure_newPanel",
+        "title": "CONFIGURE",
+        "commands": [
+          [
+            "Sketcher_ToggleConstruction",
+            "SketcherWorkbench",
+            "large",
+            "Construction",
+            "Sketcher_ToggleConstruction"
+          ]
+        ],
+        "overflow": [
+          [
+            "Sketcher_ToggleDrivingConstraint",
+            "SketcherWorkbench",
+            "small",
+            "Driving / Reference",
+            "Sketcher_ToggleConstraint"
+          ],
+          [
+            "Sketcher_ToggleActiveConstraint",
+            "SketcherWorkbench",
+            "small",
+            "Activate / Deactivate",
+            "Sketcher_ToggleActiveConstraint"
+          ],
+          [
+            "Sketcher_SwitchVirtualSpace",
+            "SketcherWorkbench",
+            "small",
+            "Virtual Space",
+            "Sketcher_SwitchVirtualSpace"
+          ],
+          [
+            "Sketcher_RestoreInternalAlignmentGeometry",
+            "SketcherWorkbench",
+            "small",
+            "Restore Internal Geometry",
+            "Sketcher_Element_Ellipse_All"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Sketch Inspect_newPanel",
+        "title": "INSPECT",
+        "commands": [
+          [
+            "Sketcher_SelectElementsWithDoFs",
+            "SketcherWorkbench",
+            "large",
+            "Under-Constrained",
+            "Sketcher_SelectElementsWithDoFs"
+          ],
+          [
+            "Sketcher_SelectRedundantConstraints",
+            "SketcherWorkbench",
+            "small",
+            "Redundant",
+            "Sketcher_SelectRedundantConstraints"
+          ],
+          [
+            "Sketcher_SelectConflictingConstraints",
+            "SketcherWorkbench",
+            "small",
+            "Conflicts",
+            "Sketcher_SelectConflictingConstraints"
+          ]
+        ],
+        "overflow": [
+          [
+            "Sketcher_ArcOverlay",
+            "SketcherWorkbench",
+            "small",
+            "Arc Overlay",
+            "Sketcher_ArcOverlay"
+          ],
+          [
+            "Sketcher_CompBSplineShowHideGeometryInformation",
+            "SketcherWorkbench",
+            "small",
+            "B-Spline Information",
+            "Sketcher_BSplineDegree"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Sketch Insert_newPanel",
+        "title": "INSERT",
+        "commands": [
+          [
+            "Sketcher_CompExternal",
+            "SketcherWorkbench",
+            "large",
+            "Project / Include",
+            "Sketcher_Projection"
+          ],
+          [
+            "Sketcher_CarbonCopy",
+            "SketcherWorkbench",
+            "small",
+            "Carbon Copy",
+            "Sketcher_CarbonCopy"
+          ]
+        ],
+        "overflow": [
+          [
+            "Sketcher_Intersection",
+            "SketcherWorkbench",
+            "small",
+            "Intersection",
+            "Sketcher_Intersection"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Sketch Select_newPanel",
+        "title": "SELECT",
+        "commands": [
+          [
+            "Sketcher_SelectConstraints",
+            "SketcherWorkbench",
+            "large",
+            "Constraints",
+            "Sketcher_SelectConstraints"
+          ],
+          [
+            "Sketcher_SelectElementsAssociatedWithConstraints",
+            "SketcherWorkbench",
+            "small",
+            "Related Geometry",
+            "Sketcher_SelectElementsAssociatedWithConstraints"
+          ]
+        ],
+        "overflow": [
+          [
+            "Sketcher_SelectOrigin",
+            "SketcherWorkbench",
+            "small",
+            "Origin",
+            "Sketcher_SelectOrigin"
+          ],
+          [
+            "Sketcher_SelectHorizontalAxis",
+            "SketcherWorkbench",
+            "small",
+            "Horizontal Axis",
+            "Sketcher_SelectHorizontalAxis"
+          ],
+          [
+            "Sketcher_SelectVerticalAxis",
+            "SketcherWorkbench",
+            "small",
+            "Vertical Axis",
+            "Sketcher_SelectVerticalAxis"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Finish_newPanel",
+        "title": "SKETCH",
+        "commands": [
+          [
+            "Sketcher_LeaveSketch",
+            "SketcherWorkbench",
+            "large",
+            "Finish Sketch",
+            "Sketcher_LeaveSketch"
+          ]
+        ],
+        "overflow": [
+          [
+            "Sketcher_CancelSketch",
+            "SketcherWorkbench",
+            "small",
+            "Cancel Sketch",
+            "process-stop"
+          ]
+        ]
+      }
     ],
     "SurfaceWorkbench": [
-      {"name": "Fusion Surface Create_newPanel", "title": "CREATE", "commands": [
-        ["Surface_GeomFillSurface", "SurfaceWorkbench", "large", "Fill Boundary", "Surface_GeomFillSurface"],
-        ["Surface_Sections", "SurfaceWorkbench", "large", "Sections", "Surface_Sections"],
-        ["Surface_Filling", "SurfaceWorkbench", "large", "Fill Surface", "Surface_Filling"],
-        ["Surface_CurveOnMesh", "SurfaceWorkbench", "small", "Curve on Mesh", "Surface_CurveOnMesh"],
-        ["Surface_BlendCurve", "SurfaceWorkbench", "small", "Blend Curve", "Surface_BlendCurve"]
-      ]},
-      {"name": "Fusion Surface Modify_newPanel", "title": "MODIFY", "commands": [
-        ["Surface_ExtendFace", "SurfaceWorkbench", "large", "Extend Face", "Surface_ExtendFace"]
-      ]},
-      {"name": "Fusion Surface Frequent_newPanel", "title": "FREQUENT", "commands": [
-        ["Surface_BlendCurve", "SurfaceWorkbench", "large", "Blend Curve", "Surface_BlendCurve"],
-        ["Surface_Filling", "SurfaceWorkbench", "large", "Fill Surface", "Surface_Filling"],
-        ["Surface_ExtendFace", "SurfaceWorkbench", "large", "Extend Face", "Surface_ExtendFace"],
-        ["Surface_Sections", "SurfaceWorkbench", "small", "Sections", "Surface_Sections"]
-      ]},
-      {"name": "Fusion Surface Inspect_newPanel", "title": "INSPECT", "commands": [
-        ["Std_Measure", "Global", "large", "Measure", "Std_Measure"],
-        ["Part_CheckGeometry", "PartWorkbench", "small", "Check Geometry", "Part_CheckGeometry"],
-        ["FusionMyFreeCAD_Verify", "General", "small", "Verify UI", "Std_DlgParameter"],
-        ["FusionMyFreeCAD_Restore", "General", "small", "Restore UI", "Std_DlgCustomize"]
-      ]}
+      {
+        "name": "Fusion Surface Create_newPanel",
+        "title": "CREATE",
+        "commands": [
+          [
+            "Surface_GeomFillSurface",
+            "SurfaceWorkbench",
+            "large",
+            "Fill Boundary",
+            "Surface_GeomFillSurface"
+          ],
+          [
+            "Surface_Sections",
+            "SurfaceWorkbench",
+            "large",
+            "Sections",
+            "Surface_Sections"
+          ],
+          [
+            "Surface_Filling",
+            "SurfaceWorkbench",
+            "large",
+            "Fill Surface",
+            "Surface_Filling"
+          ],
+          [
+            "Surface_CurveOnMesh",
+            "SurfaceWorkbench",
+            "small",
+            "Curve on Mesh",
+            "Surface_CurveOnMesh"
+          ],
+          [
+            "Surface_BlendCurve",
+            "SurfaceWorkbench",
+            "small",
+            "Blend Curve",
+            "Surface_BlendCurve"
+          ]
+        ],
+        "overflow": []
+      },
+      {
+        "name": "Fusion Surface Modify_newPanel",
+        "title": "MODIFY",
+        "commands": [
+          [
+            "Surface_ExtendFace",
+            "SurfaceWorkbench",
+            "large",
+            "Extend Face",
+            "Surface_ExtendFace"
+          ]
+        ],
+        "overflow": []
+      },
+      {
+        "name": "Fusion Surface Frequent_newPanel",
+        "title": "FREQUENT",
+        "commands": [
+          [
+            "Surface_BlendCurve",
+            "SurfaceWorkbench",
+            "large",
+            "Blend Curve",
+            "Surface_BlendCurve"
+          ],
+          [
+            "Surface_Filling",
+            "SurfaceWorkbench",
+            "large",
+            "Fill Surface",
+            "Surface_Filling"
+          ],
+          [
+            "Surface_ExtendFace",
+            "SurfaceWorkbench",
+            "large",
+            "Extend Face",
+            "Surface_ExtendFace"
+          ],
+          [
+            "Surface_Sections",
+            "SurfaceWorkbench",
+            "small",
+            "Sections",
+            "Surface_Sections"
+          ]
+        ],
+        "overflow": []
+      },
+      {
+        "name": "Fusion Surface Inspect_newPanel",
+        "title": "INSPECT",
+        "commands": [
+          [
+            "Std_Measure",
+            "Global",
+            "large",
+            "Measure",
+            "umf-measurement"
+          ],
+          [
+            "Part_CheckGeometry",
+            "PartWorkbench",
+            "small",
+            "Check Geometry",
+            "Part_CheckGeometry"
+          ],
+          [
+            "FusionMyFreeCAD_Verify",
+            "General",
+            "small",
+            "Verify UI",
+            "Std_DlgParameter"
+          ],
+          [
+            "FusionMyFreeCAD_Reapply",
+            "General",
+            "small",
+            "Reapply UI",
+            "Std_DlgParameter"
+          ],
+          [
+            "FusionMyFreeCAD_Restore",
+            "General",
+            "small",
+            "Restore UI",
+            "applications-accessories"
+          ]
+        ],
+        "overflow": []
+      }
     ]
   }
 }
