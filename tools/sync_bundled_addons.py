@@ -94,6 +94,11 @@ ICON_SOURCE_OVERRIDES = {
 }
 
 
+def canonical_svg_bytes(path: Path) -> bytes:
+    """Return SVG bytes with repository-standard LF line endings."""
+    return path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
 def freecad_icon_sources(freecad_source: Path) -> dict[str, Path]:
     """Find the configured icons in an official FreeCAD source checkout."""
     freecad_source = freecad_source.resolve()
@@ -166,7 +171,7 @@ def sync_ribbon(freecad_source: Path) -> dict[str, Path]:
     icon_destination.mkdir(parents=True, exist_ok=True)
     sources = freecad_icon_sources(freecad_source)
     for name, source_icon in sources.items():
-        shutil.copy2(source_icon, icon_destination / "{}.svg".format(name))
+        (icon_destination / "{}.svg".format(name)).write_bytes(canonical_svg_bytes(source_icon))
     return sources
 
 
@@ -176,7 +181,7 @@ def write_source_icon_manifest(freecad_source: Path, sources: dict[str, Path]) -
     icons = {
         name: {
             "path": source.relative_to(freecad_source).as_posix(),
-            "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+            "sha256": hashlib.sha256(canonical_svg_bytes(source)).hexdigest(),
         }
         for name, source in sorted(sources.items())
     }
