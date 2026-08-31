@@ -24,6 +24,7 @@ PACKAGE_FILES = (
     "tools/RestoreFusionMyFreeCAD.FCMacro",
 )
 PACKAGE_DIRECTORIES = ("Resources", "bundled-addons")
+BINARY_SUFFIXES = {".png", ".qm"}
 
 
 def package_version() -> str:
@@ -55,6 +56,14 @@ def package_sources() -> list[Path]:
     return sorted(set(paths), key=lambda path: path.relative_to(ROOT).as_posix())
 
 
+def package_bytes(source: Path) -> bytes:
+    """Return deterministic contents regardless of the checkout's line endings."""
+    content = source.read_bytes()
+    if source.suffix.lower() not in BINARY_SUFFIXES:
+        content = content.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return content
+
+
 def write_archive(output: Path, sources: list[Path]) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
@@ -63,7 +72,7 @@ def write_archive(output: Path, sources: list[Path]) -> None:
             info = zipfile.ZipInfo(f"{PACKAGE_NAME}/{relative}", date_time=(2026, 8, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o100644 << 16
-            archive.writestr(info, source.read_bytes(), compresslevel=9)
+            archive.writestr(info, package_bytes(source), compresslevel=9)
 
 
 def verify_archive(output: Path, sources: list[Path]) -> None:

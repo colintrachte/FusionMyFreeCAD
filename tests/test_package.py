@@ -322,6 +322,12 @@ def test_build_addon_package_produces_a_loadable_archive(package):
             assert required in names, required
         assert not any(name.endswith(".pyc") for name in names)
         assert not any("__pycache__" in name for name in names)
+        text_entries = [
+            entry
+            for entry in archive.infolist()
+            if Path(entry.filename).suffix.lower() not in builder.BINARY_SUFFIXES
+        ]
+        assert not any(b"\r" in archive.read(entry) for entry in text_entries)
         # The archive must contain exactly one top-level directory.
         assert {name.split("/")[0] for name in names} == {"FusionMyFreeCAD"}
 
