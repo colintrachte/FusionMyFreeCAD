@@ -383,7 +383,9 @@ def test_the_source_icon_list_has_no_stale_entries(layout):
     assert set(verified["icons"]) == used
     directory = BUNDLED / "FreeCAD-Ribbon" / "Resources" / "FreeCAD Icons"
     for name, evidence in verified["icons"].items():
-        actual = hashlib.sha256((directory / (name + ".svg")).read_bytes()).hexdigest()
+        content = (directory / (name + ".svg")).read_bytes()
+        canonical = content.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        actual = hashlib.sha256(canonical).hexdigest()
         assert actual == evidence["sha256"], name
 
 

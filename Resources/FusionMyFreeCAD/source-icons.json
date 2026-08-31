@@ -555,11 +555,11 @@
     },
     "Std_DlgParameter": {
       "path": "src/Gui/Icons/Std_DlgParameter.svg",
-      "sha256": "9cc8b146aa81d183b596d18f2b036dfeeaeccb9e78e29b2cde48b90b769909cf"
+      "sha256": "89c1b91f26ce275fe82b103b6fe0a7df2218e3574ddfd6147c71c4a109b1cfaf"
     },
     "Surface_BlendCurve": {
       "path": "src/Mod/Surface/Gui/Resources/icons/Surface_BlendCurve.svg",
-      "sha256": "500e400d89d281db3fd8f76a00770d0e4dfa4eb05f76dc4e12e14cfb50db3a11"
+      "sha256": "6b6778a02f952322dc594500ed19f37530955a46f7c1d0724c7ec9fe2be7c906"
     },
     "Surface_CurveOnMesh": {
       "path": "src/Mod/Surface/Gui/Resources/icons/Surface_CurveOnMesh.svg",
@@ -583,19 +583,19 @@
     },
     "applications-accessories": {
       "path": "src/Gui/Icons/applications-accessories.svg",
-      "sha256": "fae7e7437be399af22263d33a84a97283e543837ba5bae0b26074c2577b5be17"
+      "sha256": "45031b8f0de1adb58e8aea79639b1dd1dfd0b39e568aa1e6e0c2b0c89851fe9f"
     },
     "edit-copy": {
       "path": "src/Gui/Icons/edit-copy.svg",
-      "sha256": "ae56172ab4766da6d8273be6b83978a159f0589361dd5bebd865e99d9fa0cafd"
+      "sha256": "51b883fafffe4a50108c764d48a268f06ad812861d40013815968f5817f050de"
     },
     "edit-cut": {
       "path": "src/Gui/Icons/edit-cut.svg",
-      "sha256": "d0aae1509a0eacad2364ff1509699e5e934be7d7166792e54945ea11f6af08e7"
+      "sha256": "07679adb644cbbd26d0ecd2320eebdf53e7549ece1b49d9fc023ea59384e934b"
     },
     "edit-paste": {
       "path": "src/Gui/Icons/edit-paste.svg",
-      "sha256": "17551d52c66ebd1d7d5863b3fb0ba15a5fa4b46e7c25e9677671ba6dbb4da7b1"
+      "sha256": "559322b58ab30c54b0605b6fcf634a63f51659dbb0c1ad03c2d815fa1bbc4ba7"
     },
     "preferences-part_design": {
       "path": "src/Mod/Part/Gui/Resources/icons/preferences-part_design.svg",
@@ -603,7 +603,7 @@
     },
     "process-stop": {
       "path": "src/Gui/Icons/process-stop.svg",
-      "sha256": "2457b94a4bd3e33dfd7b01779b8d87827482d6cd38802d4869e368be7ee6b7d8"
+      "sha256": "1a0b42bd2b98409818e86ce8488e9281f43e4daa4f0761b8a83197752d36318f"
     },
     "umf-measurement": {
       "path": "src/Mod/Measure/Gui/Resources/icons/umf-measurement.svg",
@@ -611,7 +611,7 @@
     },
     "zoom-all": {
       "path": "src/Gui/Icons/zoom-all.svg",
-      "sha256": "c74a244eab5363e84ff2e39bf6da2767a0edffe77728023cf381eb6eb64cda3f"
+      "sha256": "3dc615c918f90b629220bba31d2c31e224003c8ba2f2ff0fa91c33e4a85d9858"
     }
   }
 }
