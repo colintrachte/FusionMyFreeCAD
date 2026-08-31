@@ -170,7 +170,7 @@ way, each rendering a grey question mark.
 The icon name is usually **not** the command name. Ask FreeCAD what a command really declares:
 
 ```python
-Gui.Command.get("Std_Measure").getInfo()["pixmap"]   # -> 'umf-measurement'
+Gui.Command.get("Std_Measure").getInfo()["pixmap"]  # -> 'umf-measurement'
 ```
 
 Command *groups* (`..._Comp...`) declare no pixmap at all; name a representative member instead,
