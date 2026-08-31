@@ -320,7 +320,7 @@ The 13 that failed were exactly the 13 that had **no bundled file either**. So t
 been rendering a grey question mark. Asking each command what it actually declares gave the fix:
 
 ```python
-Gui.Command.get("Std_Measure").getInfo()["pixmap"]   # -> 'umf-measurement'
+Gui.Command.get("Std_Measure").getInfo()["pixmap"]  # -> 'umf-measurement'
 ```
 
 | Layout said | FreeCAD actually uses |

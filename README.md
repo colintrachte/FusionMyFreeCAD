@@ -102,11 +102,13 @@ output.
 ## Development
 
 ```bash
+python -m pip install -r requirements-dev.txt
 python -m pytest tests -q
 ```
 
 `python validate_addon.py` runs the same suite and reports the packaged size.
-`ruff check . && ruff format --check .` matches CI.
+`ruff check . && ruff format --check .` matches CI. The development requirements pin the test and
+formatting tools so local formatting cannot drift from the release gate.
 
 Only the FreeCAD command icons referenced by the layout are bundled; the full collection remains
 in FreeCAD's official repository. After changing a button icon, verify its name against a real
