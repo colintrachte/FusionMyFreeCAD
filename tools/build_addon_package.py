@@ -66,13 +66,15 @@ def package_bytes(source: Path) -> bytes:
 
 def write_archive(output: Path, sources: list[Path]) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+    # Stored entries avoid platform-specific zlib output, making the release
+    # byte-for-byte reproducible across Windows, macOS, and Linux.
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
         for source in sources:
             relative = source.relative_to(ROOT).as_posix()
             info = zipfile.ZipInfo(f"{PACKAGE_NAME}/{relative}", date_time=(2026, 8, 1, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
+            info.compress_type = zipfile.ZIP_STORED
             info.external_attr = 0o100644 << 16
-            archive.writestr(info, package_bytes(source), compresslevel=9)
+            archive.writestr(info, package_bytes(source))
 
 
 def verify_archive(output: Path, sources: list[Path]) -> None:
