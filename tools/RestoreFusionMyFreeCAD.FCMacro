@@ -1,0 +1,89 @@
+"""Undo FusionMyFreeCAD from a profile where the add-on is no longer installed.
+
+Removing FusionMyFreeCAD in Addon Manager deletes `Mod/FusionMyFreeCAD` but leaves
+the ribbon layout and the managed preferences behind, and with them the Restore UI
+command that would have undone those changes. This macro reads the same immutable
+baseline the add-on writes on first install and puts the profile back.
+
+Usage: copy into the FreeCAD macro directory (Macro -> Macros... -> User macros
+location), then run it. It is safe to run twice; nothing is deleted outright.
+"""
+
+import json
+import os
+import shutil
+from datetime import datetime
+
+import FreeCAD as App
+
+USER_ROOT = App.getUserAppDataDir()
+BACKUP_ROOT = os.path.join(USER_ROOT, "FusionMyFreeCAD-Backups")
+BASELINE_PATH = os.path.join(BACKUP_ROOT, "baseline.json")
+RIBBON_PATH = os.path.join(USER_ROOT, "RibbonUI_Data", "RibbonStructure.json")
+LOCAL_FILES = (
+    "FusionMyFreeCAD-addon-state.json",
+    "FusionMyFreeCAD-runtime-status.json",
+    "FusionMyFreeCAD-usage.json",
+    "FusionMyFreeCAD-startup.json",
+)
+
+
+def _timestamp():
+    return datetime.now().strftime("%Y%m%d-%H%M%S")
+
+
+def _restore_preferences(entries):
+    problems = []
+    for entry in entries:
+        try:
+            group = App.ParamGet(entry["path"])
+            if entry["existed"]:
+                getattr(group, "Set{}".format(entry["kind"]))(entry["name"], entry["value"])
+            else:
+                getattr(group, "Rem{}".format(entry["kind"]))(entry["name"])
+        except Exception as error:
+            problems.append("{}/{}: {}".format(entry.get("path"), entry.get("name"), error))
+    App.saveParameter()
+    return problems
+
+
+def main():
+    if not os.path.isfile(BASELINE_PATH):
+        App.Console.PrintError(
+            "No FusionMyFreeCAD baseline at {}. Nothing to restore.\n".format(BASELINE_PATH)
+        )
+        return
+
+    with open(BASELINE_PATH, "r", encoding="utf-8") as stream:
+        baseline = json.load(stream)
+
+    backup_root = baseline.get("backupRoot") or BACKUP_ROOT
+    removed = os.path.join(backup_root, "removed-" + _timestamp())
+    os.makedirs(removed, exist_ok=True)
+
+    if os.path.isfile(RIBBON_PATH):
+        shutil.move(RIBBON_PATH, os.path.join(removed, "RibbonStructure.json"))
+    prior = os.path.join(backup_root, "RibbonStructure.json")
+    if baseline.get("ribbonHadExisting") and os.path.isfile(prior):
+        shutil.copy2(prior, RIBBON_PATH)
+
+    problems = _restore_preferences(baseline.get("preferences", []))
+
+    for name in LOCAL_FILES:
+        path = os.path.join(USER_ROOT, name)
+        if os.path.isfile(path):
+            shutil.move(path, os.path.join(removed, name))
+    App.ParamGet("User parameter:BaseApp/Preferences/Mod/FusionMyFreeCAD").RemString(
+        "AppliedVersion"
+    )
+    App.saveParameter()
+
+    App.Console.PrintMessage(
+        "FusionMyFreeCAD restored. Removed configuration kept at {}.\n"
+        "Restart FreeCAD to load the previous interface.\n".format(removed)
+    )
+    for problem in problems:
+        App.Console.PrintWarning("Could not restore {}\n".format(problem))
+
+
+main()

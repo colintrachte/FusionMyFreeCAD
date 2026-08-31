@@ -1,9 +1,8 @@
 # Maintaining FusionMyFreeCAD
 
 This guide is for human maintainers changing, testing, or preparing releases of FusionMyFreeCAD.
-The repository contains the current cross-platform FreeCAD add-on plus older prototype and Windows
-installer paths. Unless a task explicitly concerns migration or the Windows installer, work on the
-root add-on.
+The repository contains the current cross-platform FreeCAD add-on plus an older manual prototype
+kept as a troubleshooting baseline. The root add-on is the only supported release path.
 
 ## Start here
 
@@ -11,7 +10,7 @@ Before changing anything:
 
 1. Check `git status --short` and preserve unrelated or uncommitted work.
 2. Read `README.md` for the supported user experience and `package.xml` for compatibility metadata.
-3. Decide whether the change belongs to the current add-on, the legacy installer, or vendored code.
+3. Decide whether the change belongs to the current add-on, the manual prototype, or vendored code.
 4. Make the smallest practical change and run the relevant validators.
 5. Test user-visible UI changes in FreeCAD 1.1.x with a backed-up or disposable profile.
 
@@ -31,32 +30,71 @@ The current product is the add-on rooted at:
 
 The following paths have narrower roles:
 
-- `installer/` is the former Windows graphical installer, retained for local migration and
-  development. It is not the current cross-platform release path.
-- `prototype/` is the original manual prototype and troubleshooting baseline. Its FreeCAD command
-  manifest is still used by the legacy installer validator.
-- `setup-build/`, `installer/bin/`, `installer/obj/`, root `.exe` files, and `.pdb` files are build
-  outputs. Do not edit them by hand.
+- `prototype/` is the original manual prototype and troubleshooting baseline. It is not a release
+  input.
 - `research/`, `sources.md`, and the other design notes preserve rationale and evidence. They are
   not runtime inputs.
 
 ## Runtime architecture
 
-FreeCAD loads `InitGui.py`, which performs these operations in order:
+FreeCAD loads `InitGui.py`, which runs these steps in order. Each is wrapped by `_step()`, so a
+failure is reported to the console and recorded in `FusionMyFreeCAD-startup.json` instead of
+aborting the module:
 
-1. `fusion_bootstrap.prepare()` backs up managed preferences and the previous Ribbon layout, merges
-   the FusionMyFreeCAD layout, and records restoration state.
-2. `fusion_bootstrap.register_commands()` registers Verify UI, Restore UI, Create Sketch, and
-   Parameter Table commands.
-3. `fusion_bootstrap.run_runtime()` loads dynamic behavior from
-   `Resources/FusionMyFreeCAD/runtime.py`.
-4. The bundled SearchBar and FreeCAD-Ribbon runtime payloads are loaded from `bundled-addons/`.
+1. `register_commands()` registers Create Sketch, Parameter Table, Verify UI, Reapply UI, and
+   Restore UI. **This runs first on purpose**: an add-on that fails to install is exactly when the
+   user needs the recovery commands, and an exception here used to take them down with it.
+2. `register_preferences_page()` adds the opt-out page to FreeCAD's preferences dialog.
+3. `prepare()` records the first-run baseline, merges the FusionMyFreeCAD layout, and writes
+   restoration state.
+4. `run_runtime()` loads dynamic behaviour from `Resources/FusionMyFreeCAD/runtime.py`.
+5. The bundled SearchBar and FreeCAD-Ribbon payloads are loaded from `bundled-addons/`.
+
+Verify UI reports any recorded startup failure, so a partial installation is visible rather than
+merely broken.
+
+### Restoration data
+
+Two files record how to undo the add-on:
+
+- `FusionMyFreeCAD-Backups/baseline.json` is written **once, on true first install, and never
+  overwritten**. It is the authority for Restore UI.
+- `FusionMyFreeCAD-addon-state.json` is working state: installed version, layout version, ribbon
+  digest, and update history. It is disposable; if it is lost or corrupted, `prepare()` quarantines
+  it and rebuilds from the baseline.
+- `FusionMyFreeCAD-customization.json` is the user-owned panel and command order overlay. Direct
+  drag writes it immediately. A panel dropdown can remove only its own entry; Reapply UI removes
+  the complete overlay.
+
+Never add a code path that re-captures the baseline while the add-on is applied. Doing so records
+FusionMyFreeCAD's own settings as the "previous UI" and destroys the user's original profile
+permanently. `tests/test_install.py::test_lost_state_does_not_capture_fusion_settings_as_the_baseline`
+guards this.
+
+### Preferences are applied once per version
+
+`runtime.apply_preferences()` splits its work:
+
+- `_apply_structural()` runs at every launch. It only writes the paths the bundled Ribbon needs to
+  find its own data. These are not user-facing settings.
+- `_apply_defaults()` runs once per installed version, gated on the `AppliedVersion` parameter. A
+  change the user makes afterwards in FreeCAD's preferences dialog survives the next start.
+
+Reapply UI (`bootstrap.reapply()`) is the supported way back to the shipped defaults.
+
+### Startup timing
+
+The runtime uses `_defer(label, function, attempts, interval)`, not fixed delays. The deferred
+function returns True when it is done and False when the widget it needs does not exist yet.
+Exhausting the attempts records a problem that Verify UI surfaces. Do not reintroduce a
+`QTimer.singleShot` ladder with hardcoded milliseconds: those constants encode one machine's startup
+timing and fail silently on any slower one.
 
 The add-on builds the installed Ribbon layout by merging:
 
 - `Resources/FusionMyFreeCAD/RibbonStructure.json`: the complete base Ribbon structure.
 - `Resources/FusionMyFreeCAD/layout-v3.json`: the human-maintained FusionMyFreeCAD panels,
-  dropdowns, command order, labels, sizes, and icons.
+  dropdowns, pinned commands, overflow inventory, command order, labels, sizes, and icons.
 
 The merged layout is written into the user's FreeCAD application-data directory. Do not maintain
 the generated user-profile copy; it will be regenerated by the add-on.
@@ -69,12 +107,14 @@ the generated user-profile copy; it will be regenerated by the add-on.
 | Change a FREQUENT panel | `Resources/FusionMyFreeCAD/layout-manifest.json` | Keep its panel names and commands synchronized with `layout-v3.json` |
 | Change shortcuts or managed preferences | `Resources/FusionMyFreeCAD/runtime.py` | Review restoration coverage in `fusion_bootstrap.py` |
 | Change adaptive usage scoring or UI reconciliation | `Resources/FusionMyFreeCAD/runtime.py` | Exercise workbench switching interactively |
-| Change installation, backup, verification, or restoration | `fusion_bootstrap.py` | Extend `validate_addon.py` and test upgrade plus restore paths |
+| Change installation, backup, verification, or restoration | `fusion_bootstrap.py` | Extend `tests/test_install.py`; cover upgrade, restore, and the lost-state path |
 | Add a FusionMyFreeCAD command | `fusion_bootstrap.py` | Register it in `register_commands()` and add layout/test coverage |
 | Change startup order or bundled modules | `InitGui.py` | Test a clean FreeCAD start and restart |
-| Change compatibility or release metadata | `package.xml` | Synchronize every version location listed below |
+| Change a button's icon | `Resources/FusionMyFreeCAD/layout-v3.json` | Then re-run `tools/probe_freecad_icons.py --freecad <path>` and commit the regenerated `verified-icons.json`; the suite fails on an unverified name |
+| Add or change a user-facing opt-out | `Resources/FusionMyFreeCAD/preferences.ui` | The runtime must read it via `PREFERENCES`; `tests/test_startup.py` fails until the page has a matching control |
+| Change standalone recovery | `tools/RestoreFusionMyFreeCAD.FCMacro` | Keep it dependency-free and safe to run twice; it must not import the add-on |
+| Change compatibility or release metadata | `package.xml` | The runtime reads the version from here; bump both `layoutVersion` fields to match |
 | Change the bundled Ribbon or search engine | `vendor/`, then `tools/sync_bundled_addons.py` | Treat as a controlled third-party update; preserve licenses and local patches |
-| Change the old Windows installer | `installer/` | Run `installer/validate_installer.py`; rebuild outputs instead of editing them |
 
 `Init.py` is intentionally empty because FusionMyFreeCAD has no document-layer initialization.
 
@@ -85,22 +125,24 @@ the generated user-profile copy; it will be regenerated by the add-on.
 1. Edit `Resources/FusionMyFreeCAD/layout-v3.json`.
 2. Use a FreeCAD 1.1.x command identifier and the workbench that registers it.
 3. Preserve each command entry's five fields: command, source workbench, size, label, and icon.
+   Put frequently used commands in `commands` and all other panel commands in `overflow`; both are
+   presented in the panel dropdown.
 4. If the command may appear adaptively, update
    `Resources/FusionMyFreeCAD/layout-manifest.json` as well.
-5. Run `python .\validate_addon.py`.
+5. Run `python -m pytest tests -q`.
 6. Open FreeCAD and inspect every affected workbench and context. A command can be registered yet
    disabled when the selection or active editing mode is wrong.
-
-When adding a command for the legacy installer, also update the verified command manifest under
-`prototype/` if necessary and run the installer validator.
 
 ### Change preferences or shortcuts
 
 1. Edit `Resources/FusionMyFreeCAD/runtime.py`.
 2. If a new preference is managed, add it to `PREFERENCE_KEYS` in `fusion_bootstrap.py` so the
    previous value can be restored.
-3. Extend `validate_addon.py` with a focused regression assertion.
-4. Test first installation, repeated startup, Verify UI, and Restore UI.
+3. Add a behavioural regression test to `tests/test_runtime.py`, and confirm it fails without
+   your change.
+4. If the preference is a user-facing opt-out, add a control to
+   `Resources/FusionMyFreeCAD/preferences.ui`. The suite fails until you do.
+5. Test first installation, repeated startup, Verify UI, Reapply UI, and Restore UI.
 
 Restoration is a product feature, not an optional cleanup step. New managed state must either be
 restored or be clearly documented as intentionally persistent.
@@ -110,24 +152,61 @@ restored or be clearly documented as intentionally persistent.
 1. Implement the command class in `fusion_bootstrap.py`.
 2. Register it in `register_commands()`.
 3. Add it to `layout-v3.json` and, when applicable, `layout-manifest.json`.
-4. Add a simulated behavior test to `validate_addon.py`.
+4. Add a behavioural test to `tests/` using the fake FreeCAD environment.
 5. Test it in FreeCAD with no document, a normal document, and the intended selection/editing
    context where those states matter.
+
+### Change or verify an icon
+
+FusionMyFreeCAD vendors only the FreeCAD command icons named by `layout-v3.json`. The curated files
+are copied from an official FreeCAD source checkout so Ribbon can render them before every source
+workbench has registered its Qt resources.
+
+The trap: **`Gui.getIcon()` never fails.** Given a name it does not know it returns FreeCAD's
+"unknown icon" placeholder, which is a perfectly valid non-null `QIcon`. Any check based on
+`isNull()` therefore passes for names that are simply wrong. Thirteen misspelled names shipped this
+way, each rendering a grey question mark.
+
+The icon name is usually **not** the command name. Ask FreeCAD what a command really declares:
+
+```python
+Gui.Command.get("Std_Measure").getInfo()["pixmap"]   # -> 'umf-measurement'
+```
+
+Command *groups* (`..._Comp...`) declare no pixmap at all; name a representative member instead,
+which is the convention FreeCAD-Ribbon already uses for dropdown buttons.
+
+After changing any icon:
+
+```bash
+python tools/probe_freecad_icons.py --freecad "F:/path/to/FreeCADCmd.exe"
+```
+
+It fingerprints the placeholder from deliberately impossible names, compares every layout icon
+against it, rewrites `Resources/FusionMyFreeCAD/verified-icons.json`, and exits non-zero if anything
+is unresolved. The source sync also records the exact source path and SHA-256 hash for every copied
+file in `Resources/FusionMyFreeCAD/source-icons.json`. The offline suite accepts either form of
+FreeCAD-backed verification and rejects missing or stale curated files.
 
 ### Update bundled third-party code
 
 `vendor/FreeCAD-Ribbon` and `vendor/SearchBar` are ignored full upstream snapshots used only as
 update inputs. The tracked runtime subset is generated in `bundled-addons/` by
-`python .\tools\sync_bundled_addons.py`.
+`python tools/sync_bundled_addons.py --freecad-source <official FreeCAD checkout>`. FreeCAD's full
+icon collection is not copied into this repository; the tool selects only the icons referenced by
+the layout from the official source tree and fails if any selected icon is unavailable.
 Before replacing either snapshot:
 
 1. Record the upstream project, version, and source revision.
 2. Review `THIRD_PARTY_NOTICES.md` and preserve the upstream license files.
 3. Compare the new upstream source with the existing snapshot and identify local integration
    patches before copying files.
-4. Reapply only the patches still required. Current validation expects, among other behavior,
-   non-modal Ribbon startup, authoritative workbench support, and suppressed SearchBar startup
-   prompts.
+4. Reapply only the patches still required. `tests/test_package.py` asserts each one: non-modal
+   Ribbon startup, a close button on Ribbon dialogs, authoritative workbench support, direct drag,
+   panel-scoped reset, suppressed SearchBar startup prompts, no declared third-party Python
+   dependency, and no surviving import of `lxml`, `numpy`, or `matplotlib`.
+   `tools/sync_bundled_addons.py` re-applies dependency stripping mechanically and rejects an icon
+   that cannot be resolved unambiguously from the FreeCAD source tree.
 5. Confirm that no nested `.git` directories or build caches were introduced.
 6. Run all offline validators and perform a clean-start interactive test.
 7. Update `THIRD_PARTY_NOTICES.md` with the new version and any material local modifications.
@@ -138,25 +217,45 @@ regenerate the curated payload.
 
 ## Validation
 
-Run the current add-on validator from the repository root after every runtime change:
-
-```powershell
-python .\validate_addon.py
+```bash
+python -m pytest tests -q
+ruff check .
+ruff format --check .
 ```
 
-It checks package metadata, required files, Python syntax, selected vendor patches, layout
-invariants, command behavior with a simulated FreeCAD API, installation state, verification, and
-restoration.
+`python validate_addon.py` runs the same suite and additionally reports the packaged size. CI runs
+all three across Windows, macOS, and Linux on Python 3.11 and 3.13.
 
-For changes to the historical paths, also run:
+The suite is organised by concern:
 
-```powershell
-python .\prototype\validate_prototype.py
-python .\installer\validate_installer.py
+| File | Covers |
+|---|---|
+| `tests/test_install.py` | First install, upgrade, baseline protection, corrupt state, restoration, verification reporting |
+| `tests/test_runtime.py` | Preferences, shortcuts and displacement, deferral and retry, adaptive panel scoring and rewriting |
+| `tests/test_startup.py` | InitGui degradation, vendor loading, preferences page |
+| `tests/test_package.py` | Metadata, version coherence, layout/manifest agreement, vendor patches, the built archive |
+
+`tests/fake_freecad.py` implements just enough of FreeCAD, FreeCADGui, and PySide for the add-on's
+real code to execute unchanged. **Prefer a behavioural assertion against these fakes over an
+assertion about source text.** The previous validator matched strings like
+`'search.SetBool("ShowChangeDialog", False)' in runtime_source`, which broke on reformatting, passed
+on unreachable code, and made refactoring expensive.
+
+Source-level assertions are still correct for two things, and both remain in `tests/test_package.py`:
+patches to the bundled third-party trees, which have no importable behaviour here, and structural
+guarantees best expressed over the AST, such as "this startup path raises no modal dialog".
+
+When you change behaviour, check the test actually fails without your fix. A test that passes both
+with and without the change is not protecting anything.
+
+Passing offline validation does not prove that Qt renders the Ribbon correctly or that FreeCAD
+modelling operations produce correct geometry.
+
+For the historical manual prototype:
+
+```bash
+python prototype/validate_prototype.py
 ```
-
-Report exactly which checks ran. Passing offline validation does not prove that Qt renders the
-Ribbon correctly or that FreeCAD modeling operations produce correct geometry.
 
 ### Interactive FreeCAD checklist
 
@@ -177,36 +276,44 @@ the correctness or safety of production CAD or manufacturing output.
 
 ## Version and release synchronization
 
-The current release version is duplicated. A version bump must update at least:
+`package.xml` is the single source of truth. `fusion_bootstrap.PACKAGE_VERSION` reads it at import
+time; there is no constant to keep in step.
 
-- `package.xml`
-- `fusion_bootstrap.py` (`PACKAGE_VERSION`)
+Two files still carry the version and must be bumped with it:
+
 - `Resources/FusionMyFreeCAD/layout-v3.json` (`layoutVersion`)
 - `Resources/FusionMyFreeCAD/layout-manifest.json` (`layoutVersion`)
-- version expectations and output text in `validate_addon.py`
 
-If the legacy Windows installer is being released too, also search `installer/` for the old version
-and update its project metadata, setup script, assets, UI text, and validator expectations.
+`tests/test_package.py::test_one_version_everywhere` fails if either drifts, so a missed bump is
+caught by the suite rather than by a manual `rg` sweep.
 
-Use this check to find missed copies, substituting the previous version:
+Bumping the version causes the next launch to re-apply managed preferences and regenerate the
+ribbon. Treat that as a user-visible event, not a formality.
 
-```powershell
-rg -n "3\.1\.0" package.xml fusion_bootstrap.py Resources validate_addon.py installer
-```
-
-Before release:
+### Before release
 
 1. Confirm the Git diff contains no unrelated changes, nested repositories, caches, or generated
    binaries that were not deliberately rebuilt.
-2. Run the relevant offline validators.
+2. Run the validators above.
 3. Complete the interactive checklist on a supported FreeCAD version.
-4. Review `README.md`, `package.xml`, license files, and third-party notices.
-5. Run `python .\tools\build_addon_package.py` and inspect the reported archive contents and hash.
+4. Review `README.md`, `package.xml`, licence files, and third-party notices.
+5. Run `python tools/build_addon_package.py` and inspect the reported archive contents and hash.
 6. Record what was tested and what was not tested.
 
-The repository has not yet documented or completed submission to the FreeCAD add-on index. Treat
-index submission and publishing as explicit release work, not an automatic consequence of a
-version bump.
+### Before submitting to the FreeCAD add-on index
+
+Addon Manager clones this repository, so its history is a cost paid by every user.
+
+At the time of the 1.2.0 release, `.git` is roughly 134 MiB for a 4.7 MiB unpacked add-on. The weight is
+`docs/a-freecad-manual.pdf` (15 MB, tracked) plus `vendor/` blobs committed before that directory was
+ignored. Deleting the files from the working tree does **not** help, because a clone still fetches
+the history that contains them.
+
+The fix is a history rewrite (`git filter-repo`) or publishing from a fresh repository, followed by a
+force-push. Both are destructive and coordinated actions: decide deliberately, and do them before
+submission rather than after. The `package-hygiene` CI job warns about tracked files over 1 MiB.
+
+Index submission has not been done and is not an automatic consequence of a version bump.
 
 ## Documentation maintenance
 
@@ -217,13 +324,16 @@ research and user guides rather than copying their contents here. Update this fi
 - a generated path changes;
 - a validator is added or removed;
 - the supported FreeCAD/Python range changes;
-- the legacy installer is retired or restored to active support; or
 - the add-on publication process becomes established.
 
 Useful companion documents:
 
 - `README.md`: user-facing overview and installation status
+- `CHANGELOG.md`: user-visible release history and upgrade notes
 - `setup-guide.md`: manual/native FreeCAD workflow baseline
 - `command-map.md`: Fusion-to-FreeCAD command and shortcut decisions
 - `THIRD_PARTY_NOTICES.md`: bundled component provenance and modifications
 - `research/ui-architecture-independent-review-2026-07-30.md`: architectural rationale
+- `research/codex-implementation-review-2026-08-25.md`: implementation review and the improvement
+  backlog this revision worked from
+- `research/native-freecad-baseline-2026-07-30.md`: the pre-add-on native FreeCAD baseline

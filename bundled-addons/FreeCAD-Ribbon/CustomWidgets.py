@@ -58,6 +58,7 @@ from PySide.QtWidgets import (
     QGridLayout,
     QPushButton,
     QGraphicsEffect,
+    QApplication,
 )
 from PySide.QtCore import (
     Qt,
@@ -202,7 +203,16 @@ class CustomControls(RibbonToolButton):
         self.layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.setFixedSize(self.widget.size())
           
+    def mousePressEvent(self, e):
+        self._dragStartPosition = e.pos()
+        QToolButton.mousePressEvent(self, e)
+
     def mouseMoveEvent(self, e):
+        start = getattr(self, "_dragStartPosition", None)
+        if start is None:
+            return
+        if (e.pos() - start).manhattanLength() < QApplication.startDragDistance():
+            return
         if e.buttons() == Qt.MouseButton.LeftButton:
             try:
                 drag = QDrag(self)
@@ -710,6 +720,9 @@ class CustomControls(RibbonToolButton):
             Label_Text.setToolTip(CommandButton.toolTip())
 
         btn.mouseMoveEvent = lambda mouseEvent: CustomControls.mouseMoveEvent(
+            btn, mouseEvent
+        )
+        btn.mousePressEvent = lambda mouseEvent: CustomControls.mousePressEvent(
             btn, mouseEvent
         )
 
@@ -1268,6 +1281,9 @@ class CustomControls(RibbonToolButton):
         btn.mouseMoveEvent = lambda mouseEvent: CustomControls.mouseMoveEvent(
             btn, mouseEvent
         )
+        btn.mousePressEvent = lambda mouseEvent: CustomControls.mousePressEvent(
+            btn, mouseEvent
+        )
         
         # Hide the text if set in preferences
         if showText is False:
@@ -1399,6 +1415,9 @@ class CustomControls(RibbonToolButton):
     def EmptyButton():
         btn = QToolButton()
         btn.mouseMoveEvent = lambda mouseEvent: CustomControls.mouseMoveEvent(
+            btn, mouseEvent
+        )
+        btn.mousePressEvent = lambda mouseEvent: CustomControls.mousePressEvent(
             btn, mouseEvent
         )
         return btn

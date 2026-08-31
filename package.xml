@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
   <name>FusionMyFreeCAD</name>
-  <description>A self-contained Fusion-familiar adaptive ribbon for FreeCAD.</description>
-  <version>3.1.0</version>
-  <date>2026-08-01</date>
+  <description>A self-contained, customizable Fusion-familiar adaptive ribbon for FreeCAD.</description>
+  <version>1.2.0</version>
+  <date>2026-08-31</date>
   <freecadmin>1.1.0</freecadmin>
   <pythonmin>3.11</pythonmin>
   <maintainer>Colin Trachte</maintainer>

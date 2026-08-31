@@ -1,0 +1,37 @@
+[project]
+name = "fusionmyfreecad"
+description = "A self-contained, customizable Fusion-familiar adaptive ribbon for FreeCAD."
+requires-python = ">=3.11"
+dynamic = ["version"]
+
+# This project is a FreeCAD add-on, not an installable distribution. The file
+# exists to configure the test and lint tooling in one place.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "-q --strict-markers"
+filterwarnings = ["error::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+# The vendored upstream trees and historical prototype are not ours to format.
+extend-exclude = [
+    "vendor",
+    "bundled-addons",
+    # Historical manual prototype; not part of the cross-platform add-on.
+    "prototype",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "RUF"]
+ignore = [
+    # FreeCAD's Python is old enough that .format() is the house style here, and
+    # the add-on must import cleanly under the oldest supported interpreter.
+    "UP032",
+    "UP030",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The fakes deliberately mirror Qt and FreeCAD naming.
+"tests/fake_freecad.py" = ["N802", "N803"]

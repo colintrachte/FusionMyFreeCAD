@@ -1,6 +1,6 @@
 # Research brief: Fusion UI replication for FusionMyFreeCAD
 
-**Status:** Independent research pass used to revise the installer payload  
+**Status:** Independent research pass used to revise the add-on payload
 **Date:** 2026-08-01  
 **Question:** Which Fusion toolbar hierarchy, contextual behavior, and navigation affordances should
 the FreeCAD makeover reproduce, and which FreeCAD-native mechanisms should implement them?  
@@ -13,7 +13,7 @@ The makeover should reproduce Fusion's hierarchy, not merely its vocabulary. In 
 **Create Sketch is a visually independent gateway command** before the CREATE group. Invoking it
 switches to a contextual Sketch toolbar whose default surface keeps common geometry and constraints
 visible and places a conspicuous Finish Sketch action at the far right.[1][2] FreeCAD 1.1 already
-has the matching context-sensitive Dimension tool; the installer should select its Single Tool mode
+has the matching context-sensitive Dimension tool; the add-on should select its Single Tool mode
 and Auto radius/diameter behavior rather than implement another dimension dispatcher.[7][8]
 
 The Ribbon add-on's Views/Individual Views panel is redundant with FreeCAD's native on-canvas

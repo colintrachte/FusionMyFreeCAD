@@ -1,7 +1,7 @@
 # FusionMyFreeCAD prototype 1
 
-> **Simpler path:** This manual procedure is retained for troubleshooting. For normal use, close
-> FreeCAD and double-click `D:\Git\FusionMyFreeCAD\INSTALL.cmd`.
+> **Simpler path:** This manual procedure is retained for troubleshooting. For normal use, install
+> the self-contained add-on by following `../docs/INSTALL-FREECAD-ADDON.md`.
 
 This is a reversible FreeCAD 1.1.3 UI prototype based on native Part Design and Sketcher commands.
 
@@ -11,7 +11,7 @@ It does **not** modify FreeCAD source, create new modeling feature types, write 
 
 - `fusion-ribbon-freecad-1.1.3.json` — FreeCAD-Ribbon layout for Part Design and Sketcher.
 - `freecad-1.1.3-command-manifest.json` — command identifiers checked against the official FreeCAD 1.1.3 source tag.
-- `shortcut-proposals.json` — proposed Fusion-like bindings; this file is documentation, not an installer.
+- `shortcut-proposals.json` — proposed Fusion-like bindings; this file does not apply them.
 - `AuditFusionProfile.FCMacro` — read-only runtime check for registered commands and occupied shortcuts.
 - `validate_prototype.py` — offline schema and command-reference validator.
 
