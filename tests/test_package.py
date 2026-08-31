@@ -322,6 +322,7 @@ def test_build_addon_package_produces_a_loadable_archive(package):
             assert required in names, required
         assert not any(name.endswith(".pyc") for name in names)
         assert not any("__pycache__" in name for name in names)
+        assert {entry.create_system for entry in archive.infolist()} == {3}
         text_entries = [
             entry
             for entry in archive.infolist()

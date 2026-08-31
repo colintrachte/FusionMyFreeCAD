@@ -72,6 +72,7 @@ def write_archive(output: Path, sources: list[Path]) -> None:
         for source in sources:
             relative = source.relative_to(ROOT).as_posix()
             info = zipfile.ZipInfo(f"{PACKAGE_NAME}/{relative}", date_time=(2026, 8, 1, 0, 0, 0))
+            info.create_system = 3
             info.compress_type = zipfile.ZIP_STORED
             info.external_attr = 0o100644 << 16
             archive.writestr(info, package_bytes(source))
