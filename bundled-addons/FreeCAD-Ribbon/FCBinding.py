@@ -378,6 +378,8 @@ class ModernMenu(RibbonBar):
         with open(Parameters.RIBBON_STRUCTURE_JSON, "r") as file:
             self.ribbonStructure.update(json.load(file))
         file.close()
+        self._responsiveWidthTierValue = self._responsiveWidthTier()
+        self._responsiveRebuildPending = False
         
         DataFile2 = os.path.join(ConfigDirectory, "RibbonDataFile2.dat")
         if os.path.exists(DataFile2) is True:
@@ -1164,6 +1166,65 @@ class ModernMenu(RibbonBar):
     def closeEvent(self, event):
         mw.menuBar().show()
         return True
+
+    def _responsiveWidthTier(self, Dict=None):
+        """Return the highest responsive command threshold reached by the window."""
+        structure = Dict if isinstance(Dict, dict) else getattr(self, "ribbonStructure", {})
+        thresholds = {0}
+        for workbench in structure.get("workbenches", {}).values():
+            for panel in workbench.get("toolbars", {}).values():
+                if not isinstance(panel, dict):
+                    continue
+                for minimumWidth in panel.get("responsive", {}).values():
+                    try:
+                        thresholds.add(int(minimumWidth))
+                    except (TypeError, ValueError):
+                        continue
+        width = mw.width()
+        return max(threshold for threshold in thresholds if width >= threshold)
+
+    def _rebuildResponsivePanels(self):
+        """Rebuild only width-aware panels after the window crosses a size tier."""
+        self._responsiveRebuildPending = False
+        if self.CustomizeEnabled:
+            return
+        workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())
+        category = self.currentCategory()
+        if workbenchName is None or category is None:
+            return
+        Dict = self.workBenchDict
+        if workbenchName not in Dict.get("workbenches", {}):
+            Dict = self.ribbonStructure
+        definitions = Dict.get("workbenches", {}).get(workbenchName, {}).get("toolbars", {})
+        for panel in list(category.panels().values()):
+            if not definitions.get(panel.objectName(), {}).get("responsive"):
+                continue
+            replacement = self.CreatePanel(
+                workbenchName,
+                panel.objectName(),
+                addPanel=False,
+                Dict=Dict,
+                ignoreColumnLimit=False,
+                showEnableControl=False,
+                enableSeparator=False,
+                ActivateButtons=True,
+            )
+            if replacement is None:
+                continue
+            category.replacePanel(panel, replacement)
+            category._panels[replacement.title()] = replacement
+            self.setPanelProperties(replacement)
+            panel.close()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        tier = self._responsiveWidthTier()
+        previousTier = getattr(self, "_responsiveWidthTierValue", tier)
+        self._responsiveWidthTierValue = tier
+        if tier == previousTier or getattr(self, "_responsiveRebuildPending", False):
+            return
+        self._responsiveRebuildPending = True
+        QTimer.singleShot(75, self._rebuildResponsivePanels)
 
     def eventFilter(self, obj, event):
         # Disable the standard hover behavior
@@ -5998,6 +6059,19 @@ class ModernMenu(RibbonBar):
                 OrderList: list = Dict["workbenches"][
                     workbenchName
                 ]["toolbars"][panelName]["order"]
+                # FreeCAD-Ribbon can prune commands that register after its
+                # initial toolbar scan. FMF's complete panelMenu remains the
+                # authoritative order and prevents late commands such as
+                # Create Sketch from wandering to the right edge.
+                if workbenchName in Dict.get("authoritativeWorkbenches", []):
+                    panelMenuOrder = Dict["workbenches"][workbenchName]["toolbars"][
+                        panelName
+                    ].get("panelMenu", [])
+                    if panelMenuOrder:
+                        OrderList = list(panelMenuOrder)
+                        Dict["workbenches"][workbenchName]["toolbars"][panelName][
+                            "order"
+                        ] = list(OrderList)
                 
                 # XXX check that positionsList consists of strings only
                 def sortButtons(button: QToolButton):
@@ -6045,6 +6119,7 @@ class ModernMenu(RibbonBar):
         )
         explicitPanelMenu = set(panelDefinition.get("panelMenu", []))
         explicitOverflow = set(panelDefinition.get("overflow", []))
+        responsiveCommands = panelDefinition.get("responsive", {})
 
         # Go through the button list:
         for i in range(len(allButtons)):
@@ -6125,8 +6200,18 @@ class ModernMenu(RibbonBar):
                 # Explicit overflow is the user-facing command inventory for a
                 # panel. Ignore it only while arranging, when the complete panel
                 # must be visible and draggable.
+                minimumResponsiveWidth = responsiveCommands.get(CommandName)
+                responsiveVisible = False
+                try:
+                    responsiveVisible = (
+                        minimumResponsiveWidth is not None
+                        and mw.width() >= int(minimumResponsiveWidth)
+                    )
+                except (TypeError, ValueError):
+                    pass
                 if (
                     CommandName in explicitOverflow
+                    and not responsiveVisible
                     and ignoreColumnLimit is False
                 ):
                     ButtonList.append(button)

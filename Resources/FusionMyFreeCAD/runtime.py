@@ -70,6 +70,7 @@ _status_write_pending = False
 _problems = []
 _displaced_shortcuts = []
 _last_workbench = ""
+_task_accept_filter = None
 
 
 def _record_problem(text):
@@ -189,6 +190,11 @@ def _apply_defaults():
     dimensioning.SetBool("SeparatedDimensioningTools", False)
     dimensioning.SetBool("DimensioningDiameter", True)
     dimensioning.SetBool("DimensioningRadius", True)
+
+    # Generate selectable planar regions from closed sketch boundaries. This is
+    # FreeCAD's native profile-face pipeline: crossing and boundary-to-boundary
+    # lines subdivide a profile, while dangling open geometry is ignored.
+    App.ParamGet("User parameter:BaseApp/Preferences/Mod/Sketcher").SetBool("MakeInternals", True)
 
     # The upstream first-run changelog can cover Ribbon's modal cache prompt and
     # leave both windows impossible to operate. FusionMyFreeCAD provides its own
@@ -316,6 +322,88 @@ def ensure_starter_design():
         body.Label = "Part"
         document.recompute()
     Gui.activateWorkbench("PartDesignWorkbench")
+    return True
+
+
+def _qt_enum(owner, group, name, default=None):
+    """Read an enum from either the Qt5 or Qt6 spelling."""
+    value = getattr(owner, name, None)
+    if value is not None:
+        return value
+    nested = getattr(owner, group, None)
+    return getattr(nested, name, default) if nested is not None else default
+
+
+def accept_active_task():
+    """Click the active task dialog's real affirmative button."""
+    control = getattr(Gui, "Control", None)
+    if control is None or not control.activeDialog():
+        return False
+    main_window = Gui.getMainWindow()
+    if main_window is None:
+        return False
+
+    button_box_type = getattr(QtWidgets, "QDialogButtonBox", None)
+    if button_box_type is None:
+        return False
+    accept_roles = {
+        _qt_enum(button_box_type, "ButtonRole", "AcceptRole"),
+        _qt_enum(button_box_type, "ButtonRole", "YesRole"),
+    }
+    accept_roles.discard(None)
+    for box in reversed(main_window.findChildren(button_box_type)):
+        if hasattr(box, "isVisible") and not box.isVisible():
+            continue
+        for button in box.buttons():
+            if box.buttonRole(button) not in accept_roles:
+                continue
+            if hasattr(button, "isEnabled") and not button.isEnabled():
+                continue
+            button.click()
+            return True
+    return False
+
+
+class _TaskAcceptFilter(QtCore.QObject):
+    """Give FreeCAD task dialogs Fusion-style Enter-to-OK behaviour."""
+
+    def eventFilter(self, watched, event):
+        key_press = _qt_enum(QtCore.QEvent, "Type", "KeyPress")
+        enter_keys = {
+            _qt_enum(QtCore.Qt, "Key", "Key_Return"),
+            _qt_enum(QtCore.Qt, "Key", "Key_Enter"),
+        }
+        enter_keys.discard(None)
+        if event.type() != key_press or event.key() not in enter_keys:
+            return False
+
+        # A newline is intentional in multiline editors; do not turn it into OK.
+        multiline_types = tuple(
+            widget_type
+            for widget_type in (
+                getattr(QtWidgets, "QTextEdit", None),
+                getattr(QtWidgets, "QPlainTextEdit", None),
+            )
+            if widget_type is not None
+        )
+        focus = QtWidgets.QApplication.focusWidget()
+        if multiline_types and isinstance(focus, multiline_types):
+            return False
+        if not accept_active_task():
+            return False
+        if hasattr(event, "accept"):
+            event.accept()
+        return True
+
+
+def install_task_accept_filter():
+    global _task_accept_filter
+    application = QtWidgets.QApplication.instance()
+    if application is None:
+        return False
+    if _task_accept_filter is None:
+        _task_accept_filter = _TaskAcceptFilter(application)
+        application.installEventFilter(_task_accept_filter)
     return True
 
 
@@ -704,6 +792,7 @@ def install():
     _defer("model tree", ensure_model_tree)
     _defer("navigation cube", ensure_navigation_cube)
     _defer("shortcut reconciliation", reconcile_actions)
+    _defer("Enter-to-OK task handling", install_task_accept_filter)
     schedule_status_write(1500)
     App.Console.PrintMessage(
         "FusionMyFreeCAD {}: adaptive ribbon, smart dimensions, navigation cube, "

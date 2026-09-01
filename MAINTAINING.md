@@ -203,10 +203,12 @@ Before replacing either snapshot:
    patches before copying files.
 4. Reapply only the patches still required. `tests/test_package.py` asserts each one: non-modal
    Ribbon startup, a close button on Ribbon dialogs, authoritative workbench support, direct drag,
-   panel-scoped reset, suppressed SearchBar startup prompts, no declared third-party Python
-   dependency, and no surviving import of `lxml`, `numpy`, or `matplotlib`.
+   responsive overflow tiers, panel-scoped reset, suppressed SearchBar startup prompts, no declared
+   third-party Python dependency, and no surviving import of `lxml`, `numpy`, or `matplotlib`.
    `tools/sync_bundled_addons.py` re-applies dependency stripping mechanically and rejects an icon
    that cannot be resolved unambiguously from the FreeCAD source tree.
+   Use its `--icons-only` option when a layout change needs a newly referenced command icon but the
+   bundled add-on sources themselves have not changed.
 5. Confirm that no nested `.git` directories or build caches were introduced.
 6. Run all offline validators and perform a clean-start interactive test.
 7. Update `THIRD_PARTY_NOTICES.md` with the new version and any material local modifications.
@@ -291,6 +293,9 @@ Bumping the version causes the next launch to re-apply managed preferences and r
 ribbon. Treat that as a user-visible event, not a formality.
 
 ### Before release
+
+Follow [`RELEASING.md`](RELEASING.md) for the complete human-run preparation, validation, GitHub
+upload, review, and publication procedure. The checklist below is the underlying release gate.
 
 1. Confirm the Git diff contains no unrelated changes, nested repositories, caches, or generated
    binaries that were not deliberately rebuilt.

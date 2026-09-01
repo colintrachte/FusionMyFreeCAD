@@ -1,5 +1,5 @@
 {
-  "layoutVersion": "1.2.0",
+  "layoutVersion": "1.3.0",
   "targetFreeCAD": "1.1.x",
   "primaryCommands": [
     "FusionMyFreeCAD_CreateSketch",

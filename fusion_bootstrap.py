@@ -87,6 +87,7 @@ PREFERENCE_KEYS = (
         "Bool",
     ),
     ("User parameter:BaseApp/Preferences/Mod/Sketcher/dimensioning", "DimensioningRadius", "Bool"),
+    ("User parameter:BaseApp/Preferences/Mod/Sketcher", "MakeInternals", "Bool"),
     ("User parameter:BaseApp/Preferences/Mod/SearchBar", "ShowChangeDialog", "Bool"),
     ("User parameter:BaseApp/Preferences/Mod/SearchBar", "DoNotShowAgain", "String"),
     ("User parameter:BaseApp/Preferences/Shortcut", "Sketcher_CreateLine", "String"),
@@ -358,6 +359,7 @@ def _merge_layout(apply_customization=True):
                 "commands": commands,
                 "panelMenu": list(command_order),
                 "overflow": [entry[0] for entry in panel.get("overflow", [])],
+                "responsive": dict(panel.get("responsive", {})),
                 "pinCount": len(panel["commands"]),
             }
         # FreeCAD-Ribbon stores panel order alongside the toolbar entries.
@@ -566,7 +568,7 @@ def _verify_layout(path, spec=None, candidates=None):
                             workbench, name, command, sources.get(command), source
                         )
                     )
-            for key in ("panelMenu", "overflow", "pinCount"):
+            for key in ("panelMenu", "overflow", "responsive", "pinCount"):
                 if toolbar.get(key) != expected_toolbars[name].get(key):
                     checks["panelContents"] = False
                     problems.append(
@@ -1044,7 +1046,34 @@ class CreateSketchCommand:
             document.recompute()
         Gui.activateWorkbench("PartDesignWorkbench")
         Gui.runCommand("PartDesign_NewSketch")
-        Gui.activateWorkbench("SketcherWorkbench")
+        # Keep Part Design active while FreeCAD's attachment task displays its
+        # selectable origin planes. Switching workbenches here destroys the
+        # Fusion-like plane-picking presentation before the user has chosen one.
+        try:
+            from PySide import QtCore
+
+            QtCore.QTimer.singleShot(0, _frame_origin_planes)
+        except ImportError:
+            _frame_origin_planes()
+
+
+def _frame_origin_planes():
+    """Give FreeCAD's temporary origin planes a predictable, visible camera."""
+    document = getattr(Gui, "ActiveDocument", None)
+    view = getattr(document, "ActiveView", None)
+    if view is None:
+        return
+    view.viewAxonometric()
+    view.fitAll()
+
+
+class _SketchEditWorkbenchObserver:
+    """Enter Sketcher only after attachment selection actually starts editing."""
+
+    def slotInEdit(self, view_provider):
+        obj = getattr(view_provider, "Object", None)
+        if obj is not None and obj.isDerivedFrom("Sketcher::SketchObject"):
+            Gui.activateWorkbench("SketcherWorkbench")
 
 
 class ParameterTableCommand:
@@ -1100,12 +1129,19 @@ def register_preferences_page():
     Gui.addPreferencePage(PREFERENCES_UI, "FusionMyFreeCAD")
 
 
+_sketch_edit_observer = None
+
+
 def register_commands():
+    global _sketch_edit_observer
     Gui.addCommand("FusionMyFreeCAD_CreateSketch", CreateSketchCommand())
     Gui.addCommand("FusionMyFreeCAD_ParameterTable", ParameterTableCommand())
     Gui.addCommand("FusionMyFreeCAD_Verify", VerifyCommand())
     Gui.addCommand("FusionMyFreeCAD_Reapply", ReapplyCommand())
     Gui.addCommand("FusionMyFreeCAD_Restore", RestoreCommand())
+    if _sketch_edit_observer is None and hasattr(Gui, "addDocumentObserver"):
+        _sketch_edit_observer = _SketchEditWorkbenchObserver()
+        Gui.addDocumentObserver(_sketch_edit_observer)
 
 
 # ---------------------------------------------------------------------------

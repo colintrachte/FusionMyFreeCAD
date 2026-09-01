@@ -222,17 +222,21 @@ def test_resetting_one_panel_preserves_other_panel_customization(installed):
 
 def test_restore_returns_the_profile_to_its_original_state(env, bootstrap):
     view = env.param("User parameter:BaseApp/Preferences/View")
+    sketcher = env.param("User parameter:BaseApp/Preferences/Mod/Sketcher")
     view.SetString("NavigationStyle", "PreviousStyle")
+    sketcher.SetBool("MakeInternals", False)
     Path(bootstrap.RIBBON_DIR).mkdir(parents=True, exist_ok=True)
     Path(bootstrap.RIBBON_PATH).write_text('{"previous": true}', encoding="utf-8")
 
     bootstrap.prepare()
     view.SetString("NavigationStyle", "Gui::RevitNavigationStyle")
+    sketcher.SetBool("MakeInternals", True)
 
     removed, problems = bootstrap.restore()
     assert problems == []
     assert json.loads(Path(bootstrap.RIBBON_PATH).read_text("utf-8")) == {"previous": True}
     assert view.GetString("NavigationStyle") == "PreviousStyle"
+    assert sketcher.GetBool("MakeInternals") is False
     assert (Path(removed) / "FusionMyFreeCAD-addon-state.json").is_file()
 
 

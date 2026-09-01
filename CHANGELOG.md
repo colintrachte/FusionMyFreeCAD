@@ -2,6 +2,42 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
+## 1.3.0 — 2026-09-01
+
+### Sketch creation and extrusion
+
+- Enabled FreeCAD's native selectable sketch regions so ordinary, non-construction lines can
+  subdivide closed profiles for Fusion-style face selection and extrusion.
+- Added **Validate Sketch** directly to Part Design so disconnected or invalid geometry can be
+  checked without hunting through another workbench.
+- Kept **Create Sketch** visible in Sketcher and fixed its position at the far-left edge of the
+  ribbon, including when Ribbon initializes before FMF's commands finish registering.
+- Preserved and framed FreeCAD's selectable origin planes during sketch creation, then switched to
+  the Sketcher ribbon only after a plane has been chosen and sketch editing begins.
+- Let Enter activate the enabled affirmative button in modeling task dialogs while preserving
+  normal Enter behavior in multiline text editors.
+
+### Responsive Sketcher ribbon
+
+- Promoted Sketcher's **Symmetric** constraint to a top-level, independently movable button with
+  its official FreeCAD icon.
+- Made the Sketcher ribbon responsive: up to 29 useful overflow commands automatically occupy
+  available space at 1450 px and 1750 px window widths and return to their panel menus when narrow.
+- Preserved panel customization and complete dropdown access while responsive commands move on and
+  off the ribbon face.
+
+### Release maintenance
+
+- Added a tested release-preparation helper and a manually dispatched GitHub Actions workflow that
+  validates, builds, checksums, tags, and uploads a draft release.
+- Added a human release runbook covering validation, archive review, publication, and rollback.
+
+### Upgrade notes
+
+- Replace the entire existing `Mod/FusionMyFreeCAD` folder; do not merge files from older versions.
+- Restart FreeCAD after updating. FMF applies the new selectable-region preference once for 1.3.0
+  while retaining existing ribbon panel arrangements.
+
 ## 1.2.0 — 2026-08-31
 
 ### Ribbon access and personalization

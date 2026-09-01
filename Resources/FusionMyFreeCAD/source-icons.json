@@ -29,6 +29,10 @@
       "path": "src/Mod/Sketcher/Gui/Resources/icons/constraints/Constraint_PointOnPoint.svg",
       "sha256": "97e18972ae5439a85202e39f207295bdd6b7bdea0b6bba372c3b4c4ea27b93fd"
     },
+    "Constraint_Symmetric": {
+      "path": "src/Mod/Sketcher/Gui/Resources/icons/constraints/Constraint_Symmetric.svg",
+      "sha256": "4b96a1aa9ef9239a807e5dbd0b358d2d5544270d9a29b99a75b3fe0d9ddb7ce1"
+    },
     "Constraint_Tangent": {
       "path": "src/Mod/Sketcher/Gui/Resources/icons/constraints/Constraint_Tangent.svg",
       "sha256": "6bef62ac401229c96e595fcc63fcc7224cab2d51215e4481e4e801012d3d6408"

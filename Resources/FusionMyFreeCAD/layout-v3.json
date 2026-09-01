@@ -1,5 +1,5 @@
 {
-  "layoutVersion": "1.2.0",
+  "layoutVersion": "1.3.0",
   "targetFreeCAD": "1.1.x",
   "dropdownButtons": {
     "Fusion_MoreCreate_ddb": [
@@ -47,24 +47,6 @@
         "Sketcher_CreateText",
         "SketcherWorkbench"
       ]
-    ],
-    "Fusion_MoreConstraints_ddb": [
-      [
-        "Sketcher_ConstrainBlock",
-        "SketcherWorkbench"
-      ],
-      [
-        "Sketcher_ConstrainSymmetric",
-        "SketcherWorkbench"
-      ],
-      [
-        "Sketcher_CompDimensionTools",
-        "SketcherWorkbench"
-      ],
-      [
-        "Sketcher_CompConstrainTools",
-        "SketcherWorkbench"
-      ]
     ]
   },
   "workbenches": {
@@ -86,6 +68,13 @@
             "small",
             "New Body",
             "PartDesign_Body"
+          ],
+          [
+            "Sketcher_ValidateSketch",
+            "SketcherWorkbench",
+            "small",
+            "Validate Sketch",
+            "Sketcher_ValidateSketch"
           ]
         ],
         "overflow": [
@@ -116,13 +105,6 @@
             "small",
             "Reorient Sketch",
             "Sketcher_ReorientSketch"
-          ],
-          [
-            "Sketcher_ValidateSketch",
-            "SketcherWorkbench",
-            "small",
-            "Validate Sketch",
-            "Sketcher_ValidateSketch"
           ],
           [
             "Sketcher_MergeSketches",
@@ -898,6 +880,13 @@
         "title": "CREATE",
         "commands": [
           [
+            "FusionMyFreeCAD_CreateSketch",
+            "General",
+            "large",
+            "Create Sketch",
+            "Sketcher_NewSketch"
+          ],
+          [
             "Sketcher_CreateLine",
             "SketcherWorkbench",
             "large",
@@ -1004,7 +993,15 @@
             "Text",
             "Sketcher_CreateText"
           ]
-        ]
+        ],
+        "responsive": {
+          "Sketcher_CompLine": 1750,
+          "Sketcher_CompCreateRectangles": 1750,
+          "Sketcher_CompSlot": 1750,
+          "Sketcher_CompCreateBSpline": 1750,
+          "Sketcher_CreatePoint": 1450,
+          "Sketcher_CreateText": 1750
+        }
       },
       {
         "name": "Fusion Sketch Modify_newPanel",
@@ -1166,7 +1163,17 @@
             "Join Curves",
             "Sketcher_JoinCurves"
           ]
-        ]
+        ],
+        "responsive": {
+          "Sketcher_Scale": 1450,
+          "Sketcher_CompCurveEdition": 1750,
+          "Sketcher_RemoveAxesAlignment": 1750,
+          "Sketcher_CopyClipboard": 1750,
+          "Sketcher_Cut": 1750,
+          "Sketcher_Paste": 1750,
+          "Sketcher_BSplineConvertToNURBS": 1750,
+          "Sketcher_JoinCurves": 1750
+        }
       },
       {
         "name": "Fusion Sketch Constraints_newPanel",
@@ -1222,14 +1229,21 @@
             "Constraint_Perpendicular"
           ],
           [
-            "Fusion_MoreConstraints_ddb",
-            "General",
+            "Sketcher_ConstrainSymmetric",
+            "SketcherWorkbench",
             "small",
-            "More",
-            "Constraint_Block"
+            "Symmetric",
+            "Constraint_Symmetric"
           ]
         ],
         "overflow": [
+          [
+            "Sketcher_ConstrainBlock",
+            "SketcherWorkbench",
+            "small",
+            "Block",
+            "Constraint_Block"
+          ],
           [
             "Sketcher_CompDimensionTools",
             "SketcherWorkbench",
@@ -1251,7 +1265,13 @@
             "Toggle Constraints",
             "Sketcher_ToggleConstraint"
           ]
-        ]
+        ],
+        "responsive": {
+          "Sketcher_ConstrainBlock": 1450,
+          "Sketcher_CompDimensionTools": 1750,
+          "Sketcher_CompConstrainTools": 1750,
+          "Sketcher_CompToggleConstraints": 1750
+        }
       },
       {
         "name": "Fusion Sketch Configure_newPanel",
@@ -1294,7 +1314,13 @@
             "Restore Internal Geometry",
             "Sketcher_Element_Ellipse_All"
           ]
-        ]
+        ],
+        "responsive": {
+          "Sketcher_ToggleDrivingConstraint": 1450,
+          "Sketcher_ToggleActiveConstraint": 1750,
+          "Sketcher_SwitchVirtualSpace": 1750,
+          "Sketcher_RestoreInternalAlignmentGeometry": 1750
+        }
       },
       {
         "name": "Fusion Sketch Inspect_newPanel",
@@ -1337,7 +1363,11 @@
             "B-Spline Information",
             "Sketcher_BSplineDegree"
           ]
-        ]
+        ],
+        "responsive": {
+          "Sketcher_ArcOverlay": 1450,
+          "Sketcher_CompBSplineShowHideGeometryInformation": 1750
+        }
       },
       {
         "name": "Fusion Sketch Insert_newPanel",
@@ -1366,7 +1396,10 @@
             "Intersection",
             "Sketcher_Intersection"
           ]
-        ]
+        ],
+        "responsive": {
+          "Sketcher_Intersection": 1450
+        }
       },
       {
         "name": "Fusion Sketch Select_newPanel",
@@ -1409,7 +1442,12 @@
             "Vertical Axis",
             "Sketcher_SelectVerticalAxis"
           ]
-        ]
+        ],
+        "responsive": {
+          "Sketcher_SelectOrigin": 1450,
+          "Sketcher_SelectHorizontalAxis": 1750,
+          "Sketcher_SelectVerticalAxis": 1750
+        }
       },
       {
         "name": "Fusion Finish_newPanel",
@@ -1431,7 +1469,10 @@
             "Cancel Sketch",
             "process-stop"
           ]
-        ]
+        ],
+        "responsive": {
+          "Sketcher_CancelSketch": 1750
+        }
       }
     ],
     "SurfaceWorkbench": [

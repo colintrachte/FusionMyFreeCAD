@@ -140,6 +140,20 @@ def freecad_icon_sources(freecad_source: Path) -> dict[str, Path]:
     return selected
 
 
+def sync_layout_icons(freecad_source: Path, destination: Path) -> dict[str, Path]:
+    """Refresh only the curated FreeCAD command icons used by the layout."""
+    icon_destination = destination / "Resources" / "FreeCAD Icons"
+    icon_destination.mkdir(parents=True, exist_ok=True)
+    sources = freecad_icon_sources(freecad_source)
+    required = {"{}.svg".format(name) for name in sources}
+    for path in icon_destination.iterdir():
+        if path.is_file() and path.name not in required:
+            path.unlink()
+    for name, source_icon in sources.items():
+        (icon_destination / "{}.svg".format(name)).write_bytes(canonical_svg_bytes(source_icon))
+    return sources
+
+
 def sync_ribbon(freecad_source: Path) -> dict[str, Path]:
     source = SOURCE_ROOT / "FreeCAD-Ribbon"
     destination = DESTINATION_ROOT / "FreeCAD-Ribbon"
@@ -167,12 +181,7 @@ def sync_ribbon(freecad_source: Path) -> dict[str, Path]:
     # Ribbon asks its local command-icon directory before every source workbench is
     # guaranteed to have registered Qt resources. Copy only the icons used by the
     # current layout, sourced from FreeCAD's official repository checkout.
-    icon_destination = destination / "Resources" / "FreeCAD Icons"
-    icon_destination.mkdir(parents=True, exist_ok=True)
-    sources = freecad_icon_sources(freecad_source)
-    for name, source_icon in sources.items():
-        (icon_destination / "{}.svg".format(name)).write_bytes(canonical_svg_bytes(source_icon))
-    return sources
+    return sync_layout_icons(freecad_source, destination)
 
 
 def write_source_icon_manifest(freecad_source: Path, sources: dict[str, Path]) -> None:
@@ -252,11 +261,24 @@ def main() -> None:
         default=ROOT.parent / "FreeCAD",
         help="Official FreeCAD source checkout (default: sibling ../FreeCAD)",
     )
+    parser.add_argument(
+        "--icons-only",
+        action="store_true",
+        help="Refresh the curated command icons without replacing the bundled add-ons",
+    )
     arguments = parser.parse_args()
     destination = DESTINATION_ROOT.resolve()
     expected = (ROOT / "bundled-addons").resolve()
     if destination != expected or destination.parent != ROOT.resolve():
         raise RuntimeError(f"Refusing to replace unexpected destination: {destination}")
+    if arguments.icons_only:
+        icon_sources = sync_layout_icons(
+            arguments.freecad_source, DESTINATION_ROOT / "FreeCAD-Ribbon"
+        )
+        write_source_icon_manifest(arguments.freecad_source, icon_sources)
+        assert_minimal_freecad_icons()
+        print("Refreshed {} curated FreeCAD icons.".format(len(icon_sources)))
+        return
     if destination.exists():
         shutil.rmtree(destination)
     destination.mkdir()
