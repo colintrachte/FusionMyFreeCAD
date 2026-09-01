@@ -7,8 +7,8 @@ or newer and Python 3.11 or newer, as declared in `package.xml`.
 
 1. Close FreeCAD.
 2. Back up your FreeCAD user-data directory if it contains a profile you care about.
-3. Download `FusionMyFreeCAD-1.2.0.zip` and its `.sha256` file from the
-   [1.2.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.2.0).
+3. Download `FusionMyFreeCAD-1.3.0.zip` and its `.sha256` file from the
+   [1.3.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.0).
 4. Optionally verify the archive against the published SHA-256 checksum.
 5. Open the archive and copy its top-level `FusionMyFreeCAD` folder into the `Mod` directory under
    your FreeCAD user-data directory.

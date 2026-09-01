@@ -10,14 +10,14 @@ format, and everything it changes can be undone from inside FreeCAD.
 
 ## Status
 
-Version **1.2.0** is available from [GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.2.0)
+Version **1.3.0** is available from [GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.0)
 as a self-contained archive. FusionMyFreeCAD has not yet been submitted to FreeCAD's add-on index;
 catalog publication remains separate work.
 
 ## Install
 
-Download `FusionMyFreeCAD-1.2.0.zip` from the
-[1.2.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.2.0), extract its
+Download `FusionMyFreeCAD-1.3.0.zip` from the
+[1.3.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.0), extract its
 top-level `FusionMyFreeCAD` folder into FreeCAD's user `Mod` directory, and restart FreeCAD. Full
 platform-by-platform steps, verification, update, and removal instructions are in
 [`docs/INSTALL-FREECAD-ADDON.md`](docs/INSTALL-FREECAD-ADDON.md).
@@ -43,6 +43,14 @@ Every panel has a dropdown containing its complete command inventory, including 
 not fit on the ribbon face. A normal click runs a visible command; click, hold, and drag past the
 platform's normal drag distance to reorder its icon within that panel. The new order is saved
 automatically and survives FreeCAD restarts and FusionMyFreeCAD layout updates.
+
+Sketcher also uses the available window width: frequently useful overflow commands appear at the
+1450 px and 1750 px tiers, then return to their panel dropdowns when the window becomes narrower.
+The Symmetric constraint is always a top-level button and can be reordered directly.
+
+**Create Sketch** remains the first button in the Part Design ribbon. Its attachment step stays in
+Part Design so FreeCAD can display, label, and frame the selectable origin planes; FMF changes to the
+Sketcher ribbon only after the selected plane has opened the sketch for editing.
 
 Each panel's dropdown ends with **Reset this panel**. It restores only that panel's shipped order
 and pinned commands, leaving every other panel alone. There is deliberately no top-level reset
@@ -93,6 +101,7 @@ output.
 
 - [`docs/INSTALL-FREECAD-ADDON.md`](docs/INSTALL-FREECAD-ADDON.md) — install, verify, update, remove
 - [`CHANGELOG.md`](CHANGELOG.md) — user-visible release history
+- [`RELEASING.md`](RELEASING.md) — prepare, validate, build, and upload a release without assistance
 - [`MAINTAINING.md`](MAINTAINING.md) — architecture, change procedures, validation, release checklist
 - [`command-map.md`](command-map.md) — Fusion-to-FreeCAD command and shortcut decisions
 - [`setup-guide.md`](setup-guide.md) — the manual, native-FreeCAD workflow baseline

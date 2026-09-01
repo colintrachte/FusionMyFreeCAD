@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+import types
 from pathlib import Path
 
-from fake_freecad import ROOT, _import_module
+from fake_freecad import ROOT, FakeObject, FakeTimer, _import_module
 
 
 def _run_init_gui(env, bootstrap, monkeypatch, stub_vendors=True):
@@ -25,6 +26,37 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
         "FusionMyFreeCAD_Restore",
     }
     assert bootstrap.startup_failures() == []
+
+
+def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher(env, bootstrap):
+    class View:
+        def __init__(self):
+            self.calls = []
+
+        def viewAxonometric(self):
+            self.calls.append("axonometric")
+
+        def fitAll(self):
+            self.calls.append("fitAll")
+
+    view = View()
+    env.gui.ActiveDocument = types.SimpleNamespace(ActiveView=view)
+    bootstrap.register_commands()
+
+    env.commands["FusionMyFreeCAD_CreateSketch"].Activated()
+    FakeTimer.pump()
+
+    assert env.active_workbench == "PartDesignWorkbench"
+    assert env.gui_events[-2:] == [
+        ("workbench", "PartDesignWorkbench"),
+        ("command", "PartDesign_NewSketch"),
+    ]
+    assert view.calls == ["axonometric", "fitAll"]
+
+    observer = env.document_observers[0]
+    sketch = FakeObject("Sketcher::SketchObject", "Sketch")
+    observer.slotInEdit(types.SimpleNamespace(Object=sketch))
+    assert env.active_workbench == "SketcherWorkbench"
 
 
 def test_a_failing_install_still_leaves_verify_and_restore_available(env, bootstrap, monkeypatch):

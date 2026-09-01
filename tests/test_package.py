@@ -147,6 +147,19 @@ def test_layout_command_entries_are_well_formed(layout):
                 assert text.strip(), entry
 
 
+def test_responsive_commands_are_real_overflow_commands(layout):
+    """Width-aware commands must remain available in the panel menu when compact."""
+    for workbench, panels in layout["workbenches"].items():
+        for panel in panels:
+            overflow = {entry[0] for entry in panel.get("overflow", [])}
+            responsive = panel.get("responsive", {})
+            assert set(responsive) <= overflow, "{}/{}".format(workbench, panel["name"])
+            assert all(isinstance(width, int) and width >= 1024 for width in responsive.values())
+
+    sketcher = layout["workbenches"]["SketcherWorkbench"]
+    assert sum(len(panel.get("responsive", {})) for panel in sketcher) >= 25
+
+
 def test_first_party_commands_in_the_layout_are_registered(layout, env, bootstrap):
     """Every FusionMyFreeCAD_* button in the ribbon must have a command behind it."""
     bootstrap.register_commands()
@@ -205,6 +218,29 @@ def test_every_panel_has_a_complete_menu_inventory(layout):
             )
 
 
+def test_validate_sketch_is_visible_after_finishing_a_sketch(layout):
+    """Profile repair must not be hidden when Part Design regains control after sketch editing."""
+    panels = {panel["name"]: panel for panel in layout["workbenches"]["PartDesignWorkbench"]}
+    visible = {entry[0] for entry in panels["Fusion Sketch Entry_newPanel"]["commands"]}
+    assert "Sketcher_ValidateSketch" in visible
+
+
+def test_create_sketch_stays_visible_in_the_sketcher_workbench(layout):
+    """Finishing a sketch must not strand the user without Create Sketch."""
+    panels = {panel["name"]: panel for panel in layout["workbenches"]["SketcherWorkbench"]}
+    visible = {entry[0] for entry in panels["Fusion Sketch Create_newPanel"]["commands"]}
+    assert "FusionMyFreeCAD_CreateSketch" in visible
+
+
+def test_symmetric_constraint_is_a_top_level_movable_command(layout):
+    panels = {panel["name"]: panel for panel in layout["workbenches"]["SketcherWorkbench"]}
+    constraints = panels["Fusion Sketch Constraints_newPanel"]
+    visible = {entry[0] for entry in constraints["commands"]}
+    assert "Sketcher_ConstrainSymmetric" in visible
+    assert "Fusion_MoreConstraints_ddb" not in visible
+    assert "Fusion_MoreConstraints_ddb" not in layout["dropdownButtons"]
+
+
 # ---------------------------------------------------------------------------
 # Vendor patches that must survive an upstream refresh
 # ---------------------------------------------------------------------------
@@ -233,6 +269,17 @@ def test_ribbon_honours_the_authoritative_workbench_list():
     source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
     assert 'workbenchName in Dict.get("authoritativeWorkbenches", [])' in source
     assert "ListToolbars: list = []" in source
+
+
+def test_ribbon_surfaces_overflow_commands_at_declared_width_tiers():
+    source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
+    assert "def _responsiveWidthTier" in source
+    assert "def _rebuildResponsivePanels" in source
+    assert "def resizeEvent" in source
+    assert 'responsiveCommands = panelDefinition.get("responsive", {})' in source
+    assert "mw.width() >= int(minimumResponsiveWidth)" in source
+    assert "panelMenuOrder" in source
+    assert 'Dict.get("authoritativeWorkbenches", [])' in source
 
 
 def test_ribbon_buttons_use_direct_drag_with_the_platform_threshold():

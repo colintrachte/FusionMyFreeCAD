@@ -255,10 +255,56 @@ class FakeTabWidget:
         self.current = index
 
 
+class FakeQtObject:
+    def __init__(self, *_args, **_kwargs):
+        pass
+
+
+class FakeApplication:
+    def __init__(self):
+        self.filters = []
+        self.focus_widget = None
+
+    def installEventFilter(self, event_filter):
+        self.filters.append(event_filter)
+
+
+class FakeButton:
+    def __init__(self, enabled=True):
+        self.enabled = enabled
+        self.clicks = 0
+
+    def isEnabled(self):
+        return self.enabled
+
+    def click(self):
+        self.clicks += 1
+
+
+class FakeDialogButtonBox:
+    AcceptRole = "accept"
+    YesRole = "yes"
+    RejectRole = "reject"
+
+    def __init__(self, roles=(AcceptRole, RejectRole), visible=True):
+        self.visible = visible
+        self._buttons = [(FakeButton(), role) for role in roles]
+
+    def isVisible(self):
+        return self.visible
+
+    def buttons(self):
+        return [button for button, _role in self._buttons]
+
+    def buttonRole(self, wanted):
+        return next(role for button, role in self._buttons if button is wanted)
+
+
 class FakeMainWindow:
     def __init__(self):
         self.actions = []
         self.docks = []
+        self.button_boxes = []
         self.areas = {}
         self.workbenchActivated = Signal()
         self._menu_shown = False
@@ -277,6 +323,8 @@ class FakeMainWindow:
             return list(self.actions)
         if kind is FakeDock:
             return list(self.docks)
+        if kind is FakeDialogButtonBox:
+            return list(self.button_boxes)
         return []
 
     def dockWidgetArea(self, dock):
@@ -287,9 +335,18 @@ class FakeMainWindow:
 
 
 def _qt_modules():
+    application = FakeApplication()
+
     qtcore = types.ModuleType("PySide.QtCore")
     qtcore.QTimer = FakeTimer
-    qtcore.Qt = types.SimpleNamespace(LeftDockWidgetArea="left", ApplicationShortcut="application")
+    qtcore.QObject = FakeQtObject
+    qtcore.QEvent = types.SimpleNamespace(KeyPress="key-press")
+    qtcore.Qt = types.SimpleNamespace(
+        LeftDockWidgetArea="left",
+        ApplicationShortcut="application",
+        Key_Return="return",
+        Key_Enter="enter",
+    )
 
     qtgui = types.ModuleType("PySide.QtGui")
     qtgui.QKeySequence = FakeKeySequence
@@ -300,6 +357,11 @@ def _qt_modules():
     qtwidgets.QTabWidget = FakeTabWidget
     qtwidgets.QToolBar = type("QToolBar", (), {})
     qtwidgets.QAction = FakeAction
+    qtwidgets.QDialogButtonBox = FakeDialogButtonBox
+    qtwidgets.QApplication = types.SimpleNamespace(
+        instance=lambda: application,
+        focusWidget=lambda: application.focus_widget,
+    )
 
     pyside = types.ModuleType("PySide")
     pyside.QtCore = qtcore
@@ -326,6 +388,7 @@ class Environment:
         self.main_window = FakeMainWindow()
         self.registered_commands = ["Std_ViewFitAll", "Std_Measure"]
         self.active_workbench = "PartDesignWorkbench"
+        self.task_dialog_active = False
         self.saved_parameters = 0
 
         app = types.ModuleType("FreeCAD")
@@ -343,10 +406,13 @@ class Environment:
         gui.addCommand = lambda name, command: self.commands.__setitem__(name, command)
         self.preference_pages = []
         gui.addPreferencePage = lambda path, group: self.preference_pages.append((path, group))
+        self.document_observers = []
+        gui.addDocumentObserver = self.document_observers.append
         gui.activateWorkbench = self._activate_workbench
         gui.runCommand = lambda name: self.gui_events.append(("command", name))
         gui.listCommands = lambda: list(self.registered_commands)
         gui.activeWorkbench = lambda: types.SimpleNamespace(name=lambda: self.active_workbench)
+        gui.Control = types.SimpleNamespace(activeDialog=lambda: self.task_dialog_active)
         gui.ActiveDocument = None
         gui.Selection = types.SimpleNamespace(
             clearSelection=lambda: self.gui_events.append(("selection", "clear")),

@@ -6,11 +6,12 @@ import json
 from datetime import timedelta
 from pathlib import Path
 
-from fake_freecad import FakeAction, FakeDock, FakeTabWidget, FakeTimer
+from fake_freecad import FakeAction, FakeDialogButtonBox, FakeDock, FakeTabWidget, FakeTimer
 
 SHORTCUT_GROUP = "User parameter:BaseApp/Preferences/Shortcut"
 VIEW_GROUP = "User parameter:BaseApp/Preferences/View"
 RIBBON_GROUP = "User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon"
+SKETCHER_GROUP = "User parameter:BaseApp/Preferences/Mod/Sketcher"
 
 
 # ---------------------------------------------------------------------------
@@ -22,6 +23,7 @@ def test_defaults_are_applied_on_first_run(env, runtime):
     assert runtime.apply_preferences() is True
     assert env.param(VIEW_GROUP).GetString("NavigationStyle") == "Gui::RevitNavigationStyle"
     assert env.param(SHORTCUT_GROUP).GetString("PartDesign_Pad") == "E"
+    assert env.param(SKETCHER_GROUP).GetBool("MakeInternals") is True
     assert env.param(runtime.bootstrap.PREFERENCE_ROOT).GetString("AppliedVersion") == (
         runtime.bootstrap.PACKAGE_VERSION
     )
@@ -222,6 +224,46 @@ def test_model_tree_is_docked_left_and_shows_the_model_tab(env, runtime):
 
 def test_model_tree_asks_to_be_retried_when_absent(env, runtime):
     assert runtime.ensure_model_tree() is False
+
+
+def test_enter_accepts_the_active_task_dialog(env, runtime):
+    class EnterEvent:
+        accepted = False
+
+        def type(self):
+            return "key-press"
+
+        def key(self):
+            return "return"
+
+        def accept(self):
+            self.accepted = True
+
+    box = FakeDialogButtonBox()
+    env.main_window.button_boxes = [box]
+    env.task_dialog_active = True
+    event = EnterEvent()
+
+    assert runtime._TaskAcceptFilter().eventFilter(None, event) is True
+    assert event.accepted is True
+    assert box.buttons()[0].clicks == 1
+    assert box.buttons()[1].clicks == 0
+
+
+def test_enter_does_nothing_without_an_active_task(env, runtime):
+    box = FakeDialogButtonBox()
+    env.main_window.button_boxes = [box]
+    env.task_dialog_active = False
+
+    assert runtime.accept_active_task() is False
+    assert box.buttons()[0].clicks == 0
+
+
+def test_task_accept_filter_is_installed_once(env, runtime):
+    assert runtime.install_task_accept_filter() is True
+    assert runtime.install_task_accept_filter() is True
+    application = env.qtwidgets.QApplication.instance()
+    assert application.filters == [runtime._task_accept_filter]
 
 
 def test_runtime_problems_reach_verify(env, bootstrap, runtime):

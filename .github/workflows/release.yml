@@ -1,0 +1,113 @@
+name: Build and upload draft release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version from package.xml (for example, 1.3.0; no leading v)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse releases from another branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "Run this workflow from the main branch. Selected ref: $GITHUB_REF"
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Confirm release metadata
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          version = os.environ["RELEASE_VERSION"]
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+              raise SystemExit("Version must use X.Y.Z form without a leading v")
+
+          root = ET.parse("package.xml").getroot()
+          packaged = next(child.text for child in root if child.tag.endswith("version"))
+          if packaged != version:
+              raise SystemExit(
+                  f"Workflow version {version!r} does not match package.xml {packaged!r}"
+              )
+
+          notes = Path(f"docs/RELEASE-NOTES-{version}.md")
+          if not notes.is_file():
+              raise SystemExit(f"Missing {notes}")
+          if "TODO" in notes.read_text(encoding="utf-8"):
+              raise SystemExit(f"Finish the TODO in {notes} before releasing")
+
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          if f"## {version} " not in changelog:
+              raise SystemExit(f"CHANGELOG.md has no {version} section")
+          if "TODO" in changelog:
+              raise SystemExit("Finish every CHANGELOG.md TODO before releasing")
+          PY
+
+      - name: Install pinned release tools
+        run: python -m pip install --upgrade -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Check formatting
+        run: ruff format --check .
+
+      - name: Test
+        run: python -m pytest tests -q
+
+      - name: Build and verify archive
+        run: python tools/build_addon_package.py
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FusionMyFreeCAD-${{ inputs.version }}
+          path: |
+            dist/FusionMyFreeCAD-${{ inputs.version }}.zip
+            dist/FusionMyFreeCAD-${{ inputs.version }}.zip.sha256
+
+      - name: Create tagged draft release and upload files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "v${RELEASE_VERSION}" \
+            "dist/FusionMyFreeCAD-${RELEASE_VERSION}.zip" \
+            "dist/FusionMyFreeCAD-${RELEASE_VERSION}.zip.sha256" \
+            --draft \
+            --fail-on-no-commits \
+            --notes-file "docs/RELEASE-NOTES-${RELEASE_VERSION}.md" \
+            --target "$GITHUB_SHA" \
+            --title "FusionMyFreeCAD ${RELEASE_VERSION}"
+
+      - name: Add review link to the run summary
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          url=$(gh release view "v${RELEASE_VERSION}" --json url --jq .url)
+          echo "## Draft release uploaded" >> "$GITHUB_STEP_SUMMARY"
+          echo "Review the files and notes, then publish: ${url}" >> "$GITHUB_STEP_SUMMARY"
