@@ -453,10 +453,6 @@
       "path": "src/Mod/Sketcher/Gui/Resources/icons/general/Sketcher_MergeSketch.svg",
       "sha256": "1ba017c99d1b884301d745485bc04be675902d825f7dfba5688ef5bbb030c9c7"
     },
-    "Sketcher_MirrorSketch": {
-      "path": "src/Mod/Sketcher/Gui/Resources/icons/general/Sketcher_MirrorSketch.svg",
-      "sha256": "99721caae55361698ac0a04293572a3f357d00f9e82a646ad40ba6733335116e"
-    },
     "Sketcher_NewSketch": {
       "path": "src/Mod/Sketcher/Gui/Resources/icons/general/Sketcher_NewSketch.svg",
       "sha256": "6164f4faae91b3773398e869a1b5af98162ddd066f8fc7fba4b63d6da43c23d4"
