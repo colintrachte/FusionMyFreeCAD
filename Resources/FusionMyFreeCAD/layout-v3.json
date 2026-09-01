@@ -112,13 +112,6 @@
             "small",
             "Merge Sketches",
             "Sketcher_MergeSketch"
-          ],
-          [
-            "Sketcher_MirrorSketch",
-            "SketcherWorkbench",
-            "small",
-            "Mirror Sketch",
-            "Sketcher_MirrorSketch"
           ]
         ]
       },
