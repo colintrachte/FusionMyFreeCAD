@@ -2,6 +2,20 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
+## 1.3.1 — 2026-09-01
+
+### Sketcher ribbon fix
+
+- Removed **Mirror Sketch** (`Sketcher_MirrorSketch`) from the Sketcher ribbon. It called FreeCAD's
+  underlying mirror operation without linking the copy back to the original, so mirrored geometry
+  could end up under-constrained with no warning. **Mirror** (`Sketcher_Symmetry`) remains and
+  correctly links mirrored geometry to the source by default.
+
+### Upgrade notes
+
+- If a sketch was mirrored with the removed **Mirror Sketch** button, its existing geometry is
+  unaffected. Re-mirror using **Mirror** if you want the copy properly linked to the original.
+
 ## 1.3.0 — 2026-09-01
 
 ### Sketch creation and extrusion
