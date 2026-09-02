@@ -650,7 +650,8 @@ def refresh_adaptive_panel(workbench):
         # Keep the recorded digest current so a future mismatch means a genuine
         # edit from outside the add-on rather than our own adaptive rewrite.
         bootstrap.update_ribbon_hash()
-        App.Console.PrintMessage(
+        # Housekeeping, not something the user acts on -- keep it in the log only.
+        App.Console.PrintLog(
             "FusionMyFreeCAD updated FREQUENT for {}; it appears on the next "
             "ribbon reload.\n".format(workbench)
         )
@@ -693,6 +694,7 @@ def reconcile_actions(main_window=None):
         return True
 
     context = _application_shortcut_context()
+    newly_displaced = []
     for command, shortcut in SHORTCUTS.items():
         target = by_name.get(command)
         if target is None:
@@ -709,13 +711,22 @@ def reconcile_actions(main_window=None):
             }
             if entry not in _displaced_shortcuts:
                 _displaced_shortcuts.append(entry)
-                App.Console.PrintMessage(
+                newly_displaced.append(entry)
+                # Per-shortcut detail stays in the log; Verify UI lists them too.
+                App.Console.PrintLog(
                     "FusionMyFreeCAD moved the {} shortcut from {} to {}.\n".format(
                         entry["sequence"], entry["from"], entry["to"]
                     )
                 )
         target.setShortcut(QtGui.QKeySequence(shortcut))
         target.setShortcutContext(context)
+    if newly_displaced:
+        App.Console.PrintMessage(
+            "FusionMyFreeCAD reassigned {} keyboard shortcut{} from other commands "
+            "(run Verify FusionMyFreeCAD to see which).\n".format(
+                len(newly_displaced), "" if len(newly_displaced) == 1 else "s"
+            )
+        )
     return True
 
 

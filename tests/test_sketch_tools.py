@@ -312,11 +312,12 @@ def test_mirror_links_every_card_box_divider_to_its_source(tools, env):
     symmetric = [c for c in sketch.Constraints if c.Type == "Symmetric"]
     assert len(symmetric) == 12
     assert all(c.Third == -2 for c in symmetric)
-    # The link makes the copied boundary constraints redundant, so they are not
-    # also added; every one is accounted for as covered.
-    assert result["copied"] == []
-    assert len(result["covered_by_link"]) == 12
-    assert sum(1 for c in sketch.Constraints if c.Type == "PointOnObject") == 12
+    # The endpoint attachments are still copied onto every mirrored divider --
+    # they are what lets FreeCAD split the borders and find the enclosed regions
+    # -- even though the link makes them numerically redundant.
+    assert len(result["copied"]) == 12
+    assert all(spec["type"] == "PointOnObject" for spec in result["copied"])
+    assert sum(1 for c in sketch.Constraints if c.Type == "PointOnObject") == 24
 
 
 def test_boundary_constraint_is_copied_when_the_symmetry_link_is_rejected(tools, env):
