@@ -25,7 +25,10 @@ def env(tmp_path):
         "PySide.QtCore",
         "PySide.QtGui",
         "PySide.QtWidgets",
+        "Sketcher",
+        "Part",
         "fusion_bootstrap",
+        "fusion_sketch_tools",
         "_fusion_my_freecad_runtime",
     ):
         sys.modules.pop(name, None)
@@ -34,6 +37,11 @@ def env(tmp_path):
 @pytest.fixture
 def bootstrap(env):
     return env.load_bootstrap()
+
+
+@pytest.fixture
+def sketch_tools(env):
+    return env.load_sketch_tools()
 
 
 @pytest.fixture

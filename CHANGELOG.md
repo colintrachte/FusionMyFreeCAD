@@ -2,6 +2,31 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
+## 1.3.2 — 2026-09-02
+
+### Constraint-aware sketch mirroring
+
+- Added a visually distinct **Mirror + Constraints** button beside FreeCAD's original **Mirror**.
+  Select geometry and then a mirror line or sketch axis; the advanced command mirrors it and copies
+  compatible endpoint constraints to unchanged borders or axes so profiles remain closed.
+- The command is explicitly best-effort: every constraint it cannot reproduce safely (global X/Y
+  dimensions under an angled mirror, dimensions and unsupported relations across the mirror
+  boundary, copies the solver then rejects as redundant) is reported in the Report view, never
+  dropped silently. The mirror and copied constraints are one Undo step.
+- Kept FreeCAD's original `Sketcher_Symmetry` as an adjacent top-level **Mirror** button for its
+  familiar interactive workflow, live symmetry links, point symmetry, and unsupported cases.
+
+### Coincident and Point on Object
+
+- Replaced the point-to-point-only **Coincident** button with `Sketcher_ConstrainCoincidentUnified`,
+  which picks point-to-point or point-on-edge from the selection, kept top-level beside
+  Horizontal / Vertical.
+- Added a dedicated top-level **Point on Object** button (`Sketcher_ConstrainPointOnObject`) for
+  attaching a point or line endpoint anywhere along a line, arc, curve, or axis.
+- Assigned the verified native Coincident and Point-on-Object icons so the two controls are easy to
+  distinguish visually.
+- The legacy point-to-point-only Coincident command remains in the Constraints panel menu.
+
 ## 1.3.1 — 2026-09-01
 
 ### Sketcher ribbon fix

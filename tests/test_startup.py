@@ -20,6 +20,7 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
     _run_init_gui(env, bootstrap, monkeypatch)
     assert set(env.commands) == {
         "FusionMyFreeCAD_CreateSketch",
+        "FusionMyFreeCAD_MirrorWithConstraints",
         "FusionMyFreeCAD_ParameterTable",
         "FusionMyFreeCAD_Verify",
         "FusionMyFreeCAD_Reapply",

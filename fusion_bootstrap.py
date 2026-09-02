@@ -1139,6 +1139,10 @@ def register_commands():
     Gui.addCommand("FusionMyFreeCAD_Verify", VerifyCommand())
     Gui.addCommand("FusionMyFreeCAD_Reapply", ReapplyCommand())
     Gui.addCommand("FusionMyFreeCAD_Restore", RestoreCommand())
+    # Sketch tools live in their own module so this one does not keep growing.
+    import fusion_sketch_tools
+
+    fusion_sketch_tools.register()
     if _sketch_edit_observer is None and hasattr(Gui, "addDocumentObserver"):
         _sketch_edit_observer = _SketchEditWorkbenchObserver()
         Gui.addDocumentObserver(_sketch_edit_observer)
