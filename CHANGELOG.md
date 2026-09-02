@@ -18,15 +18,19 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
   workbench, nothing more). The workbench switch on sketch-open is also deferred out of
   the document-observer callback so it can no longer re-enter an in-progress edit.
 - **Mirror + Constraints** returns as a small button in front of native **Mirror**, which
-  keeps its 1.3.1 size — the panel layout is barely changed from 1.3.1. It adds a live
-  **Symmetric** link between each element and its mirrored copy, across the same line the
-  mirror used, so dragging either one moves the other; **Equal** keeps a mirrored circle or
-  arc the same size. FreeCAD's `addSymmetric` copies the source's Vertical/Horizontal/Block
-  constraint onto the mirror; the link makes that a duplicate, so it is removed first — this
-  is what caused the "redundant constraint" warning in testing. Each pair is linked
-  all-or-nothing: if it still will not solve cleanly the pair is rolled back (the removed
-  constraint restored) and its endpoint attachments to unchanged borders or axes are copied
-  instead.
+  keeps its 1.3.1 size — the panel layout is barely changed from 1.3.1. It does two things
+  native **Mirror** does not:
+  1. Reattaches each mirrored element to the borders it was attached to
+     (Point-on-Object / Coincident to unchanged edges or axes). Native Symmetry drops these,
+     and they are also what let FreeCAD split the border edges and detect the enclosed
+     regions — so a mirrored divider now leaves a fillable, extrudable profile.
+  2. Adds a live **Symmetric** link so dragging either element moves the other; **Equal**
+     keeps a mirrored circle or arc the same size. Links are added one at a time — a
+     conflicting or fully redundant one is removed, a clean or *partially* redundant one is
+     kept. On a divider already attached to a border, the link only couples the position
+     along that border, so FreeCAD shows one mild "partially redundant" note per mirrored
+     element. It is informational; the sketch stays fully constrained and every region is
+     selectable.
 - A constraint touching only a sketch axis or the origin, with nothing mirrored, is now left
   alone rather than reported as skipped. The whole operation is one Undo step.
 - The button has its own icon: FreeCAD's Mirror glyph with a green "+" badge, so it reads as

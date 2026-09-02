@@ -1,25 +1,23 @@
 """Constraint-aware sketch mirroring for FusionMyFreeCAD.
 
 ``FusionMyFreeCAD_MirrorWithConstraints`` uses Sketcher's synchronous symmetry API
-and then does two things native Symmetry does not do on FreeCAD 1.1.3:
+and then does two things native Symmetry does not do on FreeCAD 1.1.3, in order:
 
-1. Adds a live ``Symmetric`` link between each source element and its mirrored
+1. Copies the *boundary* constraints native Symmetry drops -- the ones that tie a
+   mirrored endpoint to geometry outside the mirrored selection (an unchanged
+   border line, a sketch axis, projected external geometry). Native Symmetry only
+   reproduces constraints whose every endpoint is inside the mirrored selection,
+   so a divider attached to its top and bottom edges would lose those
+   attachments. They are also what let FreeCAD split the border edges and detect
+   the enclosed regions for face selection and extrude, so they go on first.
+2. Adds a live ``Symmetric`` link between each source element and its mirrored
    copy, across the same line the mirror used, so dragging either one moves the
-   other. ``Equal`` keeps a mirrored circle or arc the same size. ``addSymmetric``
-   reproduces the source's single-element orientation constraints (Vertical /
-   Horizontal / Block) onto the copy; the link plus the source's own constraints
-   already pins the copy, so that reproduced constraint is stripped first,
-   otherwise the solver reports it as redundant. Each pair is linked
-   all-or-nothing: if it still will not solve cleanly the whole pair is rolled
-   back -- stripped constraints restored -- and left to step 2, because a pair
-   linked at one end only distorts when the source moves.
-2. For any pair the link cannot cover, copies the *boundary* constraints native
-   Symmetry leaves behind: the ones that tie a mirrored endpoint to geometry
-   outside the mirrored selection (an unchanged border line, a sketch axis,
-   projected external geometry). Native Symmetry only reproduces constraints
-   whose every endpoint is inside the mirrored selection, so a profile whose
-   dividers are attached to its top and bottom edges would otherwise lose those
-   attachments and the pad would fail to close.
+   other (``Equal`` keeps a mirrored circle or arc the same size). Links are
+   added one at a time: a conflicting or fully redundant one is removed, a clean
+   or merely *partially* redundant one is kept -- on a divider already attached
+   to a border the coordinate along the border is the only free part left, so
+   FreeCAD notes that link as partially redundant. The note is informational; the
+   sketch stays fully constrained.
 
 The command is explicitly best-effort.  Every constraint it cannot safely
 reproduce is reported rather than dropped in silence, matching the rest of the
@@ -474,11 +472,6 @@ def plan_constraint_copies(records, source_set, mapping, before_geometry, axis_a
 # ---------------------------------------------------------------------------
 
 
-# Single-element orientation constraints that ``addSymmetric`` reproduces onto a
-# mirror copy and that a full endpoint-symmetry link then makes redundant.
-_UNARY_ORIENTATION_TYPES = frozenset({"Vertical", "Horizontal", "Block"})
-
-
 def _new_constraint(spec):
     """Instantiate a ``Sketcher.Constraint`` from a spec dict."""
     import Sketcher
@@ -501,8 +494,6 @@ def _new_constraint(spec):
         )
     if ctype == "Equal":
         return Sketcher.Constraint("Equal", spec["first"], spec["second"])
-    if ctype in _UNARY_ORIENTATION_TYPES:
-        return Sketcher.Constraint(ctype, spec["first"])
     return Sketcher.Constraint(
         "Coincident",
         spec["first"],
@@ -512,40 +503,30 @@ def _new_constraint(spec):
     )
 
 
-def _unary_orientation_constraints_on(sketch, geoid):
-    """``(index, rebuild_spec)`` for each Vertical/Horizontal/Block whose only
-    element is ``geoid``."""
-    found = []
-    for index, constraint in enumerate(getattr(sketch, "Constraints", []) or []):
-        if getattr(constraint, "Type", "") not in _UNARY_ORIENTATION_TYPES:
-            continue
-        first = int(getattr(constraint, "First", -2000))
-        second = int(getattr(constraint, "Second", -2000))
-        third = int(getattr(constraint, "Third", -2000))
-        if first == geoid and second <= -2000 and third <= -2000:
-            found.append((index, {"type": constraint.Type, "first": geoid}))
-    return found
+# Solver diagnostics. A *conflicting* or *malformed* constraint breaks the
+# sketch and must always come back out. A *fully redundant* one adds nothing and
+# is quietly dropped. A *partially* redundant one still removes a degree of
+# freedom (only part of it duplicates something) so it is kept -- an endpoint
+# symmetry link onto an already-attached mirror is the usual case.
+_CONFLICTING_ATTRS = ("ConflictingConstraints", "MalformedConstraints", "Conflicting", "Malformed")
+_FULLY_REDUNDANT_ATTRS = ("RedundantConstraints", "Redundant")
+_ALL_BAD_ATTRS = _CONFLICTING_ATTRS + _FULLY_REDUNDANT_ATTRS + ("PartiallyRedundantConstraints",)
 
 
-def _bad_constraint_indices(sketch):
-    """Redundant/conflicting/malformed constraint indices the solver flagged."""
+def _flagged_indices(sketch, attributes):
     flagged = set()
-    for attribute in (
-        "ConflictingConstraints",
-        "RedundantConstraints",
-        "MalformedConstraints",
-        "PartiallyRedundantConstraints",
-        # Compatibility with older FreeCAD builds and the lightweight test fake.
-        "Conflicting",
-        "Redundant",
-        "Malformed",
-    ):
+    for attribute in attributes:
         for value in getattr(sketch, attribute, []) or []:
             try:
                 flagged.add(int(value))
             except (TypeError, ValueError):
                 continue
     return flagged
+
+
+def _bad_constraint_indices(sketch):
+    """Redundant/conflicting/malformed constraint indices the solver flagged."""
+    return _flagged_indices(sketch, _ALL_BAD_ATTRS)
 
 
 def apply_constraint_copies(sketch, specs):
@@ -623,80 +604,70 @@ def apply_constraint_copies(sketch, specs):
 
 
 def apply_symmetry_links(sketch, link_specs):
-    """Add each mirrored pair's ``Symmetric`` / ``Equal`` links as an all-or-nothing
-    unit.
+    """Add the live ``Symmetric`` links one at a time, keeping only what helps.
 
-    ``addSymmetric`` reproduces the source's single-element orientation constraints
-    (Vertical / Horizontal / Block) onto the copy. A full endpoint-symmetry link
-    plus the source's own constraints already pins the copy, so that reproduced
-    orientation constraint is exactly what the solver then reports as redundant.
-    So for each pair this strips the reproduced orientation constraints on the
-    copy first, then adds the links. If the pair still will not solve cleanly it
-    is rolled back *and the stripped constraints are restored*, leaving the copy
-    exactly as ``addSymmetric`` left it for the boundary-copy fallback. A
-    half-applied pair -- tracking its source at one end only -- is never left
-    behind, and a constraint the user made is never touched.
+    Run this *after* the boundary endpoint attachments have been copied onto the
+    mirror. Each link is added on its own and the solver consulted:
 
-    Returns ``(linked, rolled_back)``. ``linked`` is the link specs that stuck;
-    ``rolled_back`` is ``[{"mirror", "reason"}]`` for pairs left unlinked.
+    * conflicting / malformed -> remove it, the link cannot be made here;
+    * fully redundant -> remove it, the mirror is already pinned at that point;
+    * clean or only *partially* redundant -> keep it -- it still couples the
+      mirror's position to its source, and on a divider already attached to a
+      border the coordinate along the border is the only free part left, so
+      FreeCAD notes the constraint as partially redundant. That note is
+      informational; the sketch stays fully constrained.
+
+    Returns ``(linked, dropped)``. ``linked`` is the link specs that stuck;
+    ``dropped`` is ``[{"mirror", "reason"}]`` for links that could not be kept.
     """
     groups = {}
     for spec in link_specs:
         groups.setdefault(spec["_mirror"], []).append(spec)
 
     _recompute(sketch)
-    baseline = len(_bad_constraint_indices(sketch))
+    conflicting_before = _flagged_indices(sketch, _CONFLICTING_ATTRS)
     linked = []
-    rolled_back = []
+    dropped = []
 
     for mirror_id, specs in groups.items():
-        stripped = _unary_orientation_constraints_on(sketch, mirror_id)
-        for index, _spec in sorted(stripped, key=lambda item: item[0], reverse=True):
-            try:
-                sketch.delConstraint(index)
-            except Exception:
-                pass
-
-        start = len(list(getattr(sketch, "Constraints", []) or []))
-        added_indices = []
-        failure = None
-        for offset, spec in enumerate(specs):
+        for spec in specs:
+            start = len(list(getattr(sketch, "Constraints", []) or []))
             try:
                 index = sketch.addConstraint(_new_constraint(spec))
             except Exception as error:
-                failure = "FreeCAD rejected the link: {}".format(error)
-                break
-            added_indices.append(index if isinstance(index, int) else start + offset)
+                dropped.append(
+                    {"mirror": mirror_id, "reason": "FreeCAD rejected a link: {}".format(error)}
+                )
+                continue
+            if not isinstance(index, int):
+                index = start
+            _recompute(sketch)
 
-        _recompute(sketch)
-        introduced = len(_bad_constraint_indices(sketch)) - baseline
+            new_conflict = _flagged_indices(sketch, _CONFLICTING_ATTRS) - conflicting_before
+            fully_redundant = _flagged_indices(sketch, _FULLY_REDUNDANT_ATTRS)
+            if index in new_conflict:
+                _drop_constraint(sketch, index)
+                dropped.append(
+                    {
+                        "mirror": mirror_id,
+                        "reason": "a live symmetry link here conflicts with an existing constraint",
+                    }
+                )
+            elif index in fully_redundant:
+                # The mirror is already pinned at this point; the link is a no-op.
+                _drop_constraint(sketch, index)
+            else:
+                linked.append(spec)
 
-        if failure is None and introduced <= 0:
-            linked.extend(specs)
-            baseline = len(_bad_constraint_indices(sketch))
-            continue
+    return linked, dropped
 
-        for index in sorted(added_indices, reverse=True):
-            try:
-                sketch.delConstraint(index)
-            except Exception:
-                pass
-        for _index, restore_spec in stripped:
-            try:
-                sketch.addConstraint(_new_constraint(restore_spec))
-            except Exception:
-                pass
-        _recompute(sketch)
-        baseline = len(_bad_constraint_indices(sketch))
-        rolled_back.append(
-            {
-                "mirror": mirror_id,
-                "reason": failure
-                or "a live symmetry link here would conflict with an existing constraint",
-            }
-        )
 
-    return linked, rolled_back
+def _drop_constraint(sketch, index):
+    try:
+        sketch.delConstraint(index)
+    except Exception:
+        pass
+    _recompute(sketch)
 
 
 def _recompute(sketch):
@@ -826,17 +797,14 @@ def _notify(text, error=False):
         pass
 
 
-def _format_report(mirrored_count, linked_pairs, rolled_back, added, skipped, removed, unmatched):
+def _format_report(mirrored_count, linked_pairs, dropped, added, skipped, removed, unmatched):
     parts = [
         "mirrored {} element{}".format(mirrored_count, "" if mirrored_count == 1 else "s"),
         "linked {} pair{} symmetrically".format(linked_pairs, "" if linked_pairs == 1 else "s"),
+        "copied {} boundary constraint{}".format(len(added), "" if len(added) == 1 else "s"),
     ]
-    if added or not rolled_back:
-        parts.append(
-            "copied {} boundary constraint{}".format(len(added), "" if len(added) == 1 else "s")
-        )
-    if rolled_back:
-        parts.append("{} pair(s) not linked".format(len(rolled_back)))
+    if dropped:
+        parts.append("{} link(s) not added".format(len(dropped)))
     if skipped:
         parts.append("skipped {}".format(len(skipped)))
     if removed:
@@ -847,8 +815,8 @@ def _format_report(mirrored_count, linked_pairs, rolled_back, added, skipped, re
         )
     summary = "; ".join(parts) + "."
     detail = []
-    for item in rolled_back:
-        detail.append("  geometry {} not linked: {}".format(item["mirror"], item["reason"]))
+    for item in dropped:
+        detail.append("  geometry {} link not added: {}".format(item["mirror"], item["reason"]))
     for item in skipped:
         detail.append("  skipped {} #{}: {}".format(item["type"], item["index"], item["reason"]))
     for item in removed:
@@ -947,30 +915,28 @@ def mirror_sketch_geometry(sketch, source_indices, reference_geoid, reference_po
         mapping, unmatched = build_geometry_mapping(
             before_geometry, after_geometry, source_indices, axis_a, axis_b
         )
-    link_specs = plan_symmetry_links(mapping, before_geometry, reference_geoid)
-    linked, link_rolled_back = apply_symmetry_links(sketch, link_specs)
-    _recompute(sketch)
-    linked_mirror_ids = {spec["_mirror"] for spec in linked}
-
+    # 1. Reproduce the boundary endpoint attachments onto every mirrored element.
+    #    These are what let FreeCAD split the border edges and detect the
+    #    enclosed regions for face selection and extrude; without them a
+    #    symmetry-only mirror leaves the profile un-fillable.
     copies, skipped = plan_constraint_copies(
         records, set(source_indices), mapping, before_geometry, axis_a, axis_b
     )
-    # A pair with a clean live symmetry link does not also need its boundary
-    # endpoint constraints reproduced -- they would be redundant, and a
-    # deliberately redundant constraint tips the sketch over-constrained
-    # (orange), which blocks editing. Pairs whose link rolled back still get the
-    # copies.
-    covered = [spec for spec in copies if spec.get("first") in linked_mirror_ids]
-    copies = [spec for spec in copies if spec.get("first") not in linked_mirror_ids]
     added, removed = apply_constraint_copies(sketch, copies)
     _recompute(sketch)
+
+    # 2. Add the live symmetry coupling on top, one link at a time, keeping only
+    #    what actually removes a degree of freedom.
+    link_specs = plan_symmetry_links(mapping, before_geometry, reference_geoid)
+    linked, link_dropped = apply_symmetry_links(sketch, link_specs)
+    _recompute(sketch)
+
     return {
         "mirrored": mirrored_count,
         "linked": linked,
-        "link_rolled_back": link_rolled_back,
-        "linked_pairs": len(linked_mirror_ids),
+        "link_dropped": link_dropped,
+        "linked_pairs": len({spec["_mirror"] for spec in linked}),
         "copied": added,
-        "covered_by_link": covered,
         "skipped": skipped,
         "removed": removed,
         "unmatched": unmatched,
@@ -1009,7 +975,7 @@ def mirror_with_constraints():
     summary, detail = _format_report(
         result["mirrored"],
         result["linked_pairs"],
-        result["link_rolled_back"],
+        result["link_dropped"],
         result["copied"],
         result["skipped"],
         result["removed"],
