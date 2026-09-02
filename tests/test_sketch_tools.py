@@ -8,6 +8,8 @@ explicit-axis validation, and single-transaction wrapping.
 
 from __future__ import annotations
 
+import types
+
 import pytest
 from fake_freecad import FakeConstraint, FakeLineSegment, FakeSketch
 
@@ -278,6 +280,20 @@ def test_command_is_active_while_editing_a_sketch(tools, env):
     sketch, _ = _card_box([10.0])
     env.begin_sketch_edit(sketch)
     assert tools.MirrorWithConstraintsCommand().IsActive() is True
+
+
+def test_is_active_never_touches_gui_edit_state(tools, env):
+    """FreeCAD polls IsActive on a timer, including mid-setEdit; it must stay off
+    getInEdit / view providers, whose C++ can fault uncatchably. This is what
+    withdrew 1.3.2."""
+    env._new_document()
+    env.active_workbench = "PartDesignWorkbench"
+
+    def explode():
+        raise AssertionError("IsActive must not call getInEdit()")
+
+    env.gui.ActiveDocument = types.SimpleNamespace(getInEdit=explode)
+    assert tools.MirrorWithConstraintsCommand().IsActive() is False
 
 
 def test_mirror_copies_the_twelve_card_box_boundary_constraints(tools, env):

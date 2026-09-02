@@ -1029,6 +1029,13 @@
             "Sketcher_Offset"
           ],
           [
+            "FusionMyFreeCAD_MirrorWithConstraints",
+            "General",
+            "small",
+            "Mirror + Constraints",
+            "Constraint_Symmetric"
+          ],
+          [
             "Sketcher_Symmetry",
             "SketcherWorkbench",
             "large",

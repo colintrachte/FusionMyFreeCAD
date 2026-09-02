@@ -20,6 +20,7 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
     _run_init_gui(env, bootstrap, monkeypatch)
     assert set(env.commands) == {
         "FusionMyFreeCAD_CreateSketch",
+        "FusionMyFreeCAD_MirrorWithConstraints",
         "FusionMyFreeCAD_ParameterTable",
         "FusionMyFreeCAD_Verify",
         "FusionMyFreeCAD_Reapply",
@@ -56,6 +57,10 @@ def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher
     observer = env.document_observers[0]
     sketch = FakeObject("Sketcher::SketchObject", "Sketch")
     observer.slotInEdit(types.SimpleNamespace(Object=sketch))
+    # The switch is deferred out of the slotInEdit callback so it cannot re-enter
+    # a half-built edit state; it lands on the next event-loop turn.
+    assert env.active_workbench == "PartDesignWorkbench"
+    FakeTimer.pump()
     assert env.active_workbench == "SketcherWorkbench"
 
 

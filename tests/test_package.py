@@ -242,6 +242,25 @@ def test_symmetric_constraint_is_a_top_level_movable_command(layout):
     assert "Fusion_MoreConstraints_ddb" not in layout["dropdownButtons"]
 
 
+def test_mirror_with_constraints_sits_beside_the_native_mirror(layout, manifest):
+    """The constraint-copying mirror is a small button in front of native Mirror,
+    which keeps its 1.3.1 size so the panel wrap geometry is barely disturbed."""
+    modify = {panel["name"]: panel for panel in layout["workbenches"]["SketcherWorkbench"]}[
+        "Fusion Sketch Modify_newPanel"
+    ]
+    commands = modify["commands"]
+    order = [entry[0] for entry in commands]
+    assert "FusionMyFreeCAD_MirrorWithConstraints" in order
+    by_name = {entry[0]: entry for entry in commands}
+    assert by_name["FusionMyFreeCAD_MirrorWithConstraints"][2] == "small"
+    assert by_name["FusionMyFreeCAD_MirrorWithConstraints"][3] == "Mirror + Constraints"
+    assert by_name["Sketcher_Symmetry"][2] == "large"
+    assert order.index("Sketcher_Symmetry") - order.index(
+        "FusionMyFreeCAD_MirrorWithConstraints"
+    ) == 1
+    assert "FusionMyFreeCAD_MirrorWithConstraints" in manifest["primaryCommands"]
+
+
 # ---------------------------------------------------------------------------
 # Vendor patches that must survive an upstream refresh
 # ---------------------------------------------------------------------------

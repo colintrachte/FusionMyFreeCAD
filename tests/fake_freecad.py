@@ -625,6 +625,8 @@ class Environment:
             self._new_document()
         if sketch not in self.app.ActiveDocument.Objects:
             self.app.ActiveDocument.Objects.append(sketch)
+        # FreeCAD is in the Sketcher workbench whenever a sketch is being edited.
+        self.active_workbench = "SketcherWorkbench"
         self._in_edit = types.SimpleNamespace(Object=sketch)
         self.gui.ActiveDocument = types.SimpleNamespace(
             getInEdit=lambda: self._in_edit,

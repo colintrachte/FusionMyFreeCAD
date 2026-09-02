@@ -1072,7 +1072,18 @@ class _SketchEditWorkbenchObserver:
 
     def slotInEdit(self, view_provider):
         obj = getattr(view_provider, "Object", None)
-        if obj is not None and obj.isDerivedFrom("Sketcher::SketchObject"):
+        if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
+            return
+        # Switch after setEdit returns, not from inside this callback. Activating
+        # a workbench rebuilds the ribbon and polls every command's IsActive();
+        # doing that while FreeCAD is still mid-setEdit re-enters a half-built
+        # edit state. Deferring to the event loop keeps the switch out of that
+        # window. _frame_origin_planes uses the same pattern.
+        try:
+            from PySide import QtCore
+
+            QtCore.QTimer.singleShot(0, lambda: Gui.activateWorkbench("SketcherWorkbench"))
+        except ImportError:
             Gui.activateWorkbench("SketcherWorkbench")
 
 
@@ -1139,9 +1150,10 @@ def register_commands():
     Gui.addCommand("FusionMyFreeCAD_Verify", VerifyCommand())
     Gui.addCommand("FusionMyFreeCAD_Reapply", ReapplyCommand())
     Gui.addCommand("FusionMyFreeCAD_Restore", RestoreCommand())
-    # fusion_sketch_tools ships in the package and is covered by its own tests,
-    # but stays unwired from the ribbon until the 1.3.2 startup crash is
-    # understood. See CHANGELOG 1.3.3 and docs/RELEASE-NOTES-1.3.2.md.
+    # Sketch tools live in their own module so this one does not keep growing.
+    import fusion_sketch_tools
+
+    fusion_sketch_tools.register()
     if _sketch_edit_observer is None and hasattr(Gui, "addDocumentObserver"):
         _sketch_edit_observer = _SketchEditWorkbenchObserver()
         Gui.addDocumentObserver(_sketch_edit_observer)

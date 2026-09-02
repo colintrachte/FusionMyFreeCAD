@@ -847,7 +847,19 @@ class MirrorWithConstraintsCommand:
         }
 
     def IsActive(self):
-        return active_sketch() is not None
+        # Deliberately cheap and side-effect free. FreeCAD polls this on a timer
+        # for every visible command, including while a sketch is still entering
+        # edit mode and the ribbon is rebuilding. Touching Gui edit state here
+        # (getInEdit, view providers) can dereference a half-built object in C++
+        # and crash uncatchably, which is what withdrew 1.3.2. The real
+        # "are we editing a sketch?" check stays in Activated(), where FreeCAD is
+        # idle and a clear message can be shown instead.
+        if getattr(App, "ActiveDocument", None) is None:
+            return False
+        try:
+            return Gui.activeWorkbench().name() == "SketcherWorkbench"
+        except Exception:
+            return False
 
     def Activated(self):
         mirror_with_constraints()
