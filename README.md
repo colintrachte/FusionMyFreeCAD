@@ -10,14 +10,15 @@ format, and everything it changes can be undone from inside FreeCAD.
 
 ## Status
 
-Version **1.3.1** is available from [GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.1)
-as a self-contained archive. FusionMyFreeCAD has not yet been submitted to FreeCAD's add-on index;
-catalog publication remains separate work.
+Version **1.3.2** is prepared for the next
+[GitHub Release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.2) as a
+self-contained archive. FusionMyFreeCAD has not yet been submitted to FreeCAD's add-on index;
+release publication and catalog publication remain separate work.
 
 ## Install
 
-Download `FusionMyFreeCAD-1.3.1.zip` from the
-[1.3.1 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.1), extract its
+Once published, download `FusionMyFreeCAD-1.3.2.zip` from the
+[1.3.2 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.2), extract its
 top-level `FusionMyFreeCAD` folder into FreeCAD's user `Mod` directory, and restart FreeCAD. Full
 platform-by-platform steps, verification, update, and removal instructions are in
 [`docs/INSTALL-FREECAD-ADDON.md`](docs/INSTALL-FREECAD-ADDON.md).
@@ -47,6 +48,14 @@ automatically and survives FreeCAD restarts and FusionMyFreeCAD layout updates.
 Sketcher also uses the available window width: frequently useful overflow commands appear at the
 1450 px and 1750 px tiers, then return to their panel dropdowns when the window becomes narrower.
 The Symmetric constraint is always a top-level button and can be reordered directly.
+
+Sketcher has two adjacent mirror controls. The large **Mirror + Constraints** button uses a
+constraint icon to mark the advanced workflow: select geometry and then a mirror line or sketch
+axis, and it copies compatible endpoint constraints so mirrored profiles stay closed. The smaller
+**Mirror** button is FreeCAD's original interactive tool and remains available for point symmetry,
+live symmetry links, and unsupported inputs. The Constraints panel carries a dedicated top-level
+**Point on Object** button for attaching a point or line endpoint anywhere along a line, arc, curve,
+or axis, alongside the selection-aware **Coincident**.
 
 **Create Sketch** remains the first button in the Part Design ribbon. Its attachment step stays in
 Part Design so FreeCAD can display, label, and frame the selectable origin planes; FMF changes to the

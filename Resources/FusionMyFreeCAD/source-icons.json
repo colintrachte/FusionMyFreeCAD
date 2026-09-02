@@ -5,6 +5,10 @@
       "path": "src/Mod/Sketcher/Gui/Resources/icons/constraints/Constraint_Block.svg",
       "sha256": "d801e28d8cd5485a28eda79fa5cddebe16b1171b581813121a7bcb725659bcd3"
     },
+    "Constraint_Coincident": {
+      "path": "src/Mod/Sketcher/Gui/Resources/icons/constraints/Constraint_Coincident.svg",
+      "sha256": "f556df0b694e9c8611c44efb36ab1b287269281ffa01f5400e2440bab31c0da7"
+    },
     "Constraint_Dimension": {
       "path": "src/Mod/Sketcher/Gui/Resources/icons/constraints/Constraint_Dimension.svg",
       "sha256": "30f5a45a6ff40348611200cd9743b3bec87e3671a6384ea1510d4c90cd23f680"
@@ -24,6 +28,10 @@
     "Constraint_Perpendicular": {
       "path": "src/Mod/Sketcher/Gui/Resources/icons/constraints/Constraint_Perpendicular.svg",
       "sha256": "59b7937c7782694b21480fad3a34d224b488506e1b99cd0611e4cbe63194315e"
+    },
+    "Constraint_PointOnObject": {
+      "path": "src/Mod/Sketcher/Gui/Resources/icons/constraints/Constraint_PointOnObject.svg",
+      "sha256": "d00307e46089ad69d9e4400fa2371e387f0a580533b8d4c562e025bfe0f10404"
     },
     "Constraint_PointOnPoint": {
       "path": "src/Mod/Sketcher/Gui/Resources/icons/constraints/Constraint_PointOnPoint.svg",
@@ -411,7 +419,7 @@
     },
     "Sketcher_CreateText": {
       "path": "src/Mod/Sketcher/Gui/Resources/icons/geometry/Sketcher_CreateText.svg",
-      "sha256": "54d5618612258e3082654e858845bd11ab5033bb4b5949876609e184f2271595"
+      "sha256": "df1a06fda5524801c50eae7c66ee26b915632899d55015f86ff2071e54312db6"
     },
     "Sketcher_DeleteConstraints": {
       "path": "src/Mod/Sketcher/Gui/Resources/icons/tools/Sketcher_DeleteConstraints.svg",
@@ -443,7 +451,7 @@
     },
     "Sketcher_LeaveSketch": {
       "path": "src/Mod/Sketcher/Gui/Resources/icons/general/Sketcher_LeaveSketch.svg",
-      "sha256": "ea17356843ada9541eefb8653856a46a3ce70c9f0c2e7fff4295e46915730484"
+      "sha256": "471397e72baa4246c51600a927e03663b3232c5746c43520fb15ddecdc25f446"
     },
     "Sketcher_MapSketch": {
       "path": "src/Mod/Sketcher/Gui/Resources/icons/general/Sketcher_MapSketch.svg",

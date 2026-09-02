@@ -27,6 +27,7 @@ def main() -> int:
         ROOT / "Init.py",
         ROOT / "InitGui.py",
         ROOT / "fusion_bootstrap.py",
+        ROOT / "fusion_sketch_tools.py",
         ROOT / "package.xml",
         ROOT / "LICENSE",
         ROOT / "THIRD_PARTY_NOTICES.md",

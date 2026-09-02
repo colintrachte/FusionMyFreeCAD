@@ -12,7 +12,9 @@
 | Offset | `O` | Sketcher Offset | command exists; verify local default | Rebind to `O` |
 | Project | `P` | Sketcher External Projection | command exists; verify local default | Rebind to `P` |
 | Normal / Construction | `X` | Toggle Construction Geometry | command exists; verify local default | Rebind to `X` |
-| Mirror | none in Autodesk's core shortcut list | Sketcher Mirror (internally/documented as Symmetry) | `Z`, then `S` | Pin to toolbar or `S` menu |
+| Mirror | none in Autodesk's core shortcut list | `FusionMyFreeCAD_MirrorWithConstraints` | `Z`, then `S` | Large **Mirror + Constraints** button; original `Sketcher_Symmetry` is the adjacent small **Mirror** button |
+| Coincident | none | `Sketcher_ConstrainCoincidentUnified` | — | Top-level, beside Horizontal / Vertical |
+| Point on Object | none | `Sketcher_ConstrainPointOnObject` | — | Top-level, beside Coincident |
 | Rectangular Pattern | none in core list | Move/Array Transform | varies / verify locally | Pin to toolbar or `S` menu |
 | Circular Pattern | none in core list | Rotate/Polar Transform | varies / verify locally | Pin to toolbar or `S` menu |
 
@@ -80,6 +82,34 @@ Prefer feature patterns for repeated holes or pockets when practical. The featur
 - Part Design Mirror repeats one or more 3D features about a plane or planar face.
 
 They should be adjacent but visually separated in any toolbar or pie menu.
+
+### Sketch Mirror versus Mirror with Constraints
+
+FreeCAD's native Sketcher Symmetry only reproduces constraints whose every endpoint is inside the
+mirrored selection. Constraints that tie a selected element to an *unchanged* border — for example
+the endpoint-on-edge attachments in `3x5CardBox` — are silently dropped, and the profile no longer
+closes.
+
+`FusionMyFreeCAD_MirrorWithConstraints` uses Sketcher's synchronous symmetry API and then copies
+those boundary constraints onto the mirrored geometry. Select the geometry first and the mirror
+line or sketch axis last. It is best-effort and reports, rather than hides, anything it cannot
+reproduce safely. The visually distinct original `Sketcher_Symmetry` remains directly beside it as
+**Mirror** for its interactive workflow, live symmetry links, point symmetry, or unsupported inputs.
+
+### Coincident versus Point on Object
+
+FreeCAD documents these as two distinct constraints:
+
+- **Coincident** (`Sketcher_ConstrainCoincidentUnified`) joins two points, or — reading the
+  selection — places a point on an edge. It is the everyday "make these touch" tool and stays
+  top-level next to Horizontal / Vertical.
+- **Point on Object** (`Sketcher_ConstrainPointOnObject`) always attaches the selected point or
+  line endpoint to a line, arc, curve, or axis, leaving it free to slide along that element. It has
+  its own top-level button rather than being buried in the generic Constraint Tools menu, because
+  endpoint-to-edge attachment is a distinct, frequent Fusion workflow.
+
+The point-to-point-only legacy command (`Sketcher_ConstrainCoincident`) remains available in the
+Constraints panel menu for compatibility.
 
 ## Shortcut design rationale
 

@@ -13,6 +13,7 @@ PACKAGE_FILES = (
     "Init.py",
     "InitGui.py",
     "fusion_bootstrap.py",
+    "fusion_sketch_tools.py",
     "package.xml",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",

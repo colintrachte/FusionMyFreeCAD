@@ -105,6 +105,8 @@ class FakeDocument:
         self.Name = "Untitled"
         self.Objects = []
         self.recomputes = 0
+        self.transactions = []
+        self.open_transaction = None
 
     def addObject(self, type_name, name):
         obj = FakeSheet(name) if type_name == "Spreadsheet::Sheet" else FakeObject(type_name, name)
@@ -113,6 +115,172 @@ class FakeDocument:
 
     def recompute(self):
         self.recomputes += 1
+
+    # Transactions: record the sequence so tests can assert one-step Undo.
+    def openTransaction(self, label):
+        self.open_transaction = label
+        self.transactions.append(("open", label))
+
+    def commitTransaction(self):
+        self.transactions.append(("commit", self.open_transaction))
+        self.open_transaction = None
+
+    def abortTransaction(self):
+        self.transactions.append(("abort", self.open_transaction))
+        self.open_transaction = None
+
+
+# ---------------------------------------------------------------------------
+# Sketcher geometry, constraints, and a live sketch
+# ---------------------------------------------------------------------------
+
+
+class FakeVector:
+    def __init__(self, x=0.0, y=0.0, z=0.0):
+        self.x, self.y, self.z = float(x), float(y), float(z)
+
+    def __iter__(self):
+        return iter((self.x, self.y, self.z))
+
+
+class FakeLineSegment:
+    """Stand-in for Part.LineSegment inside a sketch."""
+
+    def __init__(self, start, end, construction=False):
+        self.StartPoint = FakeVector(*start)
+        self.EndPoint = FakeVector(*end)
+        self.Construction = construction
+
+    def reflected(self, axis_a, axis_b):
+        return FakeLineSegment(
+            _reflect(self.StartPoint, axis_a, axis_b),
+            _reflect(self.EndPoint, axis_a, axis_b),
+            self.Construction,
+        )
+
+
+def _reflect(point, axis_a, axis_b):
+    px, py = point.x, point.y
+    ax, ay = axis_a
+    bx, by = axis_b
+    dx, dy = bx - ax, by - ay
+    length_squared = dx * dx + dy * dy or 1.0
+    t = ((px - ax) * dx + (py - ay) * dy) / length_squared
+    foot_x, foot_y = ax + t * dx, ay + t * dy
+    return (2.0 * foot_x - px, 2.0 * foot_y - py)
+
+
+class FakeConstraint:
+    """Mimics Sketcher.Constraint(type, *args) argument handling."""
+
+    def __init__(self, ctype, *args):
+        self.Type = ctype
+        self.First = -2000
+        self.FirstPos = 0
+        self.Second = -2000
+        self.SecondPos = 0
+        self.Third = -2000
+        self.ThirdPos = 0
+        self.Value = 0.0
+        self.Name = ""
+        self.Driving = True
+        self.IsActive = True
+        arguments = list(args)
+        if ctype == "PointOnObject" and len(arguments) >= 3:
+            self.First, self.FirstPos, self.Second = arguments[:3]
+        elif ctype in ("Coincident", "Symmetric", "Tangent", "Perpendicular", "Parallel", "Equal"):
+            if len(arguments) >= 2:
+                self.First, self.FirstPos = arguments[0], arguments[1]
+            if len(arguments) >= 4:
+                self.Second, self.SecondPos = arguments[2], arguments[3]
+            elif len(arguments) == 3:
+                self.Second = arguments[2]
+        elif ctype in ("Horizontal", "Vertical", "Block"):
+            if arguments:
+                self.First = arguments[0]
+            if len(arguments) >= 2:
+                self.FirstPos = arguments[1]
+        elif ctype in ("DistanceX", "DistanceY", "Distance", "Radius", "Diameter", "Angle"):
+            if len(arguments) == 2:
+                self.First, self.Value = arguments
+            elif len(arguments) == 3:
+                self.First, self.FirstPos, self.Value = arguments
+            elif len(arguments) == 4:
+                self.First, self.FirstPos, self.Second, self.Value = arguments
+            elif len(arguments) == 5:
+                (
+                    self.First,
+                    self.FirstPos,
+                    self.Second,
+                    self.SecondPos,
+                    self.Value,
+                ) = arguments
+
+
+class FakeSketch(FakeObject):
+    def __init__(self, name="Sketch"):
+        super().__init__("Sketcher::SketchObject", name)
+        self.Geometry = []
+        self.Constraints = []
+        self.Conflicting = []
+        self.Redundant = []
+        self.Malformed = []
+        self.ConflictingConstraints = []
+        self.RedundantConstraints = []
+        self.MalformedConstraints = []
+        self.PartiallyRedundantConstraints = []
+        self.DoF = 0
+        self.recomputes = 0
+        self.solves = 0
+
+    def addGeometry(self, geo, construction=False):
+        self.Geometry.append(geo)
+        return len(self.Geometry) - 1
+
+    def addConstraint(self, constraint):
+        self.Constraints.append(constraint)
+        return len(self.Constraints) - 1
+
+    def delConstraint(self, index):
+        self.Constraints.pop(index)
+
+    def renameConstraint(self, index, name):
+        self.Constraints[index].Name = name
+
+    def setDriving(self, index, value):
+        self.Constraints[index].Driving = bool(value)
+
+    def setActive(self, index, value):
+        self.Constraints[index].IsActive = bool(value)
+
+    def recompute(self):
+        self.recomputes += 1
+
+    def solve(self):
+        self.solves += 1
+        return 0
+
+    def mirror_selected(self, source_indices, axis_a, axis_b):
+        """Emulate native Symmetry: append reflected copies of the source edges."""
+        mapping = {}
+        for source_id in sorted(source_indices):
+            reflected = self.Geometry[source_id].reflected(axis_a, axis_b)
+            mapping[source_id] = self.addGeometry(reflected)
+        return mapping
+
+    def addSymmetric(self, source_indices, reference_geoid, reference_pos):
+        del reference_pos
+        if reference_geoid == -1:
+            axis = ((0.0, 0.0), (1.0, 0.0))
+        elif reference_geoid == -2:
+            axis = ((0.0, 0.0), (0.0, 1.0))
+        else:
+            points = self.Geometry[reference_geoid]
+            axis = (
+                (points.StartPoint.x, points.StartPoint.y),
+                (points.EndPoint.x, points.EndPoint.y),
+            )
+        return list(self.mirror_selected(source_indices, *axis).values())
 
 
 # ---------------------------------------------------------------------------
@@ -308,6 +476,7 @@ class FakeMainWindow:
         self.areas = {}
         self.workbenchActivated = Signal()
         self._menu_shown = False
+        self.status_messages = []
 
     def menuBar(self):
         window = self
@@ -332,6 +501,15 @@ class FakeMainWindow:
 
     def addDockWidget(self, area, dock):
         self.areas[id(dock)] = area
+
+    def statusBar(self):
+        window = self
+
+        class StatusBar:
+            def showMessage(self, text, _timeout=0):
+                window.status_messages.append(text)
+
+        return StatusBar()
 
 
 def _qt_modules():
@@ -390,6 +568,9 @@ class Environment:
         self.active_workbench = "PartDesignWorkbench"
         self.task_dialog_active = False
         self.saved_parameters = 0
+        self.selection_ex = []
+        self.command_handlers = {}
+        self._in_edit = None
 
         app = types.ModuleType("FreeCAD")
         app.Version = lambda: version
@@ -409,7 +590,7 @@ class Environment:
         self.document_observers = []
         gui.addDocumentObserver = self.document_observers.append
         gui.activateWorkbench = self._activate_workbench
-        gui.runCommand = lambda name: self.gui_events.append(("command", name))
+        gui.runCommand = self._run_command
         gui.listCommands = lambda: list(self.registered_commands)
         gui.activeWorkbench = lambda: types.SimpleNamespace(name=lambda: self.active_workbench)
         gui.Control = types.SimpleNamespace(activeDialog=lambda: self.task_dialog_active)
@@ -417,13 +598,48 @@ class Environment:
         gui.Selection = types.SimpleNamespace(
             clearSelection=lambda: self.gui_events.append(("selection", "clear")),
             addSelection=lambda obj: self.gui_events.append(("selection", obj.Name)),
+            getSelectionEx=lambda *args: list(self.selection_ex),
+            getSelection=lambda *args: [entry.Object for entry in self.selection_ex],
         )
         gui.activeDocument = lambda: types.SimpleNamespace(
             setEdit=lambda name: self.gui_events.append(("edit", name))
         )
         self.gui = gui
 
+        self.sketcher = types.ModuleType("Sketcher")
+        self.sketcher.Constraint = FakeConstraint
+        self.part = types.ModuleType("Part")
+        self.part.LineSegment = FakeLineSegment
+
         self.pyside, self.qtcore, self.qtgui, self.qtwidgets = _qt_modules()
+
+    def _run_command(self, name, *args):
+        self.gui_events.append(("command", name))
+        handler = self.command_handlers.get(name)
+        if handler is not None:
+            handler(*args)
+
+    def begin_sketch_edit(self, sketch):
+        """Put ``sketch`` into edit mode and make it the selection target."""
+        if self.app.ActiveDocument is None:
+            self._new_document()
+        if sketch not in self.app.ActiveDocument.Objects:
+            self.app.ActiveDocument.Objects.append(sketch)
+        self._in_edit = types.SimpleNamespace(Object=sketch)
+        self.gui.ActiveDocument = types.SimpleNamespace(
+            getInEdit=lambda: self._in_edit,
+            ActiveView=types.SimpleNamespace(),
+        )
+        return sketch
+
+    def select_subelements(self, sketch, sub_element_names):
+        self.selection_ex = [
+            types.SimpleNamespace(
+                Object=sketch,
+                ObjectName=getattr(sketch, "Name", "Sketch"),
+                SubElementNames=list(sub_element_names),
+            )
+        ]
 
     def _save_parameter(self):
         self.saved_parameters += 1
@@ -447,13 +663,20 @@ class Environment:
         sys.modules["PySide.QtCore"] = self.qtcore
         sys.modules["PySide.QtGui"] = self.qtgui
         sys.modules["PySide.QtWidgets"] = self.qtwidgets
+        sys.modules["Sketcher"] = self.sketcher
+        sys.modules["Part"] = self.part
         return self
 
     def load_bootstrap(self):
         """Import a fresh fusion_bootstrap bound to this environment."""
-        for name in ("fusion_bootstrap", "_fusion_my_freecad_runtime"):
+        for name in ("fusion_bootstrap", "fusion_sketch_tools", "_fusion_my_freecad_runtime"):
             sys.modules.pop(name, None)
         return _import_module("fusion_bootstrap", ROOT / "fusion_bootstrap.py")
+
+    def load_sketch_tools(self):
+        """Import a fresh fusion_sketch_tools bound to this environment."""
+        sys.modules.pop("fusion_sketch_tools", None)
+        return _import_module("fusion_sketch_tools", ROOT / "fusion_sketch_tools.py")
 
     def load_runtime(self):
         """Import runtime.py without letting it wire itself into the session."""
