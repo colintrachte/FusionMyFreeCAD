@@ -10,14 +10,15 @@ and then does two things native Symmetry does not do on FreeCAD 1.1.3, in order:
    so a divider attached to its top and bottom edges would lose those
    attachments. They are also what let FreeCAD split the border edges and detect
    the enclosed regions for face selection and extrude, so they go on first.
-2. Adds a live ``Symmetric`` link between each source element and its mirrored
-   copy, across the same line the mirror used, so dragging either one moves the
-   other (``Equal`` keeps a mirrored circle or arc the same size). Links are
-   added one at a time: a conflicting or fully redundant one is removed, a clean
-   or merely *partially* redundant one is kept -- on a divider already attached
-   to a border the coordinate along the border is the only free part left, so
-   FreeCAD notes that link as partially redundant. The note is informational; the
-   sketch stays fully constrained.
+2. For a mirrored element that did *not* get a border attachment -- free-floating
+   geometry -- adds a live ``Symmetric`` link to its source across the mirror
+   line, so dragging either one moves the other (``Equal`` keeps a mirrored
+   circle or arc the same size). A ``Symmetric`` point constraint is two
+   equations, and on FreeCAD 1.1.3 those always duplicate the degrees of freedom
+   a border attachment already pins, over-constraining the sketch -- so an
+   attached element (a divider) keeps the fillable profile and is left unlinked;
+   add a ``Symmetric`` constraint by hand if a live link there is wanted. Links
+   are still added one at a time and any the solver rejects are backed out.
 
 The command is explicitly best-effort.  Every constraint it cannot safely
 reproduce is reported rather than dropped in silence, matching the rest of the
@@ -797,12 +798,21 @@ def _notify(text, error=False):
         pass
 
 
-def _format_report(mirrored_count, linked_pairs, dropped, added, skipped, removed, unmatched):
-    parts = [
-        "mirrored {} element{}".format(mirrored_count, "" if mirrored_count == 1 else "s"),
-        "linked {} pair{} symmetrically".format(linked_pairs, "" if linked_pairs == 1 else "s"),
-        "copied {} boundary constraint{}".format(len(added), "" if len(added) == 1 else "s"),
-    ]
+def _format_report(
+    mirrored_count, linked_pairs, attached_pairs, dropped, added, skipped, removed, unmatched
+):
+    parts = ["mirrored {} element{}".format(mirrored_count, "" if mirrored_count == 1 else "s")]
+    if attached_pairs:
+        parts.append(
+            "reattached {} to border{}".format(attached_pairs, "" if attached_pairs == 1 else "s")
+        )
+    if linked_pairs or not attached_pairs:
+        parts.append(
+            "linked {} pair{} symmetrically".format(linked_pairs, "" if linked_pairs == 1 else "s")
+        )
+    parts.append(
+        "copied {} boundary constraint{}".format(len(added), "" if len(added) == 1 else "s")
+    )
     if dropped:
         parts.append("{} link(s) not added".format(len(dropped)))
     if skipped:
@@ -925,17 +935,28 @@ def mirror_sketch_geometry(sketch, source_indices, reference_geoid, reference_po
     added, removed = apply_constraint_copies(sketch, copies)
     _recompute(sketch)
 
-    # 2. Add the live symmetry coupling on top, one link at a time, keeping only
-    #    what actually removes a degree of freedom.
-    link_specs = plan_symmetry_links(mapping, before_geometry, reference_geoid)
+    # 2. Add a live symmetry link only where it will not fight an attachment.
+    #    A Symmetric point constraint is two equations; on FreeCAD 1.1.3 those
+    #    always duplicate the degrees of freedom a border attachment already
+    #    pins, which over-constrains the sketch. So a mirrored element that got
+    #    a border attachment keeps that (fillable profile) and is left unlinked;
+    #    free-floating geometry, with nothing to conflict, gets the link.
+    attached_mirror_ids = {spec["first"] for spec in added}
+    link_specs = [
+        spec
+        for spec in plan_symmetry_links(mapping, before_geometry, reference_geoid)
+        if spec["_mirror"] not in attached_mirror_ids
+    ]
     linked, link_dropped = apply_symmetry_links(sketch, link_specs)
     _recompute(sketch)
 
+    linked_ids = {spec["_mirror"] for spec in linked}
     return {
         "mirrored": mirrored_count,
         "linked": linked,
         "link_dropped": link_dropped,
-        "linked_pairs": len({spec["_mirror"] for spec in linked}),
+        "linked_pairs": len(linked_ids),
+        "attached_pairs": len(attached_mirror_ids),
         "copied": added,
         "skipped": skipped,
         "removed": removed,
@@ -975,6 +996,7 @@ def mirror_with_constraints():
     summary, detail = _format_report(
         result["mirrored"],
         result["linked_pairs"],
+        result["attached_pairs"],
         result["link_dropped"],
         result["copied"],
         result["skipped"],

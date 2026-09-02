@@ -24,13 +24,13 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
      (Point-on-Object / Coincident to unchanged edges or axes). Native Symmetry drops these,
      and they are also what let FreeCAD split the border edges and detect the enclosed
      regions — so a mirrored divider now leaves a fillable, extrudable profile.
-  2. Adds a live **Symmetric** link so dragging either element moves the other; **Equal**
-     keeps a mirrored circle or arc the same size. Links are added one at a time — a
-     conflicting or fully redundant one is removed, a clean or *partially* redundant one is
-     kept. On a divider already attached to a border, the link only couples the position
-     along that border, so FreeCAD shows one mild "partially redundant" note per mirrored
-     element. It is informational; the sketch stays fully constrained and every region is
-     selectable.
+  2. For **free-floating** mirrored geometry — geometry that got no border attachment — adds
+     a live **Symmetric** link so dragging either element moves the other (**Equal** keeps a
+     mirrored circle or arc the same size). A `Symmetric` point constraint is two equations,
+     and on FreeCAD 1.1.3 those always duplicate what a border attachment already pins, which
+     over-constrains the sketch (orange) — so an **attached** element, such as a divider, is
+     reattached but left unlinked. Add a `Symmetric` constraint by hand if you want a live
+     link on a divider too.
 - A constraint touching only a sketch axis or the origin, with nothing mirrored, is now left
   alone rather than reported as skipped. The whole operation is one Undo step.
 - The button has its own icon: FreeCAD's Mirror glyph with a green "+" badge, so it reads as
