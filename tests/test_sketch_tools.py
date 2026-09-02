@@ -296,7 +296,9 @@ def test_is_active_never_touches_gui_edit_state(tools, env):
     assert tools.MirrorWithConstraintsCommand().IsActive() is False
 
 
-def test_mirror_links_and_reattaches_every_card_box_divider(tools, env):
+def test_bordered_dividers_are_reattached_not_linked(tools, env):
+    """A divider pinned to the borders keeps that (fillable profile). A Symmetric
+    link on top would only over-constrain it on FreeCAD 1.1.3, so it is skipped."""
     sketch, dividers = _card_box([-30.0, -20.0, -10.0, 5.0, 15.0, 25.0])
     env.begin_sketch_edit(sketch)
     env.select_subelements(sketch, ["Edge{}".format(g + 1) for g in dividers] + ["V_Axis"])
@@ -305,39 +307,43 @@ def test_mirror_links_and_reattaches_every_card_box_divider(tools, env):
 
     assert result["status"] == "ok"
     assert result["mirrored"] == 6
-    assert result["linked_pairs"] == 6
-    assert result["unmatched"] == []
+    assert result["attached_pairs"] == 6
+    assert result["linked_pairs"] == 0
     assert result["skipped"] == []
-    # Every mirrored divider is reattached to the borders (so FreeCAD can find
-    # the regions) AND symmetry-linked to its source (so it tracks it).
     assert len(result["copied"]) == 12
     assert all(spec["type"] == "PointOnObject" for spec in result["copied"])
     assert sum(1 for c in sketch.Constraints if c.Type == "PointOnObject") == 24
-    symmetric = [c for c in sketch.Constraints if c.Type == "Symmetric"]
-    assert len(symmetric) == 12
-    assert all(c.Third == -2 for c in symmetric)
+    assert [c for c in sketch.Constraints if c.Type == "Symmetric"] == []
 
 
-def test_a_fully_redundant_link_is_dropped_but_the_border_copies_stay(tools, env):
-    sketch, _dividers = _card_box([20.0])
+def _floating_line_box():
+    """A box with one interior line that is NOT attached to any border."""
+    sketch = FakeSketch("Sketch")
+    sketch.addGeometry(FakeLineSegment((-50.0, 0.0), (50.0, 0.0)))  # 0 bottom
+    sketch.addGeometry(FakeLineSegment((-50.0, 30.0), (50.0, 30.0)))  # 1 top
+    line = sketch.addGeometry(FakeLineSegment((20.0, 8.0), (20.0, 22.0)))  # 2, free
+    sketch.addConstraint(FakeConstraint("Vertical", line))
+    return sketch, line
+
+
+def test_free_geometry_gets_the_symmetry_link(tools, env):
+    sketch, _line = _floating_line_box()
     env.begin_sketch_edit(sketch)
     env.select_subelements(sketch, ["Edge3", "V_Axis"])
-    # The solver calls every Symmetric link fully redundant (the mirror is
-    # already pinned by the copied attachments).
-    sketch._reject = lambda constraint: constraint.Type == "Symmetric"
 
     result = tools.mirror_with_constraints()
 
     assert result["status"] == "ok"
-    assert result["linked_pairs"] == 0
-    assert [c for c in sketch.Constraints if c.Type == "Symmetric"] == []
-    # The endpoint attachments are still there -- that is what keeps the profile
-    # fillable even with no live link.
-    assert [spec["type"] for spec in result["copied"]] == ["PointOnObject", "PointOnObject"]
+    assert result["attached_pairs"] == 0
+    assert result["linked_pairs"] == 1
+    assert result["copied"] == []
+    symmetric = [c for c in sketch.Constraints if c.Type == "Symmetric"]
+    assert len(symmetric) == 2
+    assert all(c.Third == -2 for c in symmetric)
 
 
 def test_a_conflicting_link_is_removed_and_reported(tools, env):
-    sketch, _dividers = _card_box([20.0])
+    sketch, _line = _floating_line_box()
     env.begin_sketch_edit(sketch)
     env.select_subelements(sketch, ["Edge3", "V_Axis"])
     sketch._conflict = lambda constraint: constraint.Type == "Symmetric"
@@ -349,20 +355,17 @@ def test_a_conflicting_link_is_removed_and_reported(tools, env):
     assert any("conflict" in item["reason"] for item in result["link_dropped"])
 
 
-def test_a_partially_redundant_link_is_kept(tools, env):
-    """On a divider already attached to a border, the symmetry link's along-the-
-    border component is the only useful part; FreeCAD marks it partially
-    redundant, and the command keeps it."""
-    sketch, _dividers = _card_box([20.0])
+def test_a_fully_redundant_link_is_dropped_silently(tools, env):
+    sketch, _line = _floating_line_box()
     env.begin_sketch_edit(sketch)
     env.select_subelements(sketch, ["Edge3", "V_Axis"])
-    sketch._partial = lambda constraint: constraint.Type == "Symmetric"
+    sketch._reject = lambda constraint: constraint.Type == "Symmetric"
 
     result = tools.mirror_with_constraints()
 
-    assert result["linked_pairs"] == 1
-    assert len([c for c in sketch.Constraints if c.Type == "Symmetric"]) == 2
+    assert result["linked_pairs"] == 0
     assert result["link_dropped"] == []
+    assert [c for c in sketch.Constraints if c.Type == "Symmetric"] == []
 
 
 def test_missing_explicit_axis_leaves_the_sketch_unchanged(tools, env):
