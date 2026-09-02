@@ -4,27 +4,33 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
 ## 1.3.3 — 2026-09-02
 
-### Withdrawn 1.3.2
+### Replaces the withdrawn 1.3.2
 
 - **1.3.2 is withdrawn.** On FreeCAD 1.1.3 it could intermittently freeze and then crash
   with an "Access violation" while the Sketcher ribbon was being built — typically on the
-  first launch after updating, before any new command was used. It did not always
-  reproduce on a later restart. 1.3.3 restores the 1.3.1 Sketcher ribbon exactly.
-- Reverted the 1.3.2 Sketcher ribbon changes: the **Mirror + Constraints** button, the
-  swap of **Coincident** to `Sketcher_ConstrainCoincidentUnified`, and the new
-  **Point on Object** button are all removed from the ribbon. **Mirror**
-  (`Sketcher_Symmetry`) and the point-to-point **Coincident** (`Sketcher_ConstrainCoincident`)
-  are back as they were in 1.3.1.
-- `fusion_sketch_tools.py` still ships in the package and keeps its own test coverage, but
-  nothing registers it or places it on the ribbon. The constraint-aware mirror workflow will
-  return in a later release once it has been verified against a running FreeCAD 1.1.3.
+  first launch after updating, before any command was used. It did not always reproduce
+  on a later restart.
+- Root cause: the new **Mirror + Constraints** command's `IsActive()` check, which FreeCAD
+  polls on a timer for every visible button, reached into live GUI edit state
+  (`getInEdit()`). When a sketch opens, that poll could run while FreeCAD was still
+  mid-`setEdit` and hand back a half-built object whose C++ access faulted uncatchably.
+- Fixes: `IsActive()` is now cheap and side-effect free (open document + Sketcher
+  workbench, nothing more). The workbench switch on sketch-open is also deferred out of
+  the document-observer callback so it can no longer re-enter an in-progress edit.
+- **Mirror + Constraints** returns as a small button in front of native **Mirror**, which
+  keeps its 1.3.1 size — the panel layout is barely changed from 1.3.1. Select geometry,
+  then a mirror line or sketch axis; the command mirrors it and copies compatible endpoint
+  constraints to unchanged borders or axes, reporting anything it cannot reproduce safely.
+- The 1.3.2 **Coincident**/`Sketcher_ConstrainCoincidentUnified` swap and the new
+  **Point on Object** button are **not** included. Point-to-point **Coincident**
+  (`Sketcher_ConstrainCoincident`) stays as it was in 1.3.1.
 
 ### Upgrade notes
 
 - Replace the entire existing `Mod/FusionMyFreeCAD` folder; do not merge files from older
   versions. Restart FreeCAD after updating.
-- If FreeCAD is currently crashing on the Sketcher tab after installing 1.3.2, installing 1.3.3
-  over it resolves it. No sketch or document data is affected.
+- If FreeCAD is currently crashing on the Sketcher tab after installing 1.3.2, installing
+  1.3.3 over it resolves it. No sketch or document data is affected.
 
 ## 1.3.2 — 2026-09-02 (withdrawn)
 

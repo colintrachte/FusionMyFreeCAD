@@ -3,6 +3,7 @@
   "targetFreeCAD": "1.1.x",
   "primaryCommands": [
     "FusionMyFreeCAD_CreateSketch",
+    "FusionMyFreeCAD_MirrorWithConstraints",
     "FusionMyFreeCAD_ParameterTable",
     "FusionMyFreeCAD_Reapply",
     "FusionMyFreeCAD_Restore",
