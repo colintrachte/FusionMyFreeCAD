@@ -527,18 +527,19 @@ def _unary_orientation_constraints_on(sketch, geoid):
     return found
 
 
-_REDUNDANT_ATTRS = ("RedundantConstraints", "PartiallyRedundantConstraints", "Redundant")
-_CONFLICTING_ATTRS = (
-    "ConflictingConstraints",
-    "MalformedConstraints",
-    "Conflicting",
-    "Malformed",
-)
-
-
-def _flagged_indices(sketch, attributes):
+def _bad_constraint_indices(sketch):
+    """Redundant/conflicting/malformed constraint indices the solver flagged."""
     flagged = set()
-    for attribute in attributes:
+    for attribute in (
+        "ConflictingConstraints",
+        "RedundantConstraints",
+        "MalformedConstraints",
+        "PartiallyRedundantConstraints",
+        # Compatibility with older FreeCAD builds and the lightweight test fake.
+        "Conflicting",
+        "Redundant",
+        "Malformed",
+    ):
         for value in getattr(sketch, attribute, []) or []:
             try:
                 flagged.add(int(value))
@@ -547,19 +548,8 @@ def _flagged_indices(sketch, attributes):
     return flagged
 
 
-def _bad_constraint_indices(sketch):
-    """Redundant/conflicting/malformed constraint indices the solver flagged."""
-    return _flagged_indices(sketch, _REDUNDANT_ATTRS + _CONFLICTING_ATTRS)
-
-
-def apply_constraint_copies(sketch, specs, drop_redundant=True):
+def apply_constraint_copies(sketch, specs):
     """Add each planned constraint, then drop any the solver rejects.
-
-    With ``drop_redundant`` false, a copy the solver only calls *redundant* is
-    kept: ``PointOnObject`` / ``Coincident`` on a mirrored endpoint is what makes
-    FreeCAD split the border edge and detect the enclosed region, and a full
-    symmetry link makes that copy numerically redundant without making it
-    topologically pointless. Conflicting and malformed copies are still removed.
 
     Returns ``(added, removed)``.  ``added`` is the list of specs that stuck;
     ``removed`` is a list of ``{"type", "reason"}`` for copies pulled back out
@@ -600,11 +590,7 @@ def apply_constraint_copies(sketch, specs, drop_redundant=True):
     _recompute(sketch)
 
     removed = []
-    bad = (
-        _bad_constraint_indices(sketch)
-        if drop_redundant
-        else _flagged_indices(sketch, _CONFLICTING_ATTRS)
-    )
+    bad = _bad_constraint_indices(sketch)
     if bad:
         survivors = []
         survivor_indices = []
@@ -969,24 +955,24 @@ def mirror_sketch_geometry(sketch, source_indices, reference_geoid, reference_po
     copies, skipped = plan_constraint_copies(
         records, set(source_indices), mapping, before_geometry, axis_a, axis_b
     )
-    # For a pair with a live symmetry link the endpoint attachments are
-    # numerically redundant, but they are what makes FreeCAD split the border
-    # edge and detect the enclosed region for face selection / extrude -- so keep
-    # them (``drop_redundant`` off). For an unlinked pair they carry real DoF and
-    # a redundant one is a mistake, so drop it as before.
-    on_link = [spec for spec in copies if spec.get("first") in linked_mirror_ids]
-    off_link = [spec for spec in copies if spec.get("first") not in linked_mirror_ids]
-    added_free, removed = apply_constraint_copies(sketch, off_link)
-    added_link, removed_link = apply_constraint_copies(sketch, on_link, drop_redundant=False)
+    # A pair with a clean live symmetry link does not also need its boundary
+    # endpoint constraints reproduced -- they would be redundant, and a
+    # deliberately redundant constraint tips the sketch over-constrained
+    # (orange), which blocks editing. Pairs whose link rolled back still get the
+    # copies.
+    covered = [spec for spec in copies if spec.get("first") in linked_mirror_ids]
+    copies = [spec for spec in copies if spec.get("first") not in linked_mirror_ids]
+    added, removed = apply_constraint_copies(sketch, copies)
     _recompute(sketch)
     return {
         "mirrored": mirrored_count,
         "linked": linked,
         "link_rolled_back": link_rolled_back,
         "linked_pairs": len(linked_mirror_ids),
-        "copied": added_free + added_link,
+        "copied": added,
+        "covered_by_link": covered,
         "skipped": skipped,
-        "removed": removed + removed_link,
+        "removed": removed,
         "unmatched": unmatched,
         "mapping": mapping,
     }
