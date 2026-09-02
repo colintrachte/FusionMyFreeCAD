@@ -1,12 +1,18 @@
 """Constraint-aware sketch mirroring for FusionMyFreeCAD.
 
 ``FusionMyFreeCAD_MirrorWithConstraints`` uses Sketcher's synchronous symmetry API
-and then copies the *boundary* constraints native Symmetry leaves behind: the ones
-that tie a mirrored endpoint to geometry outside the mirrored selection (an
-unchanged border line, a sketch axis, projected external geometry).  Native
-Symmetry only reproduces constraints whose every endpoint is inside the mirrored
-selection, so a profile whose dividers are attached to its top and bottom edges
-loses those attachments on mirroring and the pad later fails to close.
+and then does two things native Symmetry does not do on FreeCAD 1.1.3:
+
+1. Adds a live ``Symmetric`` link between each source element and its mirrored
+   copy, across the same line the mirror used, so dragging either one moves the
+   other. ``Equal`` keeps a mirrored circle or arc the same size.
+2. For any pair the link cannot cover, copies the *boundary* constraints native
+   Symmetry leaves behind: the ones that tie a mirrored endpoint to geometry
+   outside the mirrored selection (an unchanged border line, a sketch axis,
+   projected external geometry). Native Symmetry only reproduces constraints
+   whose every endpoint is inside the mirrored selection, so a profile whose
+   dividers are attached to its top and bottom edges would otherwise lose those
+   attachments and the pad would fail to close.
 
 The command is explicitly best-effort.  Every constraint it cannot safely
 reproduce is reported rather than dropped in silence, matching the rest of the
@@ -18,6 +24,8 @@ selection forms are refused rather than guessed.
 """
 
 from __future__ import annotations
+
+import os
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -467,6 +475,19 @@ def _new_constraint(spec):
         return Sketcher.Constraint(
             "PointOnObject", spec["first"], spec["first_pos"], spec["second"]
         )
+    if ctype == "Symmetric":
+        # point1, point2 symmetric about the mirror line ``third`` (a real edge
+        # geoid, or -1 / -2 for the sketch X / Y axis).
+        return Sketcher.Constraint(
+            "Symmetric",
+            spec["first"],
+            spec["first_pos"],
+            spec["second"],
+            spec["second_pos"],
+            spec["third"],
+        )
+    if ctype == "Equal":
+        return Sketcher.Constraint("Equal", spec["first"], spec["second"])
     return Sketcher.Constraint(
         "Coincident",
         spec["first"],
@@ -698,9 +719,10 @@ def _notify(text, error=False):
         pass
 
 
-def _format_report(mirrored_count, added, skipped, removed, unmatched):
+def _format_report(mirrored_count, linked_pairs, added, skipped, removed, unmatched):
     parts = [
         "mirrored {} element{}".format(mirrored_count, "" if mirrored_count == 1 else "s"),
+        "linked {} symmetric".format(linked_pairs),
         "copied {} boundary constraint{}".format(len(added), "" if len(added) == 1 else "s"),
     ]
     if skipped:
@@ -718,6 +740,66 @@ def _format_report(mirrored_count, added, skipped, removed, unmatched):
     for item in removed:
         detail.append("  removed {}: {}".format(item["type"], item["reason"]))
     return summary, detail
+
+
+def _geometry_kind(geo):
+    """Coarse classification of a Part geometry, tolerant of test fakes."""
+    type_id = str(getattr(geo, "TypeId", "") or "")
+    if "Arc" in type_id:
+        return "arc"
+    if "Circle" in type_id or "Ellipse" in type_id:
+        return "circle"
+    if "LineSegment" in type_id:
+        return "line"
+    return "other"
+
+
+def plan_symmetry_links(mapping, before_geometry, reference_geoid):
+    """One ``Symmetric`` constraint per shared named point of each mirrored pair.
+
+    This is the live link the user expects from a mirror: drag either element and
+    the other follows, reflected across the same line the mirror used. ``Equal``
+    keeps a mirrored circle or arc the same size as its source. FreeCAD 1.1.3's
+    ``addSymmetric`` creates neither, so the command adds them itself.
+
+    Each spec carries ``_mirror`` (the mirrored geoid) so the caller can tell
+    which pairs ended up coupled.
+    """
+    specs = []
+    for source_id, mirror_id in sorted(mapping.items()):
+        if not (0 <= source_id < len(before_geometry)):
+            continue
+        geo = before_geometry[source_id]
+        for pos in sorted(geometry_endpoints(geo)):
+            specs.append(
+                {
+                    "type": "Symmetric",
+                    "first": source_id,
+                    "first_pos": pos,
+                    "second": mirror_id,
+                    "second_pos": pos,
+                    "third": reference_geoid,
+                    "reason": "live symmetry link across the mirror line",
+                    "driving": True,
+                    "active": True,
+                    "_mirror": mirror_id,
+                }
+            )
+        if _geometry_kind(geo) in ("circle", "arc"):
+            specs.append(
+                {
+                    "type": "Equal",
+                    "first": source_id,
+                    "first_pos": _POS_NONE,
+                    "second": mirror_id,
+                    "second_pos": _POS_NONE,
+                    "reason": "keep the mirrored curve the same size as its source",
+                    "driving": True,
+                    "active": True,
+                    "_mirror": mirror_id,
+                }
+            )
+    return specs
 
 
 def mirror_sketch_geometry(sketch, source_indices, reference_geoid, reference_pos, axis):
@@ -751,14 +833,28 @@ def mirror_sketch_geometry(sketch, source_indices, reference_geoid, reference_po
         mapping, unmatched = build_geometry_mapping(
             before_geometry, after_geometry, source_indices, axis_a, axis_b
         )
+    link_specs = plan_symmetry_links(mapping, before_geometry, reference_geoid)
+    linked, link_removed = apply_constraint_copies(sketch, link_specs)
+    _recompute(sketch)
+    linked_mirror_ids = {spec["_mirror"] for spec in linked}
+
     copies, skipped = plan_constraint_copies(
         records, set(source_indices), mapping, before_geometry, axis_a, axis_b
     )
+    # A pair that now has a live symmetry link does not also need its boundary
+    # endpoint constraints reproduced onto the same mirrored element; those would
+    # only be redundant. Anything the link could not cover still gets copied.
+    covered = [spec for spec in copies if spec.get("first") in linked_mirror_ids]
+    copies = [spec for spec in copies if spec.get("first") not in linked_mirror_ids]
     added, removed = apply_constraint_copies(sketch, copies)
     _recompute(sketch)
     return {
         "mirrored": mirrored_count,
+        "linked": linked,
+        "link_removed": link_removed,
+        "linked_pairs": len(linked_mirror_ids),
         "copied": added,
+        "covered_by_link": covered,
         "skipped": skipped,
         "removed": removed,
         "unmatched": unmatched,
@@ -796,6 +892,7 @@ def mirror_with_constraints():
 
     summary, detail = _format_report(
         result["mirrored"],
+        result["linked_pairs"],
         result["copied"],
         result["skipped"],
         result["removed"],
@@ -836,13 +933,14 @@ class MirrorWithConstraintsCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": "Constraint_Symmetric",
+            "Pixmap": "FusionMyFreeCAD_MirrorWithConstraints",
             "MenuText": "Mirror + Constraints",
             "ToolTip": (
-                "Advanced mirror: select geometry, then a mirror line or sketch axis. "
-                "Creates the mirror and copies compatible endpoint constraints to "
-                "unchanged borders or axes. Anything unsafe is reported. Use Mirror "
-                "for FreeCAD's original interactive tool and live symmetry links."
+                "Mirror like FreeCAD's Mirror, then add the constraints it leaves out: "
+                "a live Symmetric link between each element and its copy so moving one "
+                "moves the other, plus endpoint attachments to unchanged borders or "
+                "axes. Select geometry, then a mirror line or sketch axis. Anything "
+                "that cannot be reproduced safely is reported."
             ),
         }
 
@@ -865,7 +963,31 @@ class MirrorWithConstraintsCommand:
         mirror_with_constraints()
 
 
+def _register_icon_path():
+    """Let FreeCAD resolve the command's authored icon by name in menus and search.
+
+    The ribbon finds it by filename; menus and the command search use the bitmap
+    factory, which needs the directory on its search path.
+    """
+    adder = getattr(Gui, "addIconPath", None)
+    if not callable(adder):
+        return
+    directory = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "bundled-addons",
+        "FreeCAD-Ribbon",
+        "Resources",
+        "FreeCAD Icons",
+    )
+    if os.path.isdir(directory):
+        try:
+            adder(directory)
+        except Exception:
+            pass
+
+
 def register(add_command=None):
     """Register the command with FreeCAD (or a supplied callable, for tests)."""
+    _register_icon_path()
     register_with = add_command or Gui.addCommand
     register_with("FusionMyFreeCAD_MirrorWithConstraints", MirrorWithConstraintsCommand())

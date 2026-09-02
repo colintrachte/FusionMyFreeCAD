@@ -18,9 +18,14 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
   workbench, nothing more). The workbench switch on sketch-open is also deferred out of
   the document-observer callback so it can no longer re-enter an in-progress edit.
 - **Mirror + Constraints** returns as a small button in front of native **Mirror**, which
-  keeps its 1.3.1 size — the panel layout is barely changed from 1.3.1. Select geometry,
-  then a mirror line or sketch axis; the command mirrors it and copies compatible endpoint
-  constraints to unchanged borders or axes, reporting anything it cannot reproduce safely.
+  keeps its 1.3.1 size — the panel layout is barely changed from 1.3.1. It now adds a live
+  **Symmetric** link between each element and its mirrored copy, across the same line the
+  mirror used, so dragging either one moves the other; **Equal** keeps a mirrored circle or
+  arc the same size. For any pair a link cannot cover it still copies the endpoint
+  attachments to unchanged borders or axes, and reports anything it cannot reproduce safely.
+  The mirror and every added constraint are one Undo step.
+- The button has its own icon: FreeCAD's Mirror glyph with a green "+" badge, so it reads as
+  "Mirror, plus the constraints" next to the plain **Mirror**.
 - The 1.3.2 **Coincident**/`Sketcher_ConstrainCoincidentUnified` swap and the new
   **Point on Object** button are **not** included. Point-to-point **Coincident**
   (`Sketcher_ConstrainCoincident`) stays as it was in 1.3.1.

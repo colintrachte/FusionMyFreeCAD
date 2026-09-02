@@ -20,10 +20,14 @@ C++ access faulted in a way Python cannot catch.
 - The workbench switch when a sketch opens is deferred out of the document-observer callback, so
   it can no longer re-enter an edit that is still in progress.
 - **Mirror + Constraints** returns as a small button in front of native **Mirror**. Native Mirror
-  keeps its 1.3.1 size, so the Sketcher **MODIFY** panel is virtually unchanged from 1.3.1. Select
-  geometry, then a mirror line or sketch axis; the command mirrors it and copies compatible
-  endpoint constraints to unchanged borders or axes. Anything it cannot reproduce safely is
-  reported in the Report view. The mirror and its copied constraints are one Undo step.
+  keeps its 1.3.1 size, so the Sketcher **MODIFY** panel is virtually unchanged from 1.3.1.
+- It now creates the link the previous build was missing: a **Symmetric** constraint between each
+  source element and its mirrored copy, across the same line the mirror used. Drag either one and
+  the other follows. **Equal** keeps a mirrored circle or arc the same size. For any pair a
+  Symmetric link cannot cover, the command still reproduces the endpoint attachments to unchanged
+  borders or axes so a profile stays closed. Anything it cannot reproduce safely is reported in the
+  Report view, and the whole operation is one Undo step.
+- The button has a distinct icon — FreeCAD's Mirror glyph with a green "+" badge.
 - The 1.3.2 **Coincident** → `Sketcher_ConstrainCoincidentUnified` swap and the new **Point on
   Object** button are **not** part of 1.3.3. Point-to-point **Coincident** stays as it was in 1.3.1.
 

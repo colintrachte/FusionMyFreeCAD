@@ -188,7 +188,19 @@ class FakeConstraint:
         arguments = list(args)
         if ctype == "PointOnObject" and len(arguments) >= 3:
             self.First, self.FirstPos, self.Second = arguments[:3]
-        elif ctype in ("Coincident", "Symmetric", "Tangent", "Perpendicular", "Parallel", "Equal"):
+        elif ctype == "Symmetric":
+            # (g1, p1, g2, p2, g3) about a line, or (g1, p1, g2, p2, g3, p3)
+            # about a point.
+            if len(arguments) >= 4:
+                self.First, self.FirstPos, self.Second, self.SecondPos = arguments[:4]
+            if len(arguments) >= 5:
+                self.Third = arguments[4]
+            if len(arguments) >= 6:
+                self.ThirdPos = arguments[5]
+        elif ctype == "Equal":
+            if len(arguments) >= 2:
+                self.First, self.Second = arguments[0], arguments[1]
+        elif ctype in ("Coincident", "Tangent", "Perpendicular", "Parallel"):
             if len(arguments) >= 2:
                 self.First, self.FirstPos = arguments[0], arguments[1]
             if len(arguments) >= 4:
@@ -255,10 +267,26 @@ class FakeSketch(FakeObject):
 
     def recompute(self):
         self.recomputes += 1
+        self._refresh_rejections()
 
     def solve(self):
         self.solves += 1
+        self._refresh_rejections()
         return 0
+
+    def _refresh_rejections(self):
+        """Re-evaluate solver diagnostics, like the real solver does each solve.
+
+        Tests that set ``RedundantConstraints`` directly leave ``_reject`` unset
+        and keep full control; tests that want type-driven rejection set
+        ``sketch._reject = lambda constraint: ...``.
+        """
+        predicate = getattr(self, "_reject", None)
+        if predicate is None:
+            return
+        self.RedundantConstraints = [
+            index for index, constraint in enumerate(self.Constraints) if predicate(constraint)
+        ]
 
     def mirror_selected(self, source_indices, axis_a, axis_b):
         """Emulate native Symmetry: append reflected copies of the source edges."""
