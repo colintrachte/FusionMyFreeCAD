@@ -255,9 +255,9 @@ def test_mirror_with_constraints_sits_beside_the_native_mirror(layout, manifest)
     assert by_name["FusionMyFreeCAD_MirrorWithConstraints"][2] == "small"
     assert by_name["FusionMyFreeCAD_MirrorWithConstraints"][3] == "Mirror + Constraints"
     assert by_name["Sketcher_Symmetry"][2] == "large"
-    assert order.index("Sketcher_Symmetry") - order.index(
-        "FusionMyFreeCAD_MirrorWithConstraints"
-    ) == 1
+    assert (
+        order.index("Sketcher_Symmetry") - order.index("FusionMyFreeCAD_MirrorWithConstraints") == 1
+    )
     assert "FusionMyFreeCAD_MirrorWithConstraints" in manifest["primaryCommands"]
 
 
@@ -421,12 +421,13 @@ def test_only_layout_icons_are_vendored(layout):
     assert bundled == used
 
 
-def test_every_layout_icon_was_verified_by_freecad_or_its_source(layout):
+def test_every_layout_icon_was_verified_by_freecad_or_its_source(layout, manifest):
     """Guard icon names using a recorded runtime probe or exact source files.
 
     `Gui.getIcon()` returns a placeholder rather than failing for an unknown name,
     so a wrong name renders a grey question mark instead of raising. The verified
     list comes from `tools/probe_freecad_icons.py` run against a real install.
+    FusionMyFreeCAD's own composite icons are declared in `authoredIcons`.
     """
     runtime = json.loads((RESOURCES / "verified-icons.json").read_text("utf-8"))
     source = json.loads((RESOURCES / "source-icons.json").read_text("utf-8"))
@@ -437,15 +438,24 @@ def test_every_layout_icon_was_verified_by_freecad_or_its_source(layout):
         for panel in panels
         for entry in panel["commands"] + panel.get("overflow", [])
     }
-    verified = set(runtime["verified"]) | set(source["icons"])
+    verified = set(runtime["verified"]) | set(source["icons"]) | set(manifest["authoredIcons"])
     unverified = sorted(used - verified)
     assert unverified == [], (
-        "These icon names were never verified against FreeCAD or resolved from "
-        "its official source checkout: {}".format(unverified)
+        "These icon names were never verified against FreeCAD, resolved from its "
+        "official source checkout, or declared in authoredIcons: {}".format(unverified)
     )
 
 
-def test_the_source_icon_list_has_no_stale_entries(layout):
+def test_authored_icons_are_vendored_and_not_claimed_as_freecad_source(manifest):
+    """Each authored icon must ship as a file and must not masquerade as FreeCAD's."""
+    directory = BUNDLED / "FreeCAD-Ribbon" / "Resources" / "FreeCAD Icons"
+    source = json.loads((RESOURCES / "source-icons.json").read_text("utf-8"))
+    for name in manifest["authoredIcons"]:
+        assert (directory / (name + ".svg")).is_file(), name
+        assert name not in source["icons"], name
+
+
+def test_the_source_icon_list_has_no_stale_entries(layout, manifest):
     """A name dropped from the layout should not linger in the source manifest."""
     verified = json.loads((RESOURCES / "source-icons.json").read_text("utf-8"))
     used = {
@@ -454,7 +464,7 @@ def test_the_source_icon_list_has_no_stale_entries(layout):
         for panel in panels
         for entry in panel["commands"] + panel.get("overflow", [])
     }
-    assert set(verified["icons"]) == used
+    assert set(verified["icons"]) == used - set(manifest["authoredIcons"])
     directory = BUNDLED / "FreeCAD-Ribbon" / "Resources" / "FreeCAD Icons"
     for name, evidence in verified["icons"].items():
         content = (directory / (name + ".svg")).read_bytes()

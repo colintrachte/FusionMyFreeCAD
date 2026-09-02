@@ -296,7 +296,7 @@ def test_is_active_never_touches_gui_edit_state(tools, env):
     assert tools.MirrorWithConstraintsCommand().IsActive() is False
 
 
-def test_mirror_copies_the_twelve_card_box_boundary_constraints(tools, env):
+def test_mirror_links_every_card_box_divider_to_its_source(tools, env):
     sketch, dividers = _card_box([-30.0, -20.0, -10.0, 5.0, 15.0, 25.0])
     env.begin_sketch_edit(sketch)
     env.select_subelements(sketch, ["Edge{}".format(g + 1) for g in dividers] + ["V_Axis"])
@@ -305,12 +305,34 @@ def test_mirror_copies_the_twelve_card_box_boundary_constraints(tools, env):
 
     assert result["status"] == "ok"
     assert result["mirrored"] == 6
-    assert len(result["copied"]) == 12
-    assert all(spec["type"] == "PointOnObject" for spec in result["copied"])
-    assert result["skipped"] == []
+    assert result["linked_pairs"] == 6
     assert result["unmatched"] == []
-    # Every mirrored divider now carries its two Point-on-Object attachments.
-    assert sum(1 for c in sketch.Constraints if c.Type == "PointOnObject") == 24
+    assert result["skipped"] == []
+    # Two Symmetric links per divider (start and end), about the Y axis.
+    symmetric = [c for c in sketch.Constraints if c.Type == "Symmetric"]
+    assert len(symmetric) == 12
+    assert all(c.Third == -2 for c in symmetric)
+    # The link makes the copied boundary constraints redundant, so they are not
+    # also added; every one is accounted for as covered.
+    assert result["copied"] == []
+    assert len(result["covered_by_link"]) == 12
+    assert sum(1 for c in sketch.Constraints if c.Type == "PointOnObject") == 12
+
+
+def test_boundary_constraint_is_copied_when_the_symmetry_link_is_rejected(tools, env):
+    sketch, _dividers = _card_box([20.0])
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Edge3", "V_Axis"])
+    # The solver rejects every Symmetric link the command tries to add.
+    sketch._reject = lambda constraint: constraint.Type == "Symmetric"
+
+    result = tools.mirror_with_constraints()
+
+    assert result["status"] == "ok"
+    assert result["linked_pairs"] == 0
+    assert any(item["type"] == "Symmetric" for item in result["link_removed"])
+    # With no link, the divider's endpoint attachments are reproduced instead.
+    assert [spec["type"] for spec in result["copied"]] == ["PointOnObject", "PointOnObject"]
 
 
 def test_missing_explicit_axis_leaves_the_sketch_unchanged(tools, env):

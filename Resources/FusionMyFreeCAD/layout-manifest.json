@@ -1,6 +1,9 @@
 {
   "layoutVersion": "1.3.3",
   "targetFreeCAD": "1.1.x",
+  "authoredIcons": [
+    "FusionMyFreeCAD_MirrorWithConstraints"
+  ],
   "primaryCommands": [
     "FusionMyFreeCAD_CreateSketch",
     "FusionMyFreeCAD_MirrorWithConstraints",

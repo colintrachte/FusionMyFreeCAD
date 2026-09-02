@@ -49,13 +49,13 @@ Sketcher also uses the available window width: frequently useful overflow comman
 1450 px and 1750 px tiers, then return to their panel dropdowns when the window becomes narrower.
 The Symmetric constraint is always a top-level button and can be reordered directly.
 
-Sketcher has two adjacent mirror controls. The large **Mirror + Constraints** button uses a
-constraint icon to mark the advanced workflow: select geometry and then a mirror line or sketch
-axis, and it copies compatible endpoint constraints so mirrored profiles stay closed. The smaller
-**Mirror** button is FreeCAD's original interactive tool and remains available for point symmetry,
-live symmetry links, and unsupported inputs. The Constraints panel carries a dedicated top-level
-**Point on Object** button for attaching a point or line endpoint anywhere along a line, arc, curve,
-or axis, alongside the selection-aware **Coincident**.
+Sketcher has two adjacent mirror controls. The small **Mirror + Constraints** button — FreeCAD's
+Mirror icon with a green "+" badge — sits in front of the native **Mirror**: select geometry and
+then a mirror line or sketch axis, and it adds a live **Symmetric** link between each element and
+its copy so moving one moves the other, keeps mirrored circles and arcs the same size, and copies
+any endpoint attachments a link cannot cover so mirrored profiles stay closed. The larger **Mirror**
+button is FreeCAD's original interactive tool and remains available for point symmetry and
+unsupported inputs.
 
 **Create Sketch** remains the first button in the Part Design ribbon. Its attachment step stays in
 Part Design so FreeCAD can display, label, and frame the selectable origin planes; FMF changes to the

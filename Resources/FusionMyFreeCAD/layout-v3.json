@@ -1033,7 +1033,7 @@
             "General",
             "small",
             "Mirror + Constraints",
-            "Constraint_Symmetric"
+            "FusionMyFreeCAD_MirrorWithConstraints"
           ],
           [
             "Sketcher_Symmetry",
