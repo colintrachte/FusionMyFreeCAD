@@ -289,11 +289,22 @@ class FakeSketch(FakeObject):
         ]
 
     def mirror_selected(self, source_indices, axis_a, axis_b):
-        """Emulate native Symmetry: append reflected copies of the source edges."""
+        """Emulate native Symmetry: append reflected copies of the source edges
+        and, like the real addSymmetric, reproduce their single-element
+        orientation constraints onto the copies."""
         mapping = {}
         for source_id in sorted(source_indices):
             reflected = self.Geometry[source_id].reflected(axis_a, axis_b)
             mapping[source_id] = self.addGeometry(reflected)
+        for source_id, mirror_id in mapping.items():
+            for constraint in list(self.Constraints):
+                if (
+                    constraint.Type in ("Vertical", "Horizontal", "Block")
+                    and constraint.First == source_id
+                    and constraint.Second <= -2000
+                    and constraint.Third <= -2000
+                ):
+                    self.addConstraint(FakeConstraint(constraint.Type, mirror_id))
         return mapping
 
     def addSymmetric(self, source_indices, reference_geoid, reference_pos):

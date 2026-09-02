@@ -5,10 +5,14 @@ and then does two things native Symmetry does not do on FreeCAD 1.1.3:
 
 1. Adds a live ``Symmetric`` link between each source element and its mirrored
    copy, across the same line the mirror used, so dragging either one moves the
-   other. ``Equal`` keeps a mirrored circle or arc the same size. Each pair is
-   linked all-or-nothing: if the solver would call any part of it redundant or
-   conflicting, the whole pair is rolled back and left to step 2, because a
-   pair linked at one end only distorts when the source moves.
+   other. ``Equal`` keeps a mirrored circle or arc the same size. ``addSymmetric``
+   reproduces the source's single-element orientation constraints (Vertical /
+   Horizontal / Block) onto the copy; the link plus the source's own constraints
+   already pins the copy, so that reproduced constraint is stripped first,
+   otherwise the solver reports it as redundant. Each pair is linked
+   all-or-nothing: if it still will not solve cleanly the whole pair is rolled
+   back -- stripped constraints restored -- and left to step 2, because a pair
+   linked at one end only distorts when the source moves.
 2. For any pair the link cannot cover, copies the *boundary* constraints native
    Symmetry leaves behind: the ones that tie a mirrored endpoint to geometry
    outside the mirrored selection (an unchanged border line, a sketch axis,
@@ -293,8 +297,9 @@ def classify_constraint(record, source_set, mapping, before_geometry, axis_a, ax
     touches_axis = any(_is_axis(g) for g in all_ids)
     touches_external = any(_is_external(g) for g in all_ids)
 
-    if not in_source and not (touches_axis and ctype in _BOUNDARY_COPYABLE_TYPES):
-        # Nothing mirrored here; not our concern.
+    if not in_source:
+        # The constraint names no mirrored element, so mirroring cannot have
+        # broken it -- even if it happens to touch a sketch axis or the origin.
         return "native", "constraint does not touch the mirrored selection", None
 
     # "Fully inside" means every element the constraint names is being mirrored:
@@ -469,6 +474,11 @@ def plan_constraint_copies(records, source_set, mapping, before_geometry, axis_a
 # ---------------------------------------------------------------------------
 
 
+# Single-element orientation constraints that ``addSymmetric`` reproduces onto a
+# mirror copy and that a full endpoint-symmetry link then makes redundant.
+_UNARY_ORIENTATION_TYPES = frozenset({"Vertical", "Horizontal", "Block"})
+
+
 def _new_constraint(spec):
     """Instantiate a ``Sketcher.Constraint`` from a spec dict."""
     import Sketcher
@@ -491,6 +501,8 @@ def _new_constraint(spec):
         )
     if ctype == "Equal":
         return Sketcher.Constraint("Equal", spec["first"], spec["second"])
+    if ctype in _UNARY_ORIENTATION_TYPES:
+        return Sketcher.Constraint(ctype, spec["first"])
     return Sketcher.Constraint(
         "Coincident",
         spec["first"],
@@ -498,6 +510,21 @@ def _new_constraint(spec):
         spec["second"],
         spec["second_pos"],
     )
+
+
+def _unary_orientation_constraints_on(sketch, geoid):
+    """``(index, rebuild_spec)`` for each Vertical/Horizontal/Block whose only
+    element is ``geoid``."""
+    found = []
+    for index, constraint in enumerate(getattr(sketch, "Constraints", []) or []):
+        if getattr(constraint, "Type", "") not in _UNARY_ORIENTATION_TYPES:
+            continue
+        first = int(getattr(constraint, "First", -2000))
+        second = int(getattr(constraint, "Second", -2000))
+        third = int(getattr(constraint, "Third", -2000))
+        if first == geoid and second <= -2000 and third <= -2000:
+            found.append((index, {"type": constraint.Type, "first": geoid}))
+    return found
 
 
 def _bad_constraint_indices(sketch):
@@ -599,17 +626,19 @@ def apply_symmetry_links(sketch, link_specs):
     """Add each mirrored pair's ``Symmetric`` / ``Equal`` links as an all-or-nothing
     unit.
 
-    ``addSymmetric`` already reproduces the source's own internal constraints onto
-    the copy, so a full endpoint-symmetry set on top is often partly redundant.
-    A half-applied pair is worse than none: the copy then tracks its source at one
-    end only and distorts when the source moves. So each pair is added together
-    and, if the solver flags anything new as redundant or conflicting, the whole
-    pair is rolled back and left to the boundary-copy fallback. A constraint that
-    was already in the sketch is never touched.
+    ``addSymmetric`` reproduces the source's single-element orientation constraints
+    (Vertical / Horizontal / Block) onto the copy. A full endpoint-symmetry link
+    plus the source's own constraints already pins the copy, so that reproduced
+    orientation constraint is exactly what the solver then reports as redundant.
+    So for each pair this strips the reproduced orientation constraints on the
+    copy first, then adds the links. If the pair still will not solve cleanly it
+    is rolled back *and the stripped constraints are restored*, leaving the copy
+    exactly as ``addSymmetric`` left it for the boundary-copy fallback. A
+    half-applied pair -- tracking its source at one end only -- is never left
+    behind, and a constraint the user made is never touched.
 
-    Returns ``(linked, rolled_back)``. ``linked`` is the specs that stuck;
-    ``rolled_back`` is ``[{"mirror", "reason"}]`` for pairs that could not link
-    cleanly.
+    Returns ``(linked, rolled_back)``. ``linked`` is the link specs that stuck;
+    ``rolled_back`` is ``[{"mirror", "reason"}]`` for pairs left unlinked.
     """
     groups = {}
     for spec in link_specs:
@@ -621,6 +650,13 @@ def apply_symmetry_links(sketch, link_specs):
     rolled_back = []
 
     for mirror_id, specs in groups.items():
+        stripped = _unary_orientation_constraints_on(sketch, mirror_id)
+        for index, _spec in sorted(stripped, key=lambda item: item[0], reverse=True):
+            try:
+                sketch.delConstraint(index)
+            except Exception:
+                pass
+
         start = len(list(getattr(sketch, "Constraints", []) or []))
         added_indices = []
         failure = None
@@ -637,12 +673,17 @@ def apply_symmetry_links(sketch, link_specs):
 
         if failure is None and introduced <= 0:
             linked.extend(specs)
-            baseline += 0  # no new bad constraints
+            baseline = len(_bad_constraint_indices(sketch))
             continue
 
         for index in sorted(added_indices, reverse=True):
             try:
                 sketch.delConstraint(index)
+            except Exception:
+                pass
+        for _index, restore_spec in stripped:
+            try:
+                sketch.addConstraint(_new_constraint(restore_spec))
             except Exception:
                 pass
         _recompute(sketch)
@@ -651,7 +692,7 @@ def apply_symmetry_links(sketch, link_specs):
             {
                 "mirror": mirror_id,
                 "reason": failure
-                or "a live symmetry link here would duplicate an existing constraint",
+                or "a live symmetry link here would conflict with an existing constraint",
             }
         )
 
