@@ -65,6 +65,9 @@ wheels/
 .env.*
 !.env.example
 
+# Machine-local dev helper state (tools/install-dev.ps1)
+/.install-dev.local.json
+
 # Editors and operating systems
 .idea/
 .vscode/
