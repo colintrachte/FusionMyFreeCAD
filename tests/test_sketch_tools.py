@@ -353,6 +353,46 @@ def test_symmetry_link_is_rolled_back_as_a_unit_when_one_end_is_redundant(tools,
     assert [c for c in sketch.Constraints if c.Type == "Symmetric"] == []
 
 
+def _vertical_divider_box():
+    """A box with one divider that carries its own Vertical constraint -- the
+    case where addSymmetric reproduces Vertical onto the copy."""
+    sketch = FakeSketch("Sketch")
+    sketch.addGeometry(FakeLineSegment((-50.0, 0.0), (50.0, 0.0)))  # 0 bottom
+    sketch.addGeometry(FakeLineSegment((-50.0, 30.0), (50.0, 30.0)))  # 1 top
+    divider = sketch.addGeometry(FakeLineSegment((20.0, 0.0), (20.0, 30.0)))  # 2
+    sketch.addConstraint(FakeConstraint("PointOnObject", divider, POS_START, 0))
+    sketch.addConstraint(FakeConstraint("PointOnObject", divider, POS_END, 1))
+    sketch.addConstraint(FakeConstraint("Vertical", divider))
+    return sketch, divider
+
+
+def test_reproduced_orientation_constraint_on_the_copy_is_stripped_for_the_link(tools, env):
+    sketch, _divider = _vertical_divider_box()
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Edge3", "V_Axis"])
+
+    result = tools.mirror_with_constraints()
+
+    assert result["linked_pairs"] == 1
+    # addSymmetric put a Vertical on the copy (geo 3); the link replaces it.
+    assert [c for c in sketch.Constraints if c.Type == "Vertical" and c.First == 3] == []
+    assert len([c for c in sketch.Constraints if c.Type == "Symmetric"]) == 2
+
+
+def test_stripped_orientation_constraint_is_restored_when_the_pair_rolls_back(tools, env):
+    sketch, _divider = _vertical_divider_box()
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Edge3", "V_Axis"])
+    sketch._reject = lambda c: c.Type == "Symmetric"
+
+    result = tools.mirror_with_constraints()
+
+    assert result["linked_pairs"] == 0
+    # The copy is back exactly as addSymmetric left it: Vertical restored, no link.
+    assert [c for c in sketch.Constraints if c.Type == "Symmetric"] == []
+    assert len([c for c in sketch.Constraints if c.Type == "Vertical" and c.First == 3]) == 1
+
+
 def test_missing_explicit_axis_leaves_the_sketch_unchanged(tools, env):
     sketch, _dividers = _card_box([10.0, 20.0])
     env.begin_sketch_edit(sketch)
