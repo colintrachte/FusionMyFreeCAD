@@ -144,7 +144,9 @@ def test_a_displaced_shortcut_is_recorded_and_reported(env, runtime):
     assert runtime._displaced_shortcuts == [
         {"sequence": "E", "from": "Std_SomethingElse", "to": "PartDesign_Pad"}
     ]
-    assert any("moved the E shortcut" in message for message in env.console.messages)
+    # Per-shortcut detail goes to the log; the Report view gets one summary line.
+    assert any("moved the E shortcut" in line for line in env.console.log)
+    assert any("reassigned 1 keyboard shortcut" in message for message in env.console.messages)
 
 
 def test_displaced_shortcuts_reach_the_status_file(env, bootstrap, runtime):

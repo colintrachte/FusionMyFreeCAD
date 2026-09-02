@@ -26,13 +26,27 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
   is what caused the "redundant constraint" warning in testing. Each pair is linked
   all-or-nothing: if it still will not solve cleanly the pair is rolled back (the removed
   constraint restored) and its endpoint attachments to unchanged borders or axes are copied
-  instead. A constraint touching only a sketch axis or the origin, with nothing mirrored, is
-  now left alone rather than reported as skipped. Everything is one Undo step.
+  instead.
+- The mirrored element still gets its endpoint attachments to the borders (Point-on-Object /
+  Coincident) even when it is symmetry-linked — those are what let FreeCAD split the border
+  edges and detect the enclosed regions for face selection and extrude. They are numerically
+  redundant with the link, so a fully-symmetric mirror can show a mild "redundant constraint"
+  note; the sketch stays fully constrained and every region is selectable.
+- A constraint touching only a sketch axis or the origin, with nothing mirrored, is now left
+  alone rather than reported as skipped. The whole operation is one Undo step.
 - The button has its own icon: FreeCAD's Mirror glyph with a green "+" badge, so it reads as
   "Mirror, plus the constraints" next to the plain **Mirror**.
 - The 1.3.2 **Coincident**/`Sketcher_ConstrainCoincidentUnified` swap and the new
   **Point on Object** button are **not** included. Point-to-point **Coincident**
   (`Sketcher_ConstrainCoincident`) stays as it was in 1.3.1.
+
+### Quieter startup
+
+- The ~20 per-launch "moved the *X* shortcut from …" lines are now one summary line in the
+  Report view (`reassigned N keyboard shortcuts …`), with the per-shortcut detail kept in the
+  log and in **Verify FusionMyFreeCAD**.
+- The "updated FREQUENT …" and "replaced a ribbon layout that changed outside the add-on"
+  lines move to the log; the ribbon backup is still written and still surfaced by Verify UI.
 
 ### Upgrade notes
 

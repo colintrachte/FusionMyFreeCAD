@@ -748,8 +748,12 @@ def prepare():
                 # The ribbon changed outside FusionMyFreeCAD. Replacing it is still
                 # correct for an upgrade, but the user must be able to find the copy.
                 state["externalRibbonEdit"] = update_path
-                App.Console.PrintWarning(
-                    "FusionMyFreeCAD replaced a ribbon layout that was edited outside the add-on. "
+                # The bundled Ribbon add-on re-serializes this file on its own, so
+                # a digest change is usually its normalisation rather than a real
+                # user edit. Keep the note in the log and reachable from Verify UI
+                # instead of announcing it on every launch.
+                App.Console.PrintLog(
+                    "FusionMyFreeCAD replaced a ribbon layout that changed outside the add-on. "
                     "The previous layout is kept at {}.\n".format(update_path)
                 )
 
