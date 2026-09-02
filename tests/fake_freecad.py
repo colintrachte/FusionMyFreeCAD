@@ -277,16 +277,24 @@ class FakeSketch(FakeObject):
     def _refresh_rejections(self):
         """Re-evaluate solver diagnostics, like the real solver does each solve.
 
-        Tests that set ``RedundantConstraints`` directly leave ``_reject`` unset
-        and keep full control; tests that want type-driven rejection set
-        ``sketch._reject = lambda constraint: ...``.
+        Tests that set the lists directly leave the predicates unset and keep
+        full control; tests that want type-driven diagnostics set
+        ``sketch._reject`` (fully redundant), ``sketch._partial`` (partially
+        redundant), or ``sketch._conflict`` (conflicting).
         """
-        predicate = getattr(self, "_reject", None)
-        if predicate is None:
-            return
-        self.RedundantConstraints = [
-            index for index, constraint in enumerate(self.Constraints) if predicate(constraint)
-        ]
+        for attribute, name in (
+            ("RedundantConstraints", "_reject"),
+            ("PartiallyRedundantConstraints", "_partial"),
+            ("ConflictingConstraints", "_conflict"),
+        ):
+            predicate = getattr(self, name, None)
+            if predicate is None:
+                continue
+            setattr(
+                self,
+                attribute,
+                [i for i, constraint in enumerate(self.Constraints) if predicate(constraint)],
+            )
 
     def mirror_selected(self, source_indices, axis_a, axis_b):
         """Emulate native Symmetry: append reflected copies of the source edges
