@@ -5,7 +5,10 @@ and then does two things native Symmetry does not do on FreeCAD 1.1.3:
 
 1. Adds a live ``Symmetric`` link between each source element and its mirrored
    copy, across the same line the mirror used, so dragging either one moves the
-   other. ``Equal`` keeps a mirrored circle or arc the same size.
+   other. ``Equal`` keeps a mirrored circle or arc the same size. Each pair is
+   linked all-or-nothing: if the solver would call any part of it redundant or
+   conflicting, the whole pair is rolled back and left to step 2, because a
+   pair linked at one end only distorts when the source moves.
 2. For any pair the link cannot cover, copies the *boundary* constraints native
    Symmetry leaves behind: the ones that tie a mirrored endpoint to geometry
    outside the mirrored selection (an unchanged border line, a sketch axis,
@@ -592,6 +595,69 @@ def apply_constraint_copies(sketch, specs):
     return added, removed + failed
 
 
+def apply_symmetry_links(sketch, link_specs):
+    """Add each mirrored pair's ``Symmetric`` / ``Equal`` links as an all-or-nothing
+    unit.
+
+    ``addSymmetric`` already reproduces the source's own internal constraints onto
+    the copy, so a full endpoint-symmetry set on top is often partly redundant.
+    A half-applied pair is worse than none: the copy then tracks its source at one
+    end only and distorts when the source moves. So each pair is added together
+    and, if the solver flags anything new as redundant or conflicting, the whole
+    pair is rolled back and left to the boundary-copy fallback. A constraint that
+    was already in the sketch is never touched.
+
+    Returns ``(linked, rolled_back)``. ``linked`` is the specs that stuck;
+    ``rolled_back`` is ``[{"mirror", "reason"}]`` for pairs that could not link
+    cleanly.
+    """
+    groups = {}
+    for spec in link_specs:
+        groups.setdefault(spec["_mirror"], []).append(spec)
+
+    _recompute(sketch)
+    baseline = len(_bad_constraint_indices(sketch))
+    linked = []
+    rolled_back = []
+
+    for mirror_id, specs in groups.items():
+        start = len(list(getattr(sketch, "Constraints", []) or []))
+        added_indices = []
+        failure = None
+        for offset, spec in enumerate(specs):
+            try:
+                index = sketch.addConstraint(_new_constraint(spec))
+            except Exception as error:
+                failure = "FreeCAD rejected the link: {}".format(error)
+                break
+            added_indices.append(index if isinstance(index, int) else start + offset)
+
+        _recompute(sketch)
+        introduced = len(_bad_constraint_indices(sketch)) - baseline
+
+        if failure is None and introduced <= 0:
+            linked.extend(specs)
+            baseline += 0  # no new bad constraints
+            continue
+
+        for index in sorted(added_indices, reverse=True):
+            try:
+                sketch.delConstraint(index)
+            except Exception:
+                pass
+        _recompute(sketch)
+        baseline = len(_bad_constraint_indices(sketch))
+        rolled_back.append(
+            {
+                "mirror": mirror_id,
+                "reason": failure
+                or "a live symmetry link here would duplicate an existing constraint",
+            }
+        )
+
+    return linked, rolled_back
+
+
 def _recompute(sketch):
     for target, method in (
         (sketch, "solve"),
@@ -719,12 +785,17 @@ def _notify(text, error=False):
         pass
 
 
-def _format_report(mirrored_count, linked_pairs, added, skipped, removed, unmatched):
+def _format_report(mirrored_count, linked_pairs, rolled_back, added, skipped, removed, unmatched):
     parts = [
         "mirrored {} element{}".format(mirrored_count, "" if mirrored_count == 1 else "s"),
-        "linked {} symmetric".format(linked_pairs),
-        "copied {} boundary constraint{}".format(len(added), "" if len(added) == 1 else "s"),
+        "linked {} pair{} symmetrically".format(linked_pairs, "" if linked_pairs == 1 else "s"),
     ]
+    if added or not rolled_back:
+        parts.append(
+            "copied {} boundary constraint{}".format(len(added), "" if len(added) == 1 else "s")
+        )
+    if rolled_back:
+        parts.append("{} pair(s) not linked".format(len(rolled_back)))
     if skipped:
         parts.append("skipped {}".format(len(skipped)))
     if removed:
@@ -735,6 +806,8 @@ def _format_report(mirrored_count, linked_pairs, added, skipped, removed, unmatc
         )
     summary = "; ".join(parts) + "."
     detail = []
+    for item in rolled_back:
+        detail.append("  geometry {} not linked: {}".format(item["mirror"], item["reason"]))
     for item in skipped:
         detail.append("  skipped {} #{}: {}".format(item["type"], item["index"], item["reason"]))
     for item in removed:
@@ -834,16 +907,16 @@ def mirror_sketch_geometry(sketch, source_indices, reference_geoid, reference_po
             before_geometry, after_geometry, source_indices, axis_a, axis_b
         )
     link_specs = plan_symmetry_links(mapping, before_geometry, reference_geoid)
-    linked, link_removed = apply_constraint_copies(sketch, link_specs)
+    linked, link_rolled_back = apply_symmetry_links(sketch, link_specs)
     _recompute(sketch)
     linked_mirror_ids = {spec["_mirror"] for spec in linked}
 
     copies, skipped = plan_constraint_copies(
         records, set(source_indices), mapping, before_geometry, axis_a, axis_b
     )
-    # A pair that now has a live symmetry link does not also need its boundary
+    # A pair that got a clean live symmetry link does not also need its boundary
     # endpoint constraints reproduced onto the same mirrored element; those would
-    # only be redundant. Anything the link could not cover still gets copied.
+    # only be redundant. Pairs whose link was rolled back still get the copy.
     covered = [spec for spec in copies if spec.get("first") in linked_mirror_ids]
     copies = [spec for spec in copies if spec.get("first") not in linked_mirror_ids]
     added, removed = apply_constraint_copies(sketch, copies)
@@ -851,7 +924,7 @@ def mirror_sketch_geometry(sketch, source_indices, reference_geoid, reference_po
     return {
         "mirrored": mirrored_count,
         "linked": linked,
-        "link_removed": link_removed,
+        "link_rolled_back": link_rolled_back,
         "linked_pairs": len(linked_mirror_ids),
         "copied": added,
         "covered_by_link": covered,
@@ -893,6 +966,7 @@ def mirror_with_constraints():
     summary, detail = _format_report(
         result["mirrored"],
         result["linked_pairs"],
+        result["link_rolled_back"],
         result["copied"],
         result["skipped"],
         result["removed"],

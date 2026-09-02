@@ -330,9 +330,27 @@ def test_boundary_constraint_is_copied_when_the_symmetry_link_is_rejected(tools,
 
     assert result["status"] == "ok"
     assert result["linked_pairs"] == 0
-    assert any(item["type"] == "Symmetric" for item in result["link_removed"])
+    assert len(result["link_rolled_back"]) == 1
+    # The pair's links were rolled back as a unit; nothing stayed behind.
+    assert [c for c in sketch.Constraints if c.Type == "Symmetric"] == []
     # With no link, the divider's endpoint attachments are reproduced instead.
     assert [spec["type"] for spec in result["copied"]] == ["PointOnObject", "PointOnObject"]
+
+
+def test_symmetry_link_is_rolled_back_as_a_unit_when_one_end_is_redundant(tools, env):
+    """A half-linked pair distorts when the source moves, so a single redundant
+    end rolls the whole pair back rather than leaving one link in place."""
+    sketch, _dividers = _card_box([20.0])
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Edge3", "V_Axis"])
+    # Only the end-point link of the pair (FirstPos == 2) comes back redundant.
+    sketch._reject = lambda c: c.Type == "Symmetric" and c.FirstPos == POS_END
+
+    result = tools.mirror_with_constraints()
+
+    assert result["linked_pairs"] == 0
+    assert len(result["link_rolled_back"]) == 1
+    assert [c for c in sketch.Constraints if c.Type == "Symmetric"] == []
 
 
 def test_missing_explicit_axis_leaves_the_sketch_unchanged(tools, env):
