@@ -27,11 +27,6 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
   all-or-nothing: if it still will not solve cleanly the pair is rolled back (the removed
   constraint restored) and its endpoint attachments to unchanged borders or axes are copied
   instead.
-- The mirrored element still gets its endpoint attachments to the borders (Point-on-Object /
-  Coincident) even when it is symmetry-linked — those are what let FreeCAD split the border
-  edges and detect the enclosed regions for face selection and extrude. They are numerically
-  redundant with the link, so a fully-symmetric mirror can show a mild "redundant constraint"
-  note; the sketch stays fully constrained and every region is selectable.
 - A constraint touching only a sketch axis or the origin, with nothing mirrored, is now left
   alone rather than reported as skipped. The whole operation is one Undo step.
 - The button has its own icon: FreeCAD's Mirror glyph with a green "+" badge, so it reads as
