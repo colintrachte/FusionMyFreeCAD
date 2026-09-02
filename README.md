@@ -10,15 +10,15 @@ format, and everything it changes can be undone from inside FreeCAD.
 
 ## Status
 
-Version **1.3.2** is available from
-[GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.2) as a
+Version **1.3.3** is available from
+[GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.3) as a
 self-contained archive. FusionMyFreeCAD has not yet been submitted to FreeCAD's add-on index;
 catalog publication remains separate work.
 
 ## Install
 
-Download `FusionMyFreeCAD-1.3.2.zip` from the
-[1.3.2 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.2), extract its
+Download `FusionMyFreeCAD-1.3.3.zip` from the
+[1.3.3 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.3), extract its
 top-level `FusionMyFreeCAD` folder into FreeCAD's user `Mod` directory, and restart FreeCAD. Full
 platform-by-platform steps, verification, update, and removal instructions are in
 [`docs/INSTALL-FREECAD-ADDON.md`](docs/INSTALL-FREECAD-ADDON.md).

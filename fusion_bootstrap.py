@@ -1139,10 +1139,9 @@ def register_commands():
     Gui.addCommand("FusionMyFreeCAD_Verify", VerifyCommand())
     Gui.addCommand("FusionMyFreeCAD_Reapply", ReapplyCommand())
     Gui.addCommand("FusionMyFreeCAD_Restore", RestoreCommand())
-    # Sketch tools live in their own module so this one does not keep growing.
-    import fusion_sketch_tools
-
-    fusion_sketch_tools.register()
+    # fusion_sketch_tools ships in the package and is covered by its own tests,
+    # but stays unwired from the ribbon until the 1.3.2 startup crash is
+    # understood. See CHANGELOG 1.3.3 and docs/RELEASE-NOTES-1.3.2.md.
     if _sketch_edit_observer is None and hasattr(Gui, "addDocumentObserver"):
         _sketch_edit_observer = _SketchEditWorkbenchObserver()
         Gui.addDocumentObserver(_sketch_edit_observer)

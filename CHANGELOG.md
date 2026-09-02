@@ -2,7 +2,33 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
-## 1.3.2 — 2026-09-02
+## 1.3.3 — 2026-09-02
+
+### Withdrawn 1.3.2
+
+- **1.3.2 is withdrawn.** On FreeCAD 1.1.3 it could intermittently freeze and then crash
+  with an "Access violation" while the Sketcher ribbon was being built — typically on the
+  first launch after updating, before any new command was used. It did not always
+  reproduce on a later restart. 1.3.3 restores the 1.3.1 Sketcher ribbon exactly.
+- Reverted the 1.3.2 Sketcher ribbon changes: the **Mirror + Constraints** button, the
+  swap of **Coincident** to `Sketcher_ConstrainCoincidentUnified`, and the new
+  **Point on Object** button are all removed from the ribbon. **Mirror**
+  (`Sketcher_Symmetry`) and the point-to-point **Coincident** (`Sketcher_ConstrainCoincident`)
+  are back as they were in 1.3.1.
+- `fusion_sketch_tools.py` still ships in the package and keeps its own test coverage, but
+  nothing registers it or places it on the ribbon. The constraint-aware mirror workflow will
+  return in a later release once it has been verified against a running FreeCAD 1.1.3.
+
+### Upgrade notes
+
+- Replace the entire existing `Mod/FusionMyFreeCAD` folder; do not merge files from older
+  versions. Restart FreeCAD after updating.
+- If FreeCAD is currently crashing on the Sketcher tab after installing 1.3.2, installing 1.3.3
+  over it resolves it. No sketch or document data is affected.
+
+## 1.3.2 — 2026-09-02 (withdrawn)
+
+> Withdrawn: caused a startup/Sketcher-ribbon crash on FreeCAD 1.1.3. Superseded by 1.3.3.
 
 ### Constraint-aware sketch mirroring
 
