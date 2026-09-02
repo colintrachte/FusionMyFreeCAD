@@ -1,5 +1,5 @@
 {
-  "layoutVersion": "1.3.2",
+  "layoutVersion": "1.3.3",
   "targetFreeCAD": "1.1.x",
   "dropdownButtons": {
     "Fusion_MoreCreate_ddb": [
@@ -1029,16 +1029,9 @@
             "Sketcher_Offset"
           ],
           [
-            "FusionMyFreeCAD_MirrorWithConstraints",
-            "General",
-            "large",
-            "Mirror + Constraints",
-            "Constraint_Symmetric"
-          ],
-          [
             "Sketcher_Symmetry",
             "SketcherWorkbench",
-            "small",
+            "large",
             "Mirror",
             "Sketcher_Symmetry"
           ],
@@ -1194,18 +1187,11 @@
             "Constraint_HorVer"
           ],
           [
-            "Sketcher_ConstrainCoincidentUnified",
+            "Sketcher_ConstrainCoincident",
             "SketcherWorkbench",
             "small",
             "Coincident",
-            "Constraint_Coincident"
-          ],
-          [
-            "Sketcher_ConstrainPointOnObject",
-            "SketcherWorkbench",
-            "small",
-            "Point on Object",
-            "Constraint_PointOnObject"
+            "Constraint_PointOnPoint"
           ],
           [
             "Sketcher_ConstrainTangent",
@@ -1244,13 +1230,6 @@
           ]
         ],
         "overflow": [
-          [
-            "Sketcher_ConstrainCoincident",
-            "SketcherWorkbench",
-            "small",
-            "Coincident (points only)",
-            "Constraint_PointOnPoint"
-          ],
           [
             "Sketcher_ConstrainBlock",
             "SketcherWorkbench",
