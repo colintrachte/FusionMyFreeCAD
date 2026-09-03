@@ -426,3 +426,216 @@ def test_no_selection_is_refused_without_touching_the_sketch(tools, env):
 
     assert result["status"] == "no-selection"
     assert env.console.errors
+
+
+# ---------------------------------------------------------------------------
+# Midline & Symmetry Axis tests
+# ---------------------------------------------------------------------------
+
+
+def test_midline_two_points(tools, env):
+    sketch = FakeSketch("Sketch")
+    # Add two points / lines
+    sketch.addGeometry(FakeLineSegment((-20.0, 10.0), (-20.0, 30.0)))  # geo 0
+    sketch.addGeometry(FakeLineSegment((20.0, 10.0), (20.0, 30.0)))  # geo 1
+    env.begin_sketch_edit(sketch)
+    # Select start of geo 0 (Vertex1) and start of geo 1 (Vertex3)
+    env.select_subelements(sketch, ["Vertex1", "Vertex3"])
+
+    result = tools.add_midline()
+
+    assert result["status"] == "ok"
+    assert result["kind"] == "points"
+    mid_id = result["midline"]
+    assert sketch.Geometry[mid_id].Construction is True
+    sym_constraints = [c for c in sketch.Constraints if c.Type == "Symmetric"]
+    assert len(sym_constraints) == 1
+    assert sym_constraints[0].Third == mid_id
+
+
+def test_midline_single_line(tools, env):
+    sketch = FakeSketch("Sketch")
+    geo0 = sketch.addGeometry(FakeLineSegment((-30.0, 0.0), (30.0, 0.0)))
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Edge1"])
+
+    result = tools.add_midline()
+
+    assert result["status"] == "ok"
+    assert result["kind"] == "line"
+    mid_id = result["midline"]
+    assert sketch.Geometry[mid_id].Construction is True
+    sym_constraints = [c for c in sketch.Constraints if c.Type == "Symmetric"]
+    assert len(sym_constraints) == 1
+    assert sym_constraints[0].First == geo0
+    assert sym_constraints[0].Second == geo0
+    assert sym_constraints[0].Third == mid_id
+
+
+def test_midline_two_parallel_lines(tools, env):
+    sketch = FakeSketch("Sketch")
+    sketch.addGeometry(FakeLineSegment((-10.0, 0.0), (-10.0, 40.0)))  # geo 0
+    sketch.addGeometry(FakeLineSegment((10.0, 0.0), (10.0, 40.0)))  # geo 1
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Edge1", "Edge2"])
+
+    result = tools.add_midline()
+
+    assert result["status"] == "ok"
+    assert result["kind"] == "lines"
+    mid_id = result["midline"]
+    assert sketch.Geometry[mid_id].Construction is True
+    # At least one symmetric constraint
+    sym_constraints = [c for c in sketch.Constraints if c.Type == "Symmetric"]
+    assert len(sym_constraints) >= 1
+    assert sym_constraints[0].Third == mid_id
+
+
+def test_midline_in_rectangle_attaches_to_borders(tools, env):
+    sketch = FakeSketch("Sketch")
+    # Rectangle: bottom (0), top (1), left (2), right (3)
+    sketch.addGeometry(FakeLineSegment((-20.0, 0.0), (20.0, 0.0)))  # geo 0: bottom
+    sketch.addGeometry(FakeLineSegment((-20.0, 30.0), (20.0, 30.0)))  # geo 1: top
+    sketch.addGeometry(FakeLineSegment((-20.0, 0.0), (-20.0, 30.0)))  # geo 2: left
+    sketch.addGeometry(FakeLineSegment((20.0, 0.0), (20.0, 30.0)))  # geo 3: right
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Edge3", "Edge4"])  # left and right
+
+    result = tools.add_midline()
+
+    assert result["status"] == "ok"
+    mid_id = result["midline"]
+    assert sketch.Geometry[mid_id].Construction is True
+    # Endpoints should be attached to top and bottom borders
+    poo_constraints = [c for c in sketch.Constraints if c.Type == "PointOnObject"]
+    assert len(poo_constraints) == 2
+
+
+def test_midline_runs_in_single_transaction(tools, env):
+    sketch = FakeSketch("Sketch")
+    sketch.addGeometry(FakeLineSegment((-10.0, 0.0), (10.0, 0.0)))
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Edge1"])
+
+    tools.add_midline()
+
+    assert env.app.ActiveDocument.transactions == [
+        ("open", "Add Midline"),
+        ("commit", "Add Midline"),
+    ]
+
+
+def test_midline_no_selection_aborts_cleanly(tools, env):
+    sketch = FakeSketch("Sketch")
+    env.begin_sketch_edit(sketch)
+
+    result = tools.add_midline()
+
+    assert result["status"] == "no-selection"
+    assert env.app.ActiveDocument.transactions == []
+
+
+# ---------------------------------------------------------------------------
+# Constrain Midpoint tests
+# ---------------------------------------------------------------------------
+
+
+def test_constrain_midpoint_point_and_line(tools, env):
+    sketch = FakeSketch("Sketch")
+    line_id = sketch.addGeometry(FakeLineSegment((0.0, 0.0), (50.0, 0.0)))  # geo 0
+    sketch.addGeometry(FakeLineSegment((25.0, 10.0), (25.0, 20.0)))  # geo 1
+    env.begin_sketch_edit(sketch)
+    # Select point (Vertex3 = start of geo 1) and line (Edge1)
+    env.select_subelements(sketch, ["Vertex3", "Edge1"])
+
+    result = tools.constrain_midpoint()
+
+    assert result["status"] == "ok"
+    assert result["kind"] == "point-line"
+    sym_constraints = [c for c in sketch.Constraints if c.Type == "Symmetric"]
+    assert len(sym_constraints) == 1
+    c = sym_constraints[0]
+    assert c.First == line_id
+    assert c.Second == line_id
+    assert c.Third == 1  # geo 1
+
+
+def test_constrain_midpoint_three_points(tools, env):
+    sketch = FakeSketch("Sketch")
+    # 3 points: (-20, 0), (20, 0), (0, 0)
+    sketch.addGeometry(FakeLineSegment((-20.0, 0.0), (-20.0, 10.0)))  # geo 0 (Vertex1 at -20, 0)
+    sketch.addGeometry(FakeLineSegment((20.0, 0.0), (20.0, 10.0)))  # geo 1 (Vertex3 at 20, 0)
+    sketch.addGeometry(FakeLineSegment((0.0, 5.0), (0.0, 15.0)))  # geo 2 (Vertex5 at 0, 5)
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Vertex1", "Vertex3", "Vertex5"])
+
+    result = tools.constrain_midpoint()
+
+    assert result["status"] == "ok"
+    assert result["kind"] == "3-points"
+    sym_constraints = [c for c in sketch.Constraints if c.Type == "Symmetric"]
+    assert len(sym_constraints) == 1
+    c = sym_constraints[0]
+    # Vertex5 (geo 2) is the middle point
+    assert c.Third == 2
+
+
+def test_constrain_midpoint_single_line(tools, env):
+    sketch = FakeSketch("Sketch")
+    line_id = sketch.addGeometry(FakeLineSegment((0.0, 0.0), (40.0, 0.0)))  # geo 0
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Edge1"])
+
+    result = tools.constrain_midpoint()
+
+    assert result["status"] == "ok"
+    assert result["kind"] == "line"
+    pt_id = result["point"]
+    assert sketch.Geometry[pt_id].Construction is True
+    assert sketch.Geometry[pt_id].X == 20.0
+    assert sketch.Geometry[pt_id].Y == 0.0
+    sym_constraints = [c for c in sketch.Constraints if c.Type == "Symmetric"]
+    assert len(sym_constraints) == 1
+    assert sym_constraints[0].First == line_id
+    assert sym_constraints[0].Third == pt_id
+
+
+def test_constrain_midpoint_two_points(tools, env):
+    sketch = FakeSketch("Sketch")
+    sketch.addGeometry(FakeLineSegment((0.0, 0.0), (0.0, 10.0)))  # geo 0: Vertex1 (0, 0)
+    sketch.addGeometry(FakeLineSegment((60.0, 0.0), (60.0, 10.0)))  # geo 1: Vertex3 (60, 0)
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Vertex1", "Vertex3"])
+
+    result = tools.constrain_midpoint()
+
+    assert result["status"] == "ok"
+    assert result["kind"] == "2-points"
+    pt_id = result["point"]
+    assert sketch.Geometry[pt_id].Construction is True
+    assert sketch.Geometry[pt_id].X == 30.0
+    assert sketch.Geometry[pt_id].Y == 0.0
+
+
+def test_constrain_midpoint_transaction(tools, env):
+    sketch = FakeSketch("Sketch")
+    sketch.addGeometry(FakeLineSegment((0.0, 0.0), (10.0, 0.0)))
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Edge1"])
+
+    tools.constrain_midpoint()
+
+    assert env.app.ActiveDocument.transactions == [
+        ("open", "Constrain Midpoint"),
+        ("commit", "Constrain Midpoint"),
+    ]
+
+
+def test_constrain_midpoint_no_selection_aborts(tools, env):
+    sketch = FakeSketch("Sketch")
+    env.begin_sketch_edit(sketch)
+
+    result = tools.constrain_midpoint()
+
+    assert result["status"] == "no-selection"
+    assert env.app.ActiveDocument.transactions == []

@@ -26,6 +26,8 @@ def _run_init_gui(env, bootstrap, monkeypatch, stub_vendors=True):
 def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
     _run_init_gui(env, bootstrap, monkeypatch)
     assert set(env.commands) == {
+        "FusionMyFreeCAD_AddMidline",
+        "FusionMyFreeCAD_ConstrainMidpoint",
         "FusionMyFreeCAD_CreateSketch",
         "FusionMyFreeCAD_MirrorWithConstraints",
         "FusionMyFreeCAD_ParameterTable",

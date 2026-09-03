@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="axisGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#729fcf" />
+      <stop offset="100%" stop-color="#204a87" />
+    </linearGradient>
+    <linearGradient id="triGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8ae234" />
+      <stop offset="100%" stop-color="#4e9a06" />
+    </linearGradient>
+  </defs>
+
+  <!-- Base reference line being bisected -->
+  <line x1="10" y1="46" x2="54" y2="46" stroke="#2e3436" stroke-width="4" stroke-linecap="round" />
+  <circle cx="10" cy="46" r="3.5" fill="#555753" />
+  <circle cx="54" cy="46" r="3.5" fill="#555753" />
+
+  <!-- Vertical dashed construction midline / symmetry axis -->
+  <line x1="32" y1="8" x2="32" y2="56" stroke="url(#axisGrad)" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="8,4,2,4" />
+
+  <!-- Iconic CAD/Fusion Midpoint Triangle sitting at the bisecting intersection -->
+  <polygon points="32,24 20,46 44,46" fill="url(#triGrad)" stroke="#204a87" stroke-width="2.5" stroke-linejoin="round" />
+
+  <!-- Center point inside the midpoint triangle -->
+  <circle cx="32" cy="39" r="2.5" fill="#ffffff" />
+</svg>

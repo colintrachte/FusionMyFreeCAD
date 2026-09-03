@@ -2,9 +2,13 @@
   "layoutVersion": "1.3.3",
   "targetFreeCAD": "1.1.x",
   "authoredIcons": [
+    "FusionMyFreeCAD_AddMidline",
+    "FusionMyFreeCAD_ConstrainMidpoint",
     "FusionMyFreeCAD_MirrorWithConstraints"
   ],
   "primaryCommands": [
+    "FusionMyFreeCAD_AddMidline",
+    "FusionMyFreeCAD_ConstrainMidpoint",
     "FusionMyFreeCAD_CreateSketch",
     "FusionMyFreeCAD_MirrorWithConstraints",
     "FusionMyFreeCAD_ParameterTable",
