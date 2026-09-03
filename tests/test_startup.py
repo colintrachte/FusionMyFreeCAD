@@ -6,7 +6,14 @@ import json
 import types
 from pathlib import Path
 
-from fake_freecad import ROOT, FakeObject, FakeTimer, _import_module
+from fake_freecad import (
+    ROOT,
+    FakeLineSegment,
+    FakeObject,
+    FakeSketch,
+    FakeTimer,
+    _import_module,
+)
 
 
 def _run_init_gui(env, bootstrap, monkeypatch, stub_vendors=True):
@@ -27,6 +34,7 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
         "FusionMyFreeCAD_Restore",
     }
     assert bootstrap.startup_failures() == []
+    assert len(env.selection_observers) == 1
 
 
 def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher(env, bootstrap):
@@ -37,8 +45,8 @@ def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher
         def viewAxonometric(self):
             self.calls.append("axonometric")
 
-        def fitAll(self):
-            self.calls.append("fitAll")
+        def setCameraCenter(self, center, height):
+            self.calls.append(("centerCamera", center, height))
 
     view = View()
     env.gui.ActiveDocument = types.SimpleNamespace(ActiveView=view)
@@ -52,7 +60,8 @@ def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher
         ("workbench", "PartDesignWorkbench"),
         ("command", "PartDesign_NewSketch"),
     ]
-    assert view.calls == ["axonometric", "fitAll"]
+    # Origin planes are framed centered on origin (0, 0, 0) at default 100mm scale, not fitAll.
+    assert view.calls == ["axonometric", ("centerCamera", (0.0, 0.0, 0.0), 100.0)]
 
     observer = env.document_observers[0]
     sketch = FakeObject("Sketcher::SketchObject", "Sketch")
@@ -62,6 +71,131 @@ def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher
     assert env.active_workbench == "PartDesignWorkbench"
     FakeTimer.pump()
     assert env.active_workbench == "SketcherWorkbench"
+    # New empty sketch is centered on sketch plane origin at 100mm initial range
+    assert view.calls == [
+        "axonometric",
+        ("centerCamera", (0.0, 0.0, 0.0), 100.0),
+        ("centerCamera", (0.0, 0.0, 0.0), 100.0),
+    ]
+
+
+def test_create_sketch_with_preselection_skips_origin_plane_framing(env, bootstrap):
+    class View:
+        def __init__(self):
+            self.calls = []
+
+        def viewAxonometric(self):
+            self.calls.append("axonometric")
+
+        def setCameraCenter(self, center, height):
+            self.calls.append(("centerCamera", center, height))
+
+    view = View()
+    env.gui.ActiveDocument = types.SimpleNamespace(ActiveView=view)
+    bootstrap.register_commands()
+
+    # Pre-select an existing face/feature
+    env.selection_ex = [
+        types.SimpleNamespace(
+            Object=FakeObject("PartDesign::Feature", "Pad"),
+            ObjectName="Pad",
+            SubElementNames=["Face1"],
+        )
+    ]
+
+    env.commands["FusionMyFreeCAD_CreateSketch"].Activated()
+    FakeTimer.pump()
+
+    assert env.active_workbench == "PartDesignWorkbench"
+    # Origin planes framing is skipped because the user had an active selection
+    assert view.calls == []
+
+
+def test_existing_sketch_with_geometry_preserves_camera_framing(env, bootstrap):
+    class View:
+        def __init__(self):
+            self.calls = []
+
+        def viewAxonometric(self):
+            self.calls.append("axonometric")
+
+        def setCameraCenter(self, center, height):
+            self.calls.append(("centerCamera", center, height))
+
+    view = View()
+    env.gui.ActiveDocument = types.SimpleNamespace(ActiveView=view)
+    bootstrap.register_commands()
+
+    observer = env.document_observers[0]
+    env.load_sketch_tools()  # ensure sketch tools are available
+    sketch_obj = FakeSketch("ExistingSketch")
+    sketch_obj.addGeometry(FakeLineSegment((0, 0), (50, 50)))
+
+    observer.slotInEdit(types.SimpleNamespace(Object=sketch_obj))
+    FakeTimer.pump()
+
+    assert env.active_workbench == "SketcherWorkbench"
+    # Geometry exists, so camera zoom/framing is not overridden
+    assert view.calls == []
+
+
+def test_center_camera_node_orthographic(env, bootstrap):
+    class FakeField:
+        def __init__(self, val):
+            self.val = val
+
+        def getValue(self):
+            return self.val
+
+        def setValue(self, val):
+            self.val = val
+
+    class FakeCamNode:
+        def __init__(self):
+            self.orientation = FakeField(FakeField((0.0, 0.0, 0.0, 1.0)))
+            self.position = FakeField([0.0, 0.0, 0.0])
+            self.focalDistance = FakeField(100.0)
+            self.height = FakeField(50.0)
+
+    cam = FakeCamNode()
+    view = types.SimpleNamespace(getCameraNode=lambda: cam)
+
+    bootstrap._center_camera(view, center=(10.0, 20.0, 0.0), height=100.0)
+
+    assert cam.height.val == 100.0
+    assert cam.focalDistance.val == 100.0
+    # Looking down -Z, eye placed at target + (0, 0, 1) * 100
+    assert cam.position.val == [10.0, 20.0, 100.0]
+
+
+def test_center_camera_node_perspective(env, bootstrap):
+    import math
+
+    class FakeField:
+        def __init__(self, val):
+            self.val = val
+
+        def getValue(self):
+            return self.val
+
+        def setValue(self, val):
+            self.val = val
+
+    class FakeCamNode:
+        def __init__(self):
+            self.orientation = FakeField(FakeField((0.0, 0.0, 0.0, 1.0)))
+            self.position = FakeField([0.0, 0.0, 0.0])
+            self.focalDistance = FakeField(50.0)
+            self.heightAngle = FakeField(math.pi / 4.0)  # 45 degrees
+
+    cam = FakeCamNode()
+    view = types.SimpleNamespace(getCameraNode=lambda: cam)
+
+    bootstrap._center_camera(view, center=(0.0, 0.0, 0.0), height=100.0)
+
+    expected_dist = (100.0 / 2.0) / math.tan((math.pi / 4.0) / 2.0)
+    assert math.isclose(cam.focalDistance.val, expected_dist, rel_tol=1e-5)
+    assert math.isclose(cam.position.val[2], expected_dist, rel_tol=1e-5)
 
 
 def test_a_failing_install_still_leaves_verify_and_restore_available(env, bootstrap, monkeypatch):

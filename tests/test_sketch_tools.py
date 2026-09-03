@@ -296,9 +296,13 @@ def test_is_active_never_touches_gui_edit_state(tools, env):
     assert tools.MirrorWithConstraintsCommand().IsActive() is False
 
 
-def test_bordered_dividers_are_reattached_not_linked(tools, env):
-    """A divider pinned to the borders keeps that (fillable profile). A Symmetric
-    link on top would only over-constrain it on FreeCAD 1.1.3, so it is skipped."""
+def test_bordered_dividers_receive_live_symmetry_links(tools, env):
+    """Dividers pinned to borders receive live Symmetric links across the mirror axis.
+
+    Auto-copied orientation constraints and redundant boundary constraints are
+    not stacked onto the mirror, keeping the sketch fully constrained (0 DoF),
+    clean (0 redundant, 0 conflicting), and parametrically linked (Fusion 360 paradigm).
+    """
     sketch, dividers = _card_box([-30.0, -20.0, -10.0, 5.0, 15.0, 25.0])
     env.begin_sketch_edit(sketch)
     env.select_subelements(sketch, ["Edge{}".format(g + 1) for g in dividers] + ["V_Axis"])
@@ -307,13 +311,18 @@ def test_bordered_dividers_are_reattached_not_linked(tools, env):
 
     assert result["status"] == "ok"
     assert result["mirrored"] == 6
-    assert result["attached_pairs"] == 6
-    assert result["linked_pairs"] == 0
+    assert result["attached_pairs"] == 0
+    assert result["linked_pairs"] == 6
     assert result["skipped"] == []
-    assert len(result["copied"]) == 12
-    assert all(spec["type"] == "PointOnObject" for spec in result["copied"])
-    assert sum(1 for c in sketch.Constraints if c.Type == "PointOnObject") == 24
-    assert [c for c in sketch.Constraints if c.Type == "Symmetric"] == []
+    symmetric = [c for c in sketch.Constraints if c.Type == "Symmetric"]
+    assert len(symmetric) == 12  # 2 symmetric point constraints per divider
+    assert all(c.Third == -2 for c in symmetric)
+
+
+def test_repair_sketch_internal_faces_is_safe_when_boptools_missing(tools):
+    sketch = FakeSketch("Sketch")
+    # Must not raise an exception even if Shape/BOPTools is absent
+    tools.repair_sketch_internal_faces(sketch)
 
 
 def _floating_line_box():

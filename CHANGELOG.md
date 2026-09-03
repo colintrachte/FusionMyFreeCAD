@@ -2,7 +2,7 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
-## 1.3.3 — 2026-09-02
+## 1.3.3 — 2026-09-03
 
 ### Replaces the withdrawn 1.3.2
 
@@ -17,27 +17,48 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
 - Fixes: `IsActive()` is now cheap and side-effect free (open document + Sketcher
   workbench, nothing more). The workbench switch on sketch-open is also deferred out of
   the document-observer callback so it can no longer re-enter an in-progress edit.
+
+### Mirror + Constraints — live symmetry on every mirrored pair
+
 - **Mirror + Constraints** returns as a small button in front of native **Mirror**, which
-  keeps its 1.3.1 size — the panel layout is barely changed from 1.3.1. It does two things
-  native **Mirror** does not:
-  1. Reattaches each mirrored element to the borders it was attached to
-     (Point-on-Object / Coincident to unchanged edges or axes). Native Symmetry drops these,
-     and they are also what let FreeCAD split the border edges and detect the enclosed
-     regions — so a mirrored divider now leaves a fillable, extrudable profile.
-  2. For **free-floating** mirrored geometry — geometry that got no border attachment — adds
-     a live **Symmetric** link so dragging either element moves the other (**Equal** keeps a
-     mirrored circle or arc the same size). A `Symmetric` point constraint is two equations,
-     and on FreeCAD 1.1.3 those always duplicate what a border attachment already pins, which
-     over-constrains the sketch (orange) — so an **attached** element, such as a divider, is
-     reattached but left unlinked. Add a `Symmetric` constraint by hand if you want a live
-     link on a divider too.
-- A constraint touching only a sketch axis or the origin, with nothing mirrored, is now left
-  alone rather than reported as skipped. The whole operation is one Undo step.
-- The button has its own icon: FreeCAD's Mirror glyph with a green "+" badge, so it reads as
-  "Mirror, plus the constraints" next to the plain **Mirror**.
+  keeps its 1.3.1 size — the panel layout is barely changed from 1.3.1. Its icon is
+  FreeCAD's Mirror glyph with a green "+" badge, so it reads as "Mirror, plus the
+  constraints" next to the plain **Mirror**.
+- Select geometry, then a mirror line or sketch axis. Every mirrored element now gets a
+  live **Symmetric** link to its source across that line — including dividers and other
+  geometry pinned to the borders, which the previous build left unlinked. Drag either
+  element and the other follows; **Equal** keeps a mirrored circle or arc the same size.
+  This is the Fusion 360 paradigm: the mirror tracks the source and takes no independent
+  driving dimensions.
+- Over-constraining is avoided rather than tolerated. `addSymmetric` auto-copies
+  single-element **Vertical** / **Horizontal** / **Block** constraints onto the mirrored
+  copy; with a Symmetric point link on both endpoints those are redundant, so the command
+  removes them first. Boundary endpoint attachments (Point-on-Object / Coincident to
+  unchanged edges or axes) are then added only for endpoints a Symmetric link does not
+  already pin. On a bordered card-divider box the result is 0 DoF, 0 redundant, 0
+  conflicting.
+- After mirroring, `sketch.InternalShape` is rebuilt from a full planar-face decomposition
+  (`BOPTools.SplitAPI.slice`) so every enclosed region — including the middle cells between
+  dividers — is selectable and padable. FreeCAD's native `MakeInternals` drops interior
+  faces that share an edge with a neighbour.
+- A constraint touching only a sketch axis or the origin, with nothing mirrored, is left
+  alone rather than reported as skipped. The whole operation is one Undo step; anything it
+  cannot reproduce safely is still reported in the Report view.
 - The 1.3.2 **Coincident**/`Sketcher_ConstrainCoincidentUnified` swap and the new
   **Point on Object** button are **not** included. Point-to-point **Coincident**
   (`Sketcher_ConstrainCoincident`) stays as it was in 1.3.1.
+
+### Selectable regions and Fusion-style profile picking
+
+- A sketch's complete face decomposition is now kept current on every recompute, not just
+  right after a mirror, so multi-region sketches stay fully selectable as they are edited.
+- Pick the profile after the command: click **Pad**, then click an enclosed region in the
+  3D view and it is assigned to that Pad. Multi-region sketches no longer show a misleading
+  all-green whole-sketch highlight when editing ends.
+- New empty sketches open centred on the sketch-plane origin at a ~100 mm range. Creating a
+  sketch on a pre-selected face keeps that framing; the origin-plane view no longer drifts
+  up and to the right the way `fitAll` did on the asymmetric plane bounds. A sketch that
+  already has geometry keeps whatever camera you left it at.
 
 ### Quieter startup
 

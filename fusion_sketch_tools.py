@@ -846,6 +846,63 @@ def _geometry_kind(geo):
     return "other"
 
 
+def repair_sketch_internal_faces(sketch):
+    """Ensure sketch.InternalShape contains all planar faces divided by internal edges.
+
+    FreeCAD's native MakeInternals (WireJoiner.cpp) drops interior faces that share
+    boundary edges with neighboring regions. This helper computes the complete planar
+    face decomposition using FreeCAD's BOPTools.SplitAPI.slice() and assigns the
+    compound of all resulting faces back to sketch.InternalShape so every enclosed
+    region is selectable and padable in PartDesign.
+    """
+    try:
+        import BOPTools.SplitAPI
+        import Part
+    except ImportError:
+        return
+
+    if getattr(sketch, "MakeInternals", False) is False and hasattr(sketch, "MakeInternals"):
+        try:
+            sketch.MakeInternals = True
+        except Exception:
+            pass
+
+    shape = getattr(sketch, "Shape", None)
+    if shape is None or not hasattr(shape, "Wires") or not hasattr(shape, "Edges"):
+        return
+
+    closed_wires = [w for w in shape.Wires if hasattr(w, "isClosed") and w.isClosed()]
+    if not closed_wires:
+        return
+
+    closed_wire_edges = []
+    for w in closed_wires:
+        closed_wire_edges.extend(getattr(w, "Edges", []))
+
+    interior_edges = []
+    for e in shape.Edges:
+        if not any(e.isSame(we) for we in closed_wire_edges):
+            interior_edges.append(e)
+
+    if not interior_edges:
+        return
+
+    all_sliced_faces = []
+    for w in closed_wires:
+        try:
+            face = Part.Face(w)
+            split_result = BOPTools.SplitAPI.slice(face, interior_edges, "Split")
+            all_sliced_faces.extend(getattr(split_result, "Faces", []))
+        except Exception:
+            pass
+
+    if all_sliced_faces:
+        try:
+            sketch.InternalShape = Part.Compound(all_sliced_faces)
+        except Exception:
+            pass
+
+
 def plan_symmetry_links(mapping, before_geometry, reference_geoid):
     """One ``Symmetric`` constraint per shared named point of each mirrored pair.
 
@@ -925,37 +982,69 @@ def mirror_sketch_geometry(sketch, source_indices, reference_geoid, reference_po
         mapping, unmatched = build_geometry_mapping(
             before_geometry, after_geometry, source_indices, axis_a, axis_b
         )
-    # 1. Reproduce the boundary endpoint attachments onto every mirrored element.
-    #    These are what let FreeCAD split the border edges and detect the
-    #    enclosed regions for face selection and extrude; without them a
-    #    symmetry-only mirror leaves the profile un-fillable.
-    copies, skipped = plan_constraint_copies(
-        records, set(source_indices), mapping, before_geometry, axis_a, axis_b
-    )
-    added, removed = apply_constraint_copies(sketch, copies)
+
+    # 1. Live symmetry links between each mirrored element and its source.
+    #    This is the Fusion 360 paradigm: moving the source dynamically moves
+    #    the mirror, and the mirror receives no independent driving dimensions.
+    link_specs = plan_symmetry_links(mapping, before_geometry, reference_geoid)
+    mirrored_targets = {spec["_mirror"] for spec in link_specs}
+
+    # addSymmetric auto-duplicates single-element orientation constraints
+    # (Vertical, Horizontal, Block) onto the mirrored copy. When both endpoints
+    # receive a Symmetric point link across the mirror axis, that auto-copied
+    # orientation constraint is redundant and over-constrains FreeCAD's PlanGCS
+    # solver. Remove them prior to adding symmetry links.
+    auto_copied_indices = []
+    for i, c in enumerate(getattr(sketch, "Constraints", []) or []):
+        if (
+            getattr(c, "First", None) in mirrored_targets
+            and getattr(c, "Second", -2000) in (-2000, -1, -2)
+            and getattr(c, "Type", "") in ("Vertical", "Horizontal", "Block")
+        ):
+            auto_copied_indices.append(i)
+    for idx in sorted(auto_copied_indices, reverse=True):
+        try:
+            sketch.delConstraint(idx)
+        except Exception:
+            pass
     _recompute(sketch)
 
-    # 2. Add a live symmetry link only where it will not fight an attachment.
-    #    A Symmetric point constraint is two equations; on FreeCAD 1.1.3 those
-    #    always duplicate the degrees of freedom a border attachment already
-    #    pins, which over-constrains the sketch. So a mirrored element that got
-    #    a border attachment keeps that (fillable profile) and is left unlinked;
-    #    free-floating geometry, with nothing to conflict, gets the link.
-    attached_mirror_ids = {spec["first"] for spec in added}
-    link_specs = [
-        spec
-        for spec in plan_symmetry_links(mapping, before_geometry, reference_geoid)
-        if spec["_mirror"] not in attached_mirror_ids
-    ]
     linked, link_dropped = apply_symmetry_links(sketch, link_specs)
     _recompute(sketch)
 
-    linked_ids = {spec["_mirror"] for spec in linked}
+    linked_mirror_ids = {spec["_mirror"] for spec in linked}
+    linked_endpoints = {
+        (spec["second"], spec["second_pos"]) for spec in linked if spec.get("type") == "Symmetric"
+    }
+
+    # 2. Boundary endpoint attachments (PointOnObject / Coincident).
+    #    If an endpoint is already constrained by an active Symmetric link,
+    #    it tracks its source symmetrically and does not need duplicate border
+    #    attachments. For any endpoint without an active symmetry link, copy
+    #    the boundary constraint.
+    copies, skipped = plan_constraint_copies(
+        records, set(source_indices), mapping, before_geometry, axis_a, axis_b
+    )
+    effective_copies = [
+        spec
+        for spec in copies
+        if (spec.get("first"), spec.get("first_pos")) not in linked_endpoints
+    ]
+    added, removed = apply_constraint_copies(sketch, effective_copies)
+    _recompute(sketch)
+
+    # 3. Ensure all closed planar regions (including middle divider cells)
+    #    are populated in sketch.InternalShape so every face can be padded.
+    repair_sketch_internal_faces(sketch)
+
+    attached_mirror_ids = {
+        spec["first"] for spec in added if spec["first"] not in linked_mirror_ids
+    }
     return {
         "mirrored": mirrored_count,
         "linked": linked,
         "link_dropped": link_dropped,
-        "linked_pairs": len(linked_ids),
+        "linked_pairs": len(linked_mirror_ids),
         "attached_pairs": len(attached_mirror_ids),
         "copied": added,
         "skipped": skipped,

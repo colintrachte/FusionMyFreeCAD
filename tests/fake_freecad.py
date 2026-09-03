@@ -73,14 +73,24 @@ class Console:
 # ---------------------------------------------------------------------------
 
 
+class FakePlacement:
+    def __init__(self, base=None, rotation=None):
+        self.Base = base if base is not None else FakeVector(0.0, 0.0, 0.0)
+        self.Rotation = rotation if rotation is not None else FakeRotation()
+
+
 class FakeObject:
     def __init__(self, type_name, name):
         self.TypeId = type_name
         self.Name = name
         self.Label = name
+        self.Placement = FakePlacement()
 
     def isDerivedFrom(self, type_name):
         return type_name == self.TypeId
+
+    def getGlobalPlacement(self):
+        return self.Placement
 
 
 class FakeSheet(FakeObject):
@@ -137,10 +147,43 @@ class FakeDocument:
 
 class FakeVector:
     def __init__(self, x=0.0, y=0.0, z=0.0):
-        self.x, self.y, self.z = float(x), float(y), float(z)
+        if isinstance(x, (tuple, list)):
+            self.x, self.y, self.z = float(x[0]), float(x[1]), float(x[2])
+        elif hasattr(x, "x") and hasattr(x, "y") and hasattr(x, "z"):
+            self.x, self.y, self.z = float(x.x), float(x.y), float(x.z)
+        else:
+            self.x, self.y, self.z = float(x), float(y), float(z)
 
     def __iter__(self):
         return iter((self.x, self.y, self.z))
+
+    def __add__(self, other):
+        return FakeVector(self.x + other.x, self.y + other.y, self.z + other.z)
+
+    def __sub__(self, other):
+        return FakeVector(self.x - other.x, self.y - other.y, self.z - other.z)
+
+    def __mul__(self, scalar):
+        s = float(scalar)
+        return FakeVector(self.x * s, self.y * s, self.z * s)
+
+    def __rmul__(self, scalar):
+        return self.__mul__(scalar)
+
+    def __repr__(self):
+        return f"FakeVector({self.x}, {self.y}, {self.z})"
+
+
+class FakeRotation:
+    def __init__(self, *args):
+        self._q = tuple(args) if args else (0.0, 0.0, 0.0, 1.0)
+
+    def multVec(self, vec):
+        return vec
+
+    @property
+    def Q(self):
+        return self._q
 
 
 class FakeLineSegment:
@@ -617,7 +660,7 @@ class Environment:
         self.saved_parameters = 0
         self.selection_ex = []
         self.command_handlers = {}
-        self._in_edit = None
+        self.document_observers = []
 
         app = types.ModuleType("FreeCAD")
         app.Version = lambda: version
@@ -627,6 +670,9 @@ class Environment:
         app.Console = self.console
         app.ActiveDocument = None
         app.newDocument = self._new_document
+        app.addDocumentObserver = self.document_observers.append
+        app.Vector = FakeVector
+        app.Rotation = FakeRotation
         self.app = app
 
         gui = types.ModuleType("FreeCADGui")
@@ -634,7 +680,6 @@ class Environment:
         gui.addCommand = lambda name, command: self.commands.__setitem__(name, command)
         self.preference_pages = []
         gui.addPreferencePage = lambda path, group: self.preference_pages.append((path, group))
-        self.document_observers = []
         gui.addDocumentObserver = self.document_observers.append
         gui.activateWorkbench = self._activate_workbench
         gui.runCommand = self._run_command
@@ -642,11 +687,15 @@ class Environment:
         gui.activeWorkbench = lambda: types.SimpleNamespace(name=lambda: self.active_workbench)
         gui.Control = types.SimpleNamespace(activeDialog=lambda: self.task_dialog_active)
         gui.ActiveDocument = None
+        self.selection_observers = []
         gui.Selection = types.SimpleNamespace(
             clearSelection=lambda: self.gui_events.append(("selection", "clear")),
-            addSelection=lambda obj: self.gui_events.append(("selection", obj.Name)),
+            addSelection=lambda obj: self.gui_events.append(
+                ("selection", getattr(obj, "Name", str(obj)))
+            ),
             getSelectionEx=lambda *args: list(self.selection_ex),
             getSelection=lambda *args: [entry.Object for entry in self.selection_ex],
+            addObserver=self.selection_observers.append,
         )
         gui.activeDocument = lambda: types.SimpleNamespace(
             setEdit=lambda name: self.gui_events.append(("edit", name))
