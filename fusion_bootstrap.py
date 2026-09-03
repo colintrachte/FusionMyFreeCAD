@@ -1048,27 +1048,98 @@ class CreateSketchCommand:
         if not any(obj.isDerivedFrom("PartDesign::Body") for obj in document.Objects):
             document.addObject("PartDesign::Body", "Body")
             document.recompute()
+        had_selection = bool(getattr(Gui, "Selection", None) and Gui.Selection.getSelection())
         Gui.activateWorkbench("PartDesignWorkbench")
         Gui.runCommand("PartDesign_NewSketch")
         # Keep Part Design active while FreeCAD's attachment task displays its
         # selectable origin planes. Switching workbenches here destroys the
         # Fusion-like plane-picking presentation before the user has chosen one.
-        try:
-            from PySide import QtCore
+        # Only frame the origin planes if no existing feature/face was selected.
+        if not had_selection:
+            try:
+                from PySide import QtCore
 
-            QtCore.QTimer.singleShot(0, _frame_origin_planes)
-        except ImportError:
-            _frame_origin_planes()
+                QtCore.QTimer.singleShot(0, _frame_origin_planes)
+            except ImportError:
+                _frame_origin_planes()
+
+
+def _default_camera_scale():
+    try:
+        scale = App.ParamGet("User parameter:BaseApp/Preferences/View").GetFloat(
+            "NewDocumentCameraScale", 100.0
+        )
+        return max(scale, 10.0) if scale > 0 else 100.0
+    except Exception:
+        return 100.0
+
+
+def _center_camera(view, center=(0.0, 0.0, 0.0), height=100.0):
+    """Center the camera on a 3D target point with a specific visible range/height.
+
+    Avoids fitAll's upward/rightward pan caused by asymmetric [0, +size] origin plane bounds.
+    """
+    if view is None:
+        return
+    if hasattr(view, "setCameraCenter"):
+        view.setCameraCenter(center, height)
+    cam = getattr(view, "getCameraNode", lambda: None)()
+    if cam is None:
+        return
+
+    try:
+        center_vec = App.Vector(center[0], center[1], center[2]) if hasattr(App, "Vector") else None
+        orient_field = getattr(cam, "orientation", None)
+        if orient_field is None or center_vec is None or not hasattr(App, "Rotation"):
+            return
+        q = orient_field.getValue().getValue()
+        rot = App.Rotation(*q)
+        # Vector pointing from target center back toward the camera eye
+        v_cam = rot.multVec(App.Vector(0.0, 0.0, 1.0))
+
+        if hasattr(cam, "height"):
+            # Orthographic camera
+            focal_dist = (
+                float(cam.focalDistance.getValue())
+                if hasattr(cam, "focalDistance")
+                else float(height)
+            )
+            focal_dist = max(focal_dist, float(height))
+            pos = center_vec + v_cam * focal_dist
+            cam.position.setValue([pos.x, pos.y, pos.z])
+            if hasattr(cam, "focalDistance"):
+                cam.focalDistance.setValue(focal_dist)
+            cam.height.setValue(float(height))
+        elif hasattr(cam, "heightAngle"):
+            # Perspective camera
+            import math
+
+            angle = float(cam.heightAngle.getValue())
+            focal_dist = (
+                (float(height) / 2.0) / math.tan(angle / 2.0) if angle > 0 else float(height)
+            )
+            pos = center_vec + v_cam * focal_dist
+            cam.position.setValue([pos.x, pos.y, pos.z])
+            if hasattr(cam, "focalDistance"):
+                cam.focalDistance.setValue(focal_dist)
+    except Exception:
+        pass
 
 
 def _frame_origin_planes():
-    """Give FreeCAD's temporary origin planes a predictable, visible camera."""
+    """Give FreeCAD's temporary origin planes a predictable, visible camera centered at origin."""
     document = getattr(Gui, "ActiveDocument", None)
+    if document is None:
+        return
+    if getattr(document, "getInEdit", lambda: None)() is not None:
+        return
     view = getattr(document, "ActiveView", None)
     if view is None:
         return
     view.viewAxonometric()
-    view.fitAll()
+    # Center on the origin (0, 0, 0) with default scale (~100x100mm) instead of fitAll,
+    # which shifts up/right due to asymmetric [0, +size] origin plane bounds.
+    _center_camera(view, center=(0.0, 0.0, 0.0), height=_default_camera_scale())
 
 
 class _SketchEditWorkbenchObserver:
@@ -1086,9 +1157,53 @@ class _SketchEditWorkbenchObserver:
         try:
             from PySide import QtCore
 
-            QtCore.QTimer.singleShot(0, lambda: Gui.activateWorkbench("SketcherWorkbench"))
+            QtCore.QTimer.singleShot(0, lambda: self._on_sketch_in_edit(obj))
         except ImportError:
-            Gui.activateWorkbench("SketcherWorkbench")
+            self._on_sketch_in_edit(obj)
+
+    def _on_sketch_in_edit(self, sketch_obj):
+        Gui.activateWorkbench("SketcherWorkbench")
+        # If this is a newly created sketch (no geometry yet), ensure its view
+        # is cleanly centered on the sketch plane origin with ~100x100mm range,
+        # preventing off-center pan and extreme zoom.
+        try:
+            geo_count = len(getattr(sketch_obj, "Geometry", []))
+            if geo_count == 0:
+                document = getattr(Gui, "ActiveDocument", None)
+                view = getattr(document, "ActiveView", None) if document else None
+                if view is not None:
+                    pla = (
+                        sketch_obj.getGlobalPlacement()
+                        if hasattr(sketch_obj, "getGlobalPlacement")
+                        else getattr(sketch_obj, "Placement", None)
+                    )
+                    origin = (
+                        (pla.Base.x, pla.Base.y, pla.Base.z)
+                        if pla is not None and hasattr(pla, "Base")
+                        else (0.0, 0.0, 0.0)
+                    )
+                    _center_camera(view, center=origin, height=_default_camera_scale())
+        except Exception:
+            pass
+
+    def slotResetEdit(self, view_provider):
+        obj = getattr(view_provider, "Object", None)
+        if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
+            return
+        try:
+            import fusion_sketch_tools
+
+            fusion_sketch_tools.repair_sketch_internal_faces(obj)
+        except Exception:
+            pass
+        # Clear whole-sketch selection so multi-region sketches don't trick the user
+        # with an all-green highlight that fails when Extrude (Pad) is clicked.
+        try:
+            from PySide import QtCore
+
+            QtCore.QTimer.singleShot(100, lambda: Gui.Selection.clearSelection())
+        except Exception:
+            pass
 
 
 class ParameterTableCommand:
@@ -1145,10 +1260,138 @@ def register_preferences_page():
 
 
 _sketch_edit_observer = None
+_sketch_repair_observer = None
+
+
+class _SketchRepairObserver:
+    """Ensure sketch.InternalShape contains all planar faces whenever a sketch recomputes."""
+
+    _updating = False
+
+    def slotChangedObject(self, obj, prop):
+        if self._updating:
+            return
+        if (
+            prop == "Shape"
+            and hasattr(obj, "isDerivedFrom")
+            and obj.isDerivedFrom("Sketcher::SketchObject")
+        ):
+            self._updating = True
+            try:
+                import fusion_sketch_tools
+
+                fusion_sketch_tools.repair_sketch_internal_faces(obj)
+            except Exception:
+                pass
+            finally:
+                self._updating = False
+        elif (
+            prop == "Profile"
+            and hasattr(obj, "isDerivedFrom")
+            and obj.isDerivedFrom("PartDesign::Pad")
+        ):
+            try:
+                profile_tuple = getattr(obj, "Profile", None)
+                if (
+                    profile_tuple
+                    and isinstance(profile_tuple, (tuple, list))
+                    and len(profile_tuple) >= 2
+                ):
+                    sketch_obj, sub_elements = profile_tuple[0], profile_tuple[1]
+                    if (
+                        sketch_obj
+                        and hasattr(sketch_obj, "InternalShape")
+                        and len(getattr(sketch_obj.InternalShape, "Faces", [])) > 1
+                        and (not sub_elements or sub_elements == [""] or sub_elements == ("",))
+                    ):
+                        sketch_obj.Visibility = True
+            except Exception:
+                pass
+
+
+_sketch_edit_observer = None
+_sketch_repair_observer = None
+_pad_selection_observer = None
+
+
+class _PadSelectionObserver:
+    """Allow Fusion 360-style profile selection: click Extrude first, then click profile in 3D."""
+
+    _busy = False
+
+    def addSelection(self, doc_name, obj_name, sub_name, mouse_pos=None):
+        if self._busy or not sub_name:
+            return
+        sub_part = sub_name.split(".")[-1]
+        if not sub_part.startswith("InternalFace"):
+            return
+
+        try:
+            doc = App.getDocument(doc_name) if hasattr(App, "getDocument") else None
+            if not doc:
+                return
+
+            sketch_obj = None
+            if "." in sub_name:
+                sketch_obj = doc.getObject(sub_name.split(".")[0])
+            if not sketch_obj:
+                sketch_obj = doc.getObject(obj_name)
+            if not sketch_obj or not (
+                hasattr(sketch_obj, "isDerivedFrom")
+                and sketch_obj.isDerivedFrom("Sketcher::SketchObject")
+            ):
+                return
+
+            pads = [
+                o
+                for o in doc.Objects
+                if hasattr(o, "isDerivedFrom") and o.isDerivedFrom("PartDesign::Pad")
+            ]
+            if not pads:
+                return
+
+            target_pad = None
+            gui_doc = Gui.getDocument(doc_name) if hasattr(Gui, "getDocument") else None
+            in_edit_obj = getattr(gui_doc, "InEdit", None) if gui_doc else None
+            for p in pads:
+                if p == in_edit_obj:
+                    target_pad = p
+                    break
+
+            if not target_pad:
+                for p in reversed(pads):
+                    profile = getattr(p, "Profile", None)
+                    if profile and isinstance(profile, (tuple, list)) and len(profile) >= 2:
+                        if profile[0] == sketch_obj:
+                            p_subs = profile[1]
+                            if not p_subs or p_subs == [""] or p_subs == ("",) or not p.isValid():
+                                target_pad = p
+                                break
+
+            if target_pad:
+                self._busy = True
+                try:
+                    target_pad.Profile = (sketch_obj, [sub_part])
+                    target_pad.recompute()
+                    doc.recompute()
+                    sketch_obj.Visibility = False
+                finally:
+                    self._busy = False
+        except Exception:
+            pass
+
+    def removeSelection(self, doc_name, obj_name, sub_name, mouse_pos=None):
+        pass
+
+    def clearSelection(self, doc_name):
+        pass
+
+    def setSelection(self, doc_name):
+        pass
 
 
 def register_commands():
-    global _sketch_edit_observer
+    global _sketch_edit_observer, _sketch_repair_observer, _pad_selection_observer
     Gui.addCommand("FusionMyFreeCAD_CreateSketch", CreateSketchCommand())
     Gui.addCommand("FusionMyFreeCAD_ParameterTable", ParameterTableCommand())
     Gui.addCommand("FusionMyFreeCAD_Verify", VerifyCommand())
@@ -1161,6 +1404,16 @@ def register_commands():
     if _sketch_edit_observer is None and hasattr(Gui, "addDocumentObserver"):
         _sketch_edit_observer = _SketchEditWorkbenchObserver()
         Gui.addDocumentObserver(_sketch_edit_observer)
+    if _sketch_repair_observer is None and hasattr(App, "addDocumentObserver"):
+        _sketch_repair_observer = _SketchRepairObserver()
+        App.addDocumentObserver(_sketch_repair_observer)
+    if (
+        _pad_selection_observer is None
+        and hasattr(Gui, "Selection")
+        and hasattr(Gui.Selection, "addObserver")
+    ):
+        _pad_selection_observer = _PadSelectionObserver()
+        Gui.Selection.addObserver(_pad_selection_observer)
 
 
 # ---------------------------------------------------------------------------
