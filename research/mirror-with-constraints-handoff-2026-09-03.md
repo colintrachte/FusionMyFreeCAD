@@ -229,13 +229,13 @@ The user was asked to run, on a sketch immediately after **Mirror + Constraints*
 (geo 5 = source divider, geo 6 = its mirror — adjust ids to their sketch):
 
 ```python
-s = App.ActiveDocument.getObject('Sketch')
+s = App.ActiveDocument.getObject("Sketch")
 print("faces before:", len(s.Shape.Faces))
-i = s.addConstraint(Sketcher.Constraint('Symmetric', 5, 1, 6, 1, -2))
+i = s.addConstraint(Sketcher.Constraint("Symmetric", 5, 1, 6, 1, -2))
 s.recompute()
 print("DoF:", s.solve())
 print("redundant:", list(s.RedundantConstraints))
-print("partial:", list(getattr(s, 'PartiallyRedundantConstraints', [])))
+print("partial:", list(getattr(s, "PartiallyRedundantConstraints", [])))
 print("conflicting:", list(s.ConflictingConstraints))
 print("faces after:", len(s.Shape.Faces))
 ```
