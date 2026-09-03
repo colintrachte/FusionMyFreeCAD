@@ -24,6 +24,19 @@ def test_defaults_are_applied_on_first_run(env, runtime):
     assert env.param(VIEW_GROUP).GetString("NavigationStyle") == "Gui::RevitNavigationStyle"
     assert env.param(SHORTCUT_GROUP).GetString("PartDesign_Pad") == "E"
     assert env.param(SKETCHER_GROUP).GetBool("MakeInternals") is True
+    assert env.param(SKETCHER_GROUP).GetBool("ShowCursorCoords") is True
+    assert (
+        env.param("User parameter:BaseApp/Preferences/Mod/Sketcher/General").GetBool(
+            "AutoConstraints"
+        )
+        is True
+    )
+    assert (
+        env.param("User parameter:BaseApp/Preferences/Mod/Sketcher/Tools").GetInt(
+            "OnViewParameterVisibility"
+        )
+        == 1
+    )
     assert env.param(runtime.bootstrap.PREFERENCE_ROOT).GetString("AppliedVersion") == (
         runtime.bootstrap.PACKAGE_VERSION
     )

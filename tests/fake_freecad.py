@@ -190,6 +190,7 @@ class FakeLineSegment:
     """Stand-in for Part.LineSegment inside a sketch."""
 
     def __init__(self, start, end, construction=False):
+        self.TypeId = "Part::GeomLineSegment"
         self.StartPoint = FakeVector(*start)
         self.EndPoint = FakeVector(*end)
         self.Construction = construction
@@ -211,6 +212,17 @@ def _reflect(point, axis_a, axis_b):
     t = ((px - ax) * dx + (py - ay) * dy) / length_squared
     foot_x, foot_y = ax + t * dx, ay + t * dy
     return (2.0 * foot_x - px, 2.0 * foot_y - py)
+
+
+class FakePoint:
+    """Stand-in for Part.Point inside a sketch."""
+
+    def __init__(self, point, construction=False):
+        self.TypeId = "Part::GeomPoint"
+        self.X = float(point.x if hasattr(point, "x") else point[0])
+        self.Y = float(point.y if hasattr(point, "y") else point[1])
+        self.Z = float(point.z if hasattr(point, "z") else (point[2] if len(point) > 2 else 0.0))
+        self.Construction = construction
 
 
 class FakeConstraint:
@@ -289,8 +301,43 @@ class FakeSketch(FakeObject):
         self.solves = 0
 
     def addGeometry(self, geo, construction=False):
+        if construction:
+            geo.Construction = True
         self.Geometry.append(geo)
         return len(self.Geometry) - 1
+
+    def setConstruction(self, index, value):
+        if 0 <= index < len(self.Geometry):
+            self.Geometry[index].Construction = bool(value)
+
+    def getConstruction(self, index):
+        if 0 <= index < len(self.Geometry):
+            return getattr(self.Geometry[index], "Construction", False)
+        return False
+
+    def getGeoVertexIndex(self, index):
+        count = 0
+        for g_idx, _geo in enumerate(self.Geometry):
+            for pos in (1, 2):
+                if count == index:
+                    return (g_idx, pos)
+                count += 1
+        return (-2000, 0)
+
+    def getPoint(self, geo_id, pos_id):
+        if 0 <= geo_id < len(self.Geometry):
+            geo = self.Geometry[geo_id]
+            if hasattr(geo, "X") and hasattr(geo, "Y"):
+                return FakeVector(geo.X, geo.Y, getattr(geo, "Z", 0))
+            if pos_id == 1:
+                return getattr(geo, "StartPoint", FakeVector(0, 0, 0))
+            elif pos_id == 2:
+                return getattr(geo, "EndPoint", FakeVector(0, 0, 0))
+            elif pos_id == 3:
+                return getattr(geo, "Center", FakeVector(0, 0, 0))
+        elif geo_id in (-1, -2) and pos_id in (0, 1):
+            return FakeVector(0, 0, 0)
+        return FakeVector(0, 0, 0)
 
     def addConstraint(self, constraint):
         self.Constraints.append(constraint)
@@ -706,6 +753,7 @@ class Environment:
         self.sketcher.Constraint = FakeConstraint
         self.part = types.ModuleType("Part")
         self.part.LineSegment = FakeLineSegment
+        self.part.Point = FakePoint
 
         self.pyside, self.qtcore, self.qtgui, self.qtwidgets = _qt_modules()
 

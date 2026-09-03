@@ -150,6 +150,11 @@ def geometry_point(geo, pos_id):
     Works with FreeCAD ``Part`` geometry (``Vector`` attributes) and with plain
     objects exposing ``StartPoint``/``EndPoint``/``Center``.
     """
+    if hasattr(geo, "X") and hasattr(geo, "Y"):
+        try:
+            return (float(geo.X), float(geo.Y))
+        except (TypeError, ValueError):
+            pass
     attribute = {
         _POS_START: "StartPoint",
         _POS_END: "EndPoint",
@@ -836,13 +841,17 @@ def _format_report(
 
 def _geometry_kind(geo):
     """Coarse classification of a Part geometry, tolerant of test fakes."""
-    type_id = str(getattr(geo, "TypeId", "") or "")
+    type_id = str(getattr(geo, "TypeId", "") or getattr(type(geo), "__name__", "") or "")
     if "Arc" in type_id:
         return "arc"
     if "Circle" in type_id or "Ellipse" in type_id:
         return "circle"
     if "LineSegment" in type_id:
         return "line"
+    if hasattr(geo, "StartPoint") and hasattr(geo, "EndPoint") and not hasattr(geo, "Radius"):
+        return "line"
+    if hasattr(geo, "Radius") or hasattr(geo, "Center"):
+        return "circle"
     return "other"
 
 
@@ -1118,7 +1127,346 @@ def _abort_transaction(document):
 
 
 # ---------------------------------------------------------------------------
-# Command object
+# Midline & Symmetry Axis tools
+# ---------------------------------------------------------------------------
+
+
+def _add_construction_line(sketch, start_pt, end_pt):
+    """Add a construction LineSegment between start_pt and end_pt to sketch."""
+    import Part
+
+    sx, sy = float(start_pt[0]), float(start_pt[1])
+    ex, ey = float(end_pt[0]), float(end_pt[1])
+    line_seg = Part.LineSegment(App.Vector(sx, sy, 0.0), App.Vector(ex, ey, 0.0))
+    try:
+        mid_id = sketch.addGeometry(line_seg, True)
+    except TypeError:
+        mid_id = sketch.addGeometry(line_seg)
+    setter = getattr(sketch, "setConstruction", None)
+    if callable(setter):
+        try:
+            setter(mid_id, True)
+        except Exception:
+            pass
+    return mid_id
+
+
+def _safe_add_constraint(sketch, constraint):
+    """Add a constraint to sketch, but back it out if it over-constrains or conflicts."""
+    before_conflicts = _flagged_indices(sketch, _CONFLICTING_ATTRS)
+    before_redundant = _flagged_indices(sketch, _FULLY_REDUNDANT_ATTRS)
+    try:
+        idx = sketch.addConstraint(constraint)
+    except Exception:
+        return False
+    if not isinstance(idx, int):
+        idx = len(list(getattr(sketch, "Constraints", []) or [])) - 1
+    _recompute(sketch)
+    new_conflicts = _flagged_indices(sketch, _CONFLICTING_ATTRS) - before_conflicts
+    new_redundant = _flagged_indices(sketch, _FULLY_REDUNDANT_ATTRS) - before_redundant
+    if new_conflicts or new_redundant:
+        _drop_constraint(sketch, idx)
+        return False
+    return True
+
+
+def selected_midline_references(sketch):
+    """Identify geometry references for midline / symmetry axis generation.
+
+    Returns:
+        (kind, data, error)
+        - ("points", [p1, p2], None) where each p is dict(geoid=..., posid=..., point=(x, y))
+        - ("lines", [geo1, geo2], None)
+        - ("line", geo, None)
+        - (None, None, error_message)
+    """
+    selection = []
+    getter = getattr(Gui.Selection, "getSelectionEx", None)
+    if callable(getter):
+        try:
+            selection = getter() or []
+        except Exception:
+            selection = []
+
+    selected_edges = []
+    selected_points = []
+
+    for entry in selection:
+        if getattr(entry, "Object", None) is not sketch and selection_object_name(entry) != getattr(
+            sketch, "Name", None
+        ):
+            continue
+        for sub in getattr(entry, "SubElementNames", []) or []:
+            if sub.startswith("Edge"):
+                try:
+                    geoid = int(sub[4:]) - 1
+                except ValueError:
+                    continue
+                if geoid not in selected_edges:
+                    selected_edges.append(geoid)
+            elif sub.startswith("Vertex"):
+                try:
+                    v_idx = int(sub[6:]) - 1
+                except ValueError:
+                    continue
+                geoid, posid = -2000, 0
+                resolver = getattr(sketch, "getGeoVertexIndex", None)
+                if callable(resolver):
+                    try:
+                        geoid, posid = resolver(v_idx)
+                    except Exception:
+                        geoid, posid = -2000, 0
+
+                pt = None
+                if geoid >= 0 and posid > 0:
+                    pt_getter = getattr(sketch, "getPoint", None)
+                    if callable(pt_getter):
+                        try:
+                            vec = pt_getter(geoid, posid)
+                            pt = (float(vec.x), float(vec.y))
+                        except Exception:
+                            pt = None
+                    if pt is None and 0 <= geoid < len(_geometry_list(sketch)):
+                        pt = geometry_point(_geometry_list(sketch)[geoid], posid)
+                else:
+                    shape = getattr(sketch, "Shape", None)
+                    vertexes = getattr(shape, "Vertexes", []) or []
+                    if 0 <= v_idx < len(vertexes):
+                        v_point = vertexes[v_idx].Point
+                        pt = (float(v_point.x), float(v_point.y))
+                        for g_i, g in enumerate(_geometry_list(sketch)):
+                            pts = geometry_endpoints(g)
+                            for p_pos, p_coords in pts.items():
+                                if points_equal(pt, p_coords):
+                                    geoid, posid = g_i, p_pos
+                                    break
+                            if geoid >= 0:
+                                break
+
+                if pt is not None and geoid >= 0 and posid > 0:
+                    already_selected = any(
+                        p["geoid"] == geoid and p["posid"] == posid for p in selected_points
+                    )
+                    if not already_selected:
+                        selected_points.append({"geoid": geoid, "posid": posid, "point": pt})
+            elif sub == "RootPoint":
+                if not any(p["geoid"] == -1 and p["posid"] == 1 for p in selected_points):
+                    selected_points.append({"geoid": -1, "posid": 1, "point": (0.0, 0.0)})
+
+    geos = _geometry_list(sketch)
+
+    # Circle/Arc center point support when 2 curves are selected
+    if len(selected_edges) == 2 and not selected_points:
+        if 0 <= selected_edges[0] < len(geos) and 0 <= selected_edges[1] < len(geos):
+            g1, g2 = geos[selected_edges[0]], geos[selected_edges[1]]
+            if _geometry_kind(g1) in ("circle", "arc") and _geometry_kind(g2) in ("circle", "arc"):
+                c1 = geometry_point(g1, _POS_CENTER)
+                c2 = geometry_point(g2, _POS_CENTER)
+                if c1 is not None and c2 is not None:
+                    selected_points = [
+                        {"geoid": selected_edges[0], "posid": _POS_CENTER, "point": c1},
+                        {"geoid": selected_edges[1], "posid": _POS_CENTER, "point": c2},
+                    ]
+                    selected_edges = []
+
+    # 1. Two points
+    if len(selected_points) == 2 and len(selected_edges) <= 1:
+        if points_equal(selected_points[0]["point"], selected_points[1]["point"]):
+            return None, None, "the two selected points are coincident"
+        return "points", selected_points, None
+
+    # 2. Two lines
+    if len(selected_edges) == 2 and not selected_points:
+        if 0 <= selected_edges[0] < len(geos) and 0 <= selected_edges[1] < len(geos):
+            g1, g2 = geos[selected_edges[0]], geos[selected_edges[1]]
+            if _geometry_kind(g1) == "line" and _geometry_kind(g2) == "line":
+                return "lines", selected_edges, None
+        return None, None, "select 2 lines or 2 points/centers"
+
+    # 3. One line
+    if len(selected_edges) == 1 and not selected_points:
+        if 0 <= selected_edges[0] < len(geos) and _geometry_kind(geos[selected_edges[0]]) == "line":
+            return "line", selected_edges[0], None
+        return None, None, "select a line segment to create a perpendicular bisector"
+
+    if not selected_edges and not selected_points:
+        return None, None, "select 2 points, 2 lines, or 1 line first"
+
+    return None, None, "select 2 points, 2 lines, or 1 line to create a midline or symmetry axis"
+
+
+def create_midline_geometry(sketch, kind, data):
+    """Construct a construction midline and apply symmetry constraints."""
+    import Sketcher
+
+    geos = _geometry_list(sketch)
+
+    if kind == "points":
+        p1, p2 = data
+        x1, y1 = p1["point"]
+        x2, y2 = p2["point"]
+        mx, my = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+        dx, dy = x2 - x1, y2 - y1
+        dist = math_hypot(dx, dy)
+        if dist <= TOLERANCE:
+            raise ValueError("Selected points are coincident")
+        nx, ny = -dy / dist, dx / dist
+        span = max(dist * 1.5, 20.0)
+        sx, sy = mx - (span / 2.0) * nx, my - (span / 2.0) * ny
+        ex, ey = mx + (span / 2.0) * nx, my + (span / 2.0) * ny
+        mid_id = _add_construction_line(sketch, (sx, sy), (ex, ey))
+        c = Sketcher.Constraint(
+            "Symmetric", p1["geoid"], p1["posid"], p2["geoid"], p2["posid"], mid_id
+        )
+        _safe_add_constraint(sketch, c)
+        _recompute(sketch)
+        return {"midline": mid_id, "kind": "points"}
+
+    elif kind == "line":
+        geoid = data
+        g = geos[geoid]
+        p1 = geometry_point(g, _POS_START)
+        p2 = geometry_point(g, _POS_END)
+        if p1 is None or p2 is None:
+            raise ValueError("Could not read line endpoints")
+        mx, my = (p1[0] + p2[0]) / 2.0, (p1[1] + p2[1]) / 2.0
+        dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+        dist = math_hypot(dx, dy)
+        if dist <= TOLERANCE:
+            raise ValueError("Line length is zero")
+        nx, ny = -dy / dist, dx / dist
+        span = max(dist * 1.5, 20.0)
+        sx, sy = mx - (span / 2.0) * nx, my - (span / 2.0) * ny
+        ex, ey = mx + (span / 2.0) * nx, my + (span / 2.0) * ny
+        mid_id = _add_construction_line(sketch, (sx, sy), (ex, ey))
+        c = Sketcher.Constraint("Symmetric", geoid, _POS_START, geoid, _POS_END, mid_id)
+        _safe_add_constraint(sketch, c)
+        _recompute(sketch)
+        return {"midline": mid_id, "kind": "line"}
+
+    elif kind == "lines":
+        geo1, geo2 = data
+        g1, g2 = geos[geo1], geos[geo2]
+        a1 = geometry_point(g1, _POS_START)
+        b1 = geometry_point(g1, _POS_END)
+        a2 = geometry_point(g2, _POS_START)
+        b2 = geometry_point(g2, _POS_END)
+        if any(pt is None for pt in (a1, b1, a2, b2)):
+            raise ValueError("Could not read lines endpoints")
+
+        d_direct = math_hypot(a1[0] - a2[0], a1[1] - a2[1]) + math_hypot(
+            b1[0] - b2[0], b1[1] - b2[1]
+        )
+        d_crossed = math_hypot(a1[0] - b2[0], a1[1] - b2[1]) + math_hypot(
+            b1[0] - a2[0], b1[1] - a2[1]
+        )
+
+        if d_crossed < d_direct:
+            p2a, pos2a = b2, _POS_END
+            p2b, pos2b = a2, _POS_START
+        else:
+            p2a, pos2a = a2, _POS_START
+            p2b, pos2b = b2, _POS_END
+
+        ma = ((a1[0] + p2a[0]) / 2.0, (a1[1] + p2a[1]) / 2.0)
+        mb = ((b1[0] + p2b[0]) / 2.0, (b1[1] + p2b[1]) / 2.0)
+
+        dist_m = math_hypot(mb[0] - ma[0], mb[1] - ma[1])
+        if dist_m <= TOLERANCE:
+            v1x, v1y = b1[0] - a1[0], b1[1] - a1[1]
+            v2x, v2y = p2b[0] - p2a[0], p2b[1] - p2a[1]
+            l1, l2 = math_hypot(v1x, v1y), math_hypot(v2x, v2y)
+            u1x, u1y = (v1x / l1, v1y / l1) if l1 > TOLERANCE else (1.0, 0.0)
+            u2x, u2y = (v2x / l2, v2y / l2) if l2 > TOLERANCE else (1.0, 0.0)
+            bx, by = u1x + u2x, u1y + u2y
+            lb = math_hypot(bx, by)
+            if lb <= TOLERANCE:
+                bx, by = -u1y, u1x
+                lb = math_hypot(bx, by)
+            ubx, uby = bx / lb, by / lb
+            span = max(l1, l2, 20.0)
+            ma = (a1[0] - (span / 2.0) * ubx, a1[1] - (span / 2.0) * uby)
+            mb = (a1[0] + (span / 2.0) * ubx, a1[1] + (span / 2.0) * uby)
+
+        mid_id = _add_construction_line(sketch, ma, mb)
+
+        # Apply primary symmetric link
+        c1 = Sketcher.Constraint("Symmetric", geo1, _POS_START, geo2, pos2a, mid_id)
+        _safe_add_constraint(sketch, c1)
+
+        # Apply secondary symmetric link (or parallel if secondary is redundant)
+        c2 = Sketcher.Constraint("Symmetric", geo1, _POS_END, geo2, pos2b, mid_id)
+        if not _safe_add_constraint(sketch, c2):
+            c_par = Sketcher.Constraint("Parallel", mid_id, geo1)
+            _safe_add_constraint(sketch, c_par)
+
+        # Attach endpoints to any crossing boundary edges if coincident (e.g. in a box/rectangle)
+        for e_idx, e_geo in enumerate(geos):
+            if e_idx in (geo1, geo2, mid_id):
+                continue
+            e_start = geometry_point(e_geo, _POS_START)
+            e_end = geometry_point(e_geo, _POS_END)
+            if e_start is not None and e_end is not None:
+                if distance_point_to_segment(ma, e_start, e_end) <= TOLERANCE:
+                    _safe_add_constraint(
+                        sketch, Sketcher.Constraint("PointOnObject", mid_id, _POS_START, e_idx)
+                    )
+                if distance_point_to_segment(mb, e_start, e_end) <= TOLERANCE:
+                    _safe_add_constraint(
+                        sketch, Sketcher.Constraint("PointOnObject", mid_id, _POS_END, e_idx)
+                    )
+
+        _recompute(sketch)
+        return {"midline": mid_id, "kind": "lines"}
+
+    raise ValueError("Unsupported midline mode: {}".format(kind))
+
+
+def add_midline():
+    """Create a construction midline or symmetry axis from selection.
+
+    Returns a result dict for tests; the interactive command notifies non-modally.
+    """
+    sketch = active_sketch()
+    if sketch is None:
+        _notify_midline("start editing a sketch first.", error=True)
+        return {"status": "no-sketch"}
+
+    kind, data, error = selected_midline_references(sketch)
+    if error:
+        _notify_midline(error + ".", error=True)
+        return {"status": "no-selection", "error": error}
+
+    document = getattr(App, "ActiveDocument", None)
+    _open_transaction(document, "Add Midline")
+    try:
+        result = create_midline_geometry(sketch, kind, data)
+        _commit_transaction(document)
+    except Exception as exc:
+        _abort_transaction(document)
+        _notify_midline("failed and was rolled back: {}".format(exc), error=True)
+        return {"status": "error", "error": str(exc)}
+
+    msg = "created construction midline with symmetry constraint."
+    _notify_midline(msg)
+    return {"status": "ok", **result, "message": msg}
+
+
+def _notify_midline(text, error=False):
+    """Show a non-modal result: report view line plus a transient status message."""
+    printer = App.Console.PrintError if error else App.Console.PrintMessage
+    printer("FusionMyFreeCAD Midline: {}\n".format(text))
+    try:
+        window = Gui.getMainWindow()
+        status_bar = window.statusBar() if window is not None else None
+        if status_bar is not None:
+            status_bar.showMessage("Midline: {}".format(text), 8000)
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Command objects
 # ---------------------------------------------------------------------------
 
 
@@ -1139,13 +1487,6 @@ class MirrorWithConstraintsCommand:
         }
 
     def IsActive(self):
-        # Deliberately cheap and side-effect free. FreeCAD polls this on a timer
-        # for every visible command, including while a sketch is still entering
-        # edit mode and the ribbon is rebuilding. Touching Gui edit state here
-        # (getInEdit, view providers) can dereference a half-built object in C++
-        # and crash uncatchably, which is what withdrew 1.3.2. The real
-        # "are we editing a sketch?" check stays in Activated(), where FreeCAD is
-        # idle and a clear message can be shown instead.
         if getattr(App, "ActiveDocument", None) is None:
             return False
         try:
@@ -1155,6 +1496,294 @@ class MirrorWithConstraintsCommand:
 
     def Activated(self):
         mirror_with_constraints()
+
+
+class AddMidlineCommand:
+    """``FusionMyFreeCAD_AddMidline`` ribbon command."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": "FusionMyFreeCAD_AddMidline",
+            "MenuText": "Midline",
+            "ToolTip": (
+                "Create a construction midline / symmetry axis from selected geometry:\n"
+                "- 2 Points: perpendicular bisector symmetry axis between the points.\n"
+                "- 2 Lines: centerline axis equidistant and parallel between them.\n"
+                "- 1 Line: perpendicular bisector symmetry axis across line endpoints."
+            ),
+        }
+
+    def IsActive(self):
+        if getattr(App, "ActiveDocument", None) is None:
+            return False
+        try:
+            return Gui.activeWorkbench().name() == "SketcherWorkbench"
+        except Exception:
+            return False
+
+    def Activated(self):
+        add_midline()
+
+
+def selected_midpoint_references(sketch):
+    """Identify target geometry for a midpoint constraint.
+
+    Supported patterns:
+    - 1 Point + 1 Line: locks the point to the center of the line.
+    - 3 Points: locks the middle point to the midpoint between the outer two.
+    - 1 Line: creates a construction midpoint vertex on the line.
+    - 2 Points: creates a construction midpoint vertex between the two points.
+    """
+    selected_edges = []
+    selected_points = []
+    pt_getter = getattr(sketch, "getPoint", None)
+
+    selection = []
+    getter = getattr(Gui.Selection, "getSelectionEx", None)
+    if callable(getter):
+        try:
+            selection = getter() or []
+        except Exception:
+            selection = []
+
+    for entry in selection:
+        if getattr(entry, "Object", None) is not sketch and selection_object_name(entry) != getattr(
+            sketch, "Name", None
+        ):
+            continue
+        for sub in getattr(entry, "SubElementNames", []) or []:
+            if sub.startswith("Edge") and sub[4:].isdigit():
+                idx = int(sub[4:]) - 1
+                if idx not in selected_edges:
+                    selected_edges.append(idx)
+            elif sub.startswith("Vertex") and sub[6:].isdigit():
+                v_idx = int(sub[6:]) - 1
+                geoid, posid, pt = -1, 0, None
+                if callable(pt_getter):
+                    mapper = getattr(sketch, "getGeoVertexIndex", None)
+                    if callable(mapper):
+                        try:
+                            geoid, posid = mapper(v_idx)
+                            vec = pt_getter(geoid, posid)
+                            pt = (float(vec.x), float(vec.y))
+                        except Exception:
+                            pt = None
+                    if pt is None and 0 <= geoid < len(_geometry_list(sketch)):
+                        pt = geometry_point(_geometry_list(sketch)[geoid], posid)
+                else:
+                    shape = getattr(sketch, "Shape", None)
+                    vertexes = getattr(shape, "Vertexes", []) or []
+                    if 0 <= v_idx < len(vertexes):
+                        v_point = vertexes[v_idx].Point
+                        pt = (float(v_point.x), float(v_point.y))
+                        for g_i, g in enumerate(_geometry_list(sketch)):
+                            pts = geometry_endpoints(g)
+                            for p_pos, p_coords in pts.items():
+                                if points_equal(pt, p_coords):
+                                    geoid, posid = g_i, p_pos
+                                    break
+                            if geoid >= 0:
+                                break
+
+                if pt is not None and geoid >= 0 and posid > 0:
+                    already = any(
+                        p["geoid"] == geoid and p["posid"] == posid for p in selected_points
+                    )
+                    if not already:
+                        selected_points.append({"geoid": geoid, "posid": posid, "point": pt})
+            elif sub == "RootPoint":
+                if not any(p["geoid"] == -1 and p["posid"] == 1 for p in selected_points):
+                    selected_points.append({"geoid": -1, "posid": 1, "point": (0.0, 0.0)})
+
+    geos = _geometry_list(sketch)
+
+    # 1. One point + One line
+    if len(selected_points) == 1 and len(selected_edges) == 1:
+        if 0 <= selected_edges[0] < len(geos):
+            g = geos[selected_edges[0]]
+            if _geometry_kind(g) == "line":
+                return "point-line", (selected_points[0], selected_edges[0]), None
+        return None, None, "select a line segment and a point to constrain to midpoint"
+
+    # 2. Three points
+    if len(selected_points) == 3 and not selected_edges:
+        return "3-points", selected_points, None
+
+    # 3. One line (no points) -> create construction midpoint vertex
+    if len(selected_edges) == 1 and not selected_points:
+        if 0 <= selected_edges[0] < len(geos) and _geometry_kind(geos[selected_edges[0]]) == "line":
+            return "line", selected_edges[0], None
+        return None, None, "select a line segment to create a midpoint point"
+
+    # 4. Two points -> create construction midpoint vertex
+    if len(selected_points) == 2 and not selected_edges:
+        return "2-points", selected_points, None
+
+    if not selected_edges and not selected_points:
+        return None, None, "select 1 point and 1 line, 3 points, or 1 line first"
+
+    return None, None, "select 1 point and 1 line, 3 points, or 1 line to constrain to midpoint"
+
+
+def apply_midpoint_constraint(sketch, kind, data):
+    """Apply a parametric midpoint constraint to the sketch."""
+    import Part
+    import Sketcher
+
+    geos = _geometry_list(sketch)
+
+    if kind == "point-line":
+        pt, line_idx = data
+        c = Sketcher.Constraint(
+            "Symmetric", line_idx, _POS_START, line_idx, _POS_END, pt["geoid"], pt["posid"]
+        )
+        added = _safe_add_constraint(sketch, c)
+        if not added:
+            raise ValueError(
+                "Midpoint constraint conflicts or is redundant with existing constraints"
+            )
+        _recompute(sketch)
+        return {"kind": "point-line"}
+
+    elif kind == "3-points":
+        pts = data
+        coords = [p["point"] for p in pts]
+        d01 = math_hypot(coords[0][0] - coords[1][0], coords[0][1] - coords[1][1])
+        d12 = math_hypot(coords[1][0] - coords[2][0], coords[1][1] - coords[2][1])
+        d02 = math_hypot(coords[0][0] - coords[2][0], coords[0][1] - coords[2][1])
+        if d01 >= d12 and d01 >= d02:
+            p_out1, p_out2, p_mid = pts[0], pts[1], pts[2]
+        elif d02 >= d01 and d02 >= d12:
+            p_out1, p_out2, p_mid = pts[0], pts[2], pts[1]
+        else:
+            p_out1, p_out2, p_mid = pts[1], pts[2], pts[0]
+
+        c = Sketcher.Constraint(
+            "Symmetric",
+            p_out1["geoid"],
+            p_out1["posid"],
+            p_out2["geoid"],
+            p_out2["posid"],
+            p_mid["geoid"],
+            p_mid["posid"],
+        )
+        added = _safe_add_constraint(sketch, c)
+        if not added:
+            raise ValueError(
+                "Midpoint constraint conflicts or is redundant with existing constraints"
+            )
+        _recompute(sketch)
+        return {"kind": "3-points"}
+
+    elif kind == "line":
+        line_idx = data
+        g = geos[line_idx]
+        p1 = geometry_point(g, _POS_START)
+        p2 = geometry_point(g, _POS_END)
+        if p1 is None or p2 is None:
+            raise ValueError("Could not determine line endpoints")
+        mx, my = (p1[0] + p2[0]) / 2.0, (p1[1] + p2[1]) / 2.0
+        pt_geo = Part.Point(App.Vector(mx, my, 0.0))
+        pt_id = sketch.addGeometry(pt_geo, True)
+        set_const = getattr(sketch, "setConstruction", None)
+        if callable(set_const):
+            try:
+                set_const(pt_id, True)
+            except Exception:
+                pass
+        c = Sketcher.Constraint("Symmetric", line_idx, _POS_START, line_idx, _POS_END, pt_id, 1)
+        _safe_add_constraint(sketch, c)
+        _recompute(sketch)
+        return {"kind": "line", "point": pt_id}
+
+    elif kind == "2-points":
+        p1, p2 = data
+        x1, y1 = p1["point"]
+        x2, y2 = p2["point"]
+        mx, my = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+        pt_geo = Part.Point(App.Vector(mx, my, 0.0))
+        pt_id = sketch.addGeometry(pt_geo, True)
+        set_const = getattr(sketch, "setConstruction", None)
+        if callable(set_const):
+            try:
+                set_const(pt_id, True)
+            except Exception:
+                pass
+        c = Sketcher.Constraint(
+            "Symmetric", p1["geoid"], p1["posid"], p2["geoid"], p2["posid"], pt_id, 1
+        )
+        _safe_add_constraint(sketch, c)
+        _recompute(sketch)
+        return {"kind": "2-points", "point": pt_id}
+
+    raise ValueError("Unknown midpoint constraint kind: {}".format(kind))
+
+
+def constrain_midpoint(sketch=None):
+    """Transactionally constrain selected geometry to a midpoint."""
+    sketch = sketch or active_sketch()
+    if sketch is None:
+        _notify_midpoint("Open a sketch in edit mode first.", error=True)
+        return {"status": "no-sketch"}
+
+    kind, data, error = selected_midpoint_references(sketch)
+    if error is not None:
+        _notify_midpoint(error, error=True)
+        return {"status": "no-selection", "message": error}
+
+    document = getattr(App, "ActiveDocument", None)
+    _open_transaction(document, "Constrain Midpoint")
+
+    try:
+        result = apply_midpoint_constraint(sketch, kind, data)
+        _commit_transaction(document)
+        msg = "applied midpoint constraint."
+        _notify_midpoint(msg)
+        return {"status": "ok", **result, "message": msg}
+    except Exception as exc:
+        _abort_transaction(document)
+        _notify_midpoint(str(exc), error=True)
+        return {"status": "error", "message": str(exc)}
+
+
+def _notify_midpoint(text, error=False):
+    """Show a non-modal result: report view line plus a transient status message."""
+    printer = App.Console.PrintError if error else App.Console.PrintMessage
+    printer("FusionMyFreeCAD Midpoint: {}\n".format(text))
+    try:
+        window = Gui.getMainWindow()
+        status_bar = window.statusBar() if window is not None else None
+        if status_bar is not None:
+            status_bar.showMessage("Midpoint: {}".format(text), 8000)
+    except Exception:
+        pass
+
+
+class ConstrainMidpointCommand:
+    """``FusionMyFreeCAD_ConstrainMidpoint`` ribbon command."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": "FusionMyFreeCAD_ConstrainMidpoint",
+            "MenuText": "Midpoint",
+            "ToolTip": (
+                "Constrain a point to the midpoint of a line segment, or between two points.\n"
+                "- 1 Point + 1 Line: locks the point to the center of the line.\n"
+                "- 3 Points: locks the middle point to the midpoint of the outer two.\n"
+                "- 1 Line: inserts a construction midpoint vertex on the line."
+            ),
+        }
+
+    def IsActive(self):
+        if getattr(App, "ActiveDocument", None) is None:
+            return False
+        try:
+            return Gui.activeWorkbench().name() == "SketcherWorkbench"
+        except Exception:
+            return False
+
+    def Activated(self):
+        constrain_midpoint()
 
 
 def _register_icon_path():
@@ -1181,7 +1810,9 @@ def _register_icon_path():
 
 
 def register(add_command=None):
-    """Register the command with FreeCAD (or a supplied callable, for tests)."""
+    """Register the commands with FreeCAD (or a supplied callable, for tests)."""
     _register_icon_path()
     register_with = add_command or Gui.addCommand
     register_with("FusionMyFreeCAD_MirrorWithConstraints", MirrorWithConstraintsCommand())
+    register_with("FusionMyFreeCAD_AddMidline", AddMidlineCommand())
+    register_with("FusionMyFreeCAD_ConstrainMidpoint", ConstrainMidpointCommand())

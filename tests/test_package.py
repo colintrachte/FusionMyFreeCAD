@@ -259,6 +259,31 @@ def test_mirror_with_constraints_sits_beside_the_native_mirror(layout, manifest)
         order.index("Sketcher_Symmetry") - order.index("FusionMyFreeCAD_MirrorWithConstraints") == 1
     )
     assert "FusionMyFreeCAD_MirrorWithConstraints" in manifest["primaryCommands"]
+    assert "FusionMyFreeCAD_AddMidline" in order
+    assert by_name["FusionMyFreeCAD_AddMidline"][2] == "small"
+    assert by_name["FusionMyFreeCAD_AddMidline"][3] == "Midline"
+    assert (
+        order.index("FusionMyFreeCAD_MirrorWithConstraints")
+        - order.index("FusionMyFreeCAD_AddMidline")
+        == 1
+    )
+    assert "FusionMyFreeCAD_AddMidline" in manifest["primaryCommands"]
+
+    constraints_panel = {
+        panel["name"]: panel for panel in layout["workbenches"]["SketcherWorkbench"]
+    }["Fusion Sketch Constraints_newPanel"]
+    const_commands = constraints_panel["commands"]
+    const_order = [entry[0] for entry in const_commands]
+    const_by_name = {entry[0]: entry for entry in const_commands}
+    assert "FusionMyFreeCAD_ConstrainMidpoint" in const_order
+    assert const_by_name["FusionMyFreeCAD_ConstrainMidpoint"][2] == "small"
+    assert const_by_name["FusionMyFreeCAD_ConstrainMidpoint"][3] == "Midpoint"
+    assert (
+        const_order.index("FusionMyFreeCAD_ConstrainMidpoint")
+        - const_order.index("Sketcher_ConstrainCoincident")
+        == 1
+    )
+    assert "FusionMyFreeCAD_ConstrainMidpoint" in manifest["primaryCommands"]
 
 
 # ---------------------------------------------------------------------------

@@ -194,7 +194,22 @@ def _apply_defaults():
     # Generate selectable planar regions from closed sketch boundaries. This is
     # FreeCAD's native profile-face pipeline: crossing and boundary-to-boundary
     # lines subdivide a profile, while dangling open geometry is ignored.
-    App.ParamGet("User parameter:BaseApp/Preferences/Mod/Sketcher").SetBool("MakeInternals", True)
+    sketcher = App.ParamGet("User parameter:BaseApp/Preferences/Mod/Sketcher")
+    sketcher.SetBool("MakeInternals", True)
+    sketcher.SetBool("ShowCursorCoords", True)
+
+    # Enable Fusion-style live in-canvas auto-constraints and On-View Parameters (OVP)
+    sketcher_gen = App.ParamGet("User parameter:BaseApp/Preferences/Mod/Sketcher/General")
+    sketcher_gen.SetBool("AutoConstraints", True)
+    sketcher_gen.SetBool("AvoidRedundantAutoconstraints", True)
+    sketcher_gen.SetBool("NotifyConstraintSubstitutions", True)
+
+    sketcher_const = App.ParamGet("User parameter:BaseApp/Preferences/Mod/Sketcher/Constraints")
+    sketcher_const.SetBool("UnifiedCoincident", True)
+    sketcher_const.SetBool("AutoHorVer", True)
+
+    sketcher_tools = App.ParamGet("User parameter:BaseApp/Preferences/Mod/Sketcher/Tools")
+    sketcher_tools.SetInt("OnViewParameterVisibility", 1)
 
     # The upstream first-run changelog can cover Ribbon's modal cache prompt and
     # leave both windows impossible to operate. FusionMyFreeCAD provides its own

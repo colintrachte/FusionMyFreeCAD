@@ -1029,6 +1029,13 @@
             "Sketcher_Offset"
           ],
           [
+            "FusionMyFreeCAD_AddMidline",
+            "General",
+            "small",
+            "Midline",
+            "FusionMyFreeCAD_AddMidline"
+          ],
+          [
             "FusionMyFreeCAD_MirrorWithConstraints",
             "General",
             "small",
@@ -1199,6 +1206,13 @@
             "small",
             "Coincident",
             "Constraint_PointOnPoint"
+          ],
+          [
+            "FusionMyFreeCAD_ConstrainMidpoint",
+            "SketcherWorkbench",
+            "small",
+            "Midpoint",
+            "FusionMyFreeCAD_ConstrainMidpoint"
           ],
           [
             "Sketcher_ConstrainTangent",
