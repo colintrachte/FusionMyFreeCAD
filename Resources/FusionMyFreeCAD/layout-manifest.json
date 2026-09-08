@@ -1,19 +1,31 @@
 {
-  "layoutVersion": "1.3.3",
+  "layoutVersion": "1.4.0",
   "targetFreeCAD": "1.1.x",
   "authoredIcons": [
     "FusionMyFreeCAD_AddMidline",
     "FusionMyFreeCAD_ConstrainMidpoint",
-    "FusionMyFreeCAD_MirrorWithConstraints"
+    "FusionMyFreeCAD_CreateSlot",
+    "FusionMyFreeCAD_DatumMidplane",
+    "FusionMyFreeCAD_MirrorWithConstraints",
+    "FusionMyFreeCAD_ParameterDock",
+    "FusionMyFreeCAD_SmartOffset",
+    "FusionMyFreeCAD_SolverDiagnostics",
+    "FusionMyFreeCAD_StudioViewport"
   ],
   "primaryCommands": [
     "FusionMyFreeCAD_AddMidline",
     "FusionMyFreeCAD_ConstrainMidpoint",
     "FusionMyFreeCAD_CreateSketch",
+    "FusionMyFreeCAD_CreateSlot",
+    "FusionMyFreeCAD_DatumMidplane",
     "FusionMyFreeCAD_MirrorWithConstraints",
+    "FusionMyFreeCAD_ParameterDock",
     "FusionMyFreeCAD_ParameterTable",
     "FusionMyFreeCAD_Reapply",
     "FusionMyFreeCAD_Restore",
+    "FusionMyFreeCAD_SmartOffset",
+    "FusionMyFreeCAD_SolverDiagnostics",
+    "FusionMyFreeCAD_StudioViewport",
     "FusionMyFreeCAD_Verify",
     "PartDesign_AdditiveHelix",
     "PartDesign_AdditiveLoft",

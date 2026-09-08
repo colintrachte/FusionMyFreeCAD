@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="midplaneGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fce94f" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#c4a000" stop-opacity="0.65" />
+    </linearGradient>
+  </defs>
+
+  <!-- Top bounding planar face -->
+  <polygon points="12,16 38,10 52,18 26,24" fill="#d3d7cf" stroke="#555753" stroke-width="2" stroke-linejoin="round" />
+
+  <!-- Bottom bounding planar face -->
+  <polygon points="12,48 38,42 52,50 26,56" fill="#d3d7cf" stroke="#555753" stroke-width="2" stroke-linejoin="round" />
+
+  <!-- Midplane centered between faces -->
+  <polygon points="8,32 38,25 56,34 26,41" fill="url(#midplaneGrad)" stroke="#ce5c00" stroke-width="2.5" stroke-linejoin="round" />
+
+  <!-- Bisecting symmetry dash line -->
+  <line x1="32" y1="17" x2="32" y2="49" stroke="#204a87" stroke-width="2" stroke-dasharray="3,3" />
+</svg>

@@ -36,6 +36,8 @@ import os
 import FreeCAD as App
 import FreeCADGui as Gui
 
+from fusion_common import SketcherCommand, log_swallowed, notify
+
 # Distance below which two sketch coordinates are treated as the same point.
 TOLERANCE = 1e-6
 
@@ -598,8 +600,8 @@ def apply_constraint_copies(sketch, specs):
         for index in sorted(rejected, reverse=True):
             try:
                 sketch.delConstraint(index)
-            except Exception:
-                pass
+            except Exception as exc:
+                log_swallowed(f"delConstraint({index}) during boundary copy rollback", exc)
         added, added_indices = survivors, survivor_indices
         _recompute(sketch)
 
@@ -671,8 +673,8 @@ def apply_symmetry_links(sketch, link_specs):
 def _drop_constraint(sketch, index):
     try:
         sketch.delConstraint(index)
-    except Exception:
-        pass
+    except Exception as exc:
+        log_swallowed(f"delConstraint({index}) during constraint drop", exc)
     _recompute(sketch)
 
 
@@ -790,17 +792,8 @@ def selection_object_name(entry):
     return getattr(obj, "Name", None)
 
 
-def _notify(text, error=False):
-    """Show a non-modal result: report view line plus a transient status message."""
-    printer = App.Console.PrintError if error else App.Console.PrintMessage
-    printer("FusionMyFreeCAD Mirror: {}\n".format(text))
-    try:
-        window = Gui.getMainWindow()
-        status_bar = window.statusBar() if window is not None else None
-        if status_bar is not None:
-            status_bar.showMessage("Mirror with Constraints: {}".format(text), 8000)
-    except Exception:
-        pass
+def _notify(text: str, error: bool = False) -> None:
+    notify("Mirror", text, error=error)
 
 
 def _format_report(
@@ -1131,24 +1124,68 @@ def _abort_transaction(document):
 # ---------------------------------------------------------------------------
 
 
-def _add_construction_line(sketch, start_pt, end_pt):
-    """Add a construction LineSegment between start_pt and end_pt to sketch."""
+def _add_line(sketch, start_pt, end_pt, construction=False):
+    """Add a LineSegment between start_pt and end_pt to sketch."""
     import Part
 
     sx, sy = float(start_pt[0]), float(start_pt[1])
     ex, ey = float(end_pt[0]), float(end_pt[1])
     line_seg = Part.LineSegment(App.Vector(sx, sy, 0.0), App.Vector(ex, ey, 0.0))
     try:
-        mid_id = sketch.addGeometry(line_seg, True)
+        geo_id = sketch.addGeometry(line_seg, construction)
     except TypeError:
-        mid_id = sketch.addGeometry(line_seg)
-    setter = getattr(sketch, "setConstruction", None)
-    if callable(setter):
-        try:
-            setter(mid_id, True)
-        except Exception:
-            pass
-    return mid_id
+        geo_id = sketch.addGeometry(line_seg)
+    if construction:
+        setter = getattr(sketch, "setConstruction", None)
+        if callable(setter):
+            try:
+                setter(geo_id, True)
+            except Exception:
+                pass
+    return geo_id
+
+
+def _add_arc(sketch, center, start_pt, end_pt, construction=False):
+    """Add an ArcOfCircle centered at center passing from start_pt to end_pt."""
+    import math
+
+    import Part
+
+    cx, cy = float(center[0]), float(center[1])
+    sx, sy = float(start_pt[0]), float(start_pt[1])
+    ex, ey = float(end_pt[0]), float(end_pt[1])
+    radius = math_hypot(sx - cx, sy - cy)
+    a_start = math.atan2(sy - cy, sx - cx)
+    a_end = math.atan2(ey - cy, ex - cx)
+    try:
+        circle = Part.Circle(App.Vector(cx, cy, 0.0), App.Vector(0.0, 0.0, 1.0), radius)
+        arc = Part.ArcOfCircle(circle, a_start, a_end)
+    except Exception:
+        mid_angle = a_start + (a_end - a_start) / 2.0
+        if a_end < a_start:
+            mid_angle += math.pi
+        mx = cx + radius * math.cos(mid_angle)
+        my = cy + radius * math.sin(mid_angle)
+        arc = Part.ArcOfCircle(
+            App.Vector(sx, sy, 0.0), App.Vector(mx, my, 0.0), App.Vector(ex, ey, 0.0)
+        )
+    try:
+        geo_id = sketch.addGeometry(arc, construction)
+    except TypeError:
+        geo_id = sketch.addGeometry(arc)
+    if construction:
+        setter = getattr(sketch, "setConstruction", None)
+        if callable(setter):
+            try:
+                setter(geo_id, True)
+            except Exception:
+                pass
+    return geo_id
+
+
+def _add_construction_line(sketch, start_pt, end_pt):
+    """Add a construction LineSegment between start_pt and end_pt to sketch."""
+    return _add_line(sketch, start_pt, end_pt, construction=True)
 
 
 def _safe_add_constraint(sketch, constraint):
@@ -1452,17 +1489,8 @@ def add_midline():
     return {"status": "ok", **result, "message": msg}
 
 
-def _notify_midline(text, error=False):
-    """Show a non-modal result: report view line plus a transient status message."""
-    printer = App.Console.PrintError if error else App.Console.PrintMessage
-    printer("FusionMyFreeCAD Midline: {}\n".format(text))
-    try:
-        window = Gui.getMainWindow()
-        status_bar = window.statusBar() if window is not None else None
-        if status_bar is not None:
-            status_bar.showMessage("Midline: {}".format(text), 8000)
-    except Exception:
-        pass
+def _notify_midline(text: str, error: bool = False) -> None:
+    notify("Midline", text, error=error)
 
 
 # ---------------------------------------------------------------------------
@@ -1470,7 +1498,7 @@ def _notify_midline(text, error=False):
 # ---------------------------------------------------------------------------
 
 
-class MirrorWithConstraintsCommand:
+class MirrorWithConstraintsCommand(SketcherCommand):
     """``FusionMyFreeCAD_MirrorWithConstraints`` ribbon command."""
 
     def GetResources(self):
@@ -1486,19 +1514,11 @@ class MirrorWithConstraintsCommand:
             ),
         }
 
-    def IsActive(self):
-        if getattr(App, "ActiveDocument", None) is None:
-            return False
-        try:
-            return Gui.activeWorkbench().name() == "SketcherWorkbench"
-        except Exception:
-            return False
-
     def Activated(self):
         mirror_with_constraints()
 
 
-class AddMidlineCommand:
+class AddMidlineCommand(SketcherCommand):
     """``FusionMyFreeCAD_AddMidline`` ribbon command."""
 
     def GetResources(self):
@@ -1512,14 +1532,6 @@ class AddMidlineCommand:
                 "- 1 Line: perpendicular bisector symmetry axis across line endpoints."
             ),
         }
-
-    def IsActive(self):
-        if getattr(App, "ActiveDocument", None) is None:
-            return False
-        try:
-            return Gui.activeWorkbench().name() == "SketcherWorkbench"
-        except Exception:
-            return False
 
     def Activated(self):
         add_midline()
@@ -1746,20 +1758,11 @@ def constrain_midpoint(sketch=None):
         return {"status": "error", "message": str(exc)}
 
 
-def _notify_midpoint(text, error=False):
-    """Show a non-modal result: report view line plus a transient status message."""
-    printer = App.Console.PrintError if error else App.Console.PrintMessage
-    printer("FusionMyFreeCAD Midpoint: {}\n".format(text))
-    try:
-        window = Gui.getMainWindow()
-        status_bar = window.statusBar() if window is not None else None
-        if status_bar is not None:
-            status_bar.showMessage("Midpoint: {}".format(text), 8000)
-    except Exception:
-        pass
+def _notify_midpoint(text: str, error: bool = False) -> None:
+    notify("Midpoint", text, error=error)
 
 
-class ConstrainMidpointCommand:
+class ConstrainMidpointCommand(SketcherCommand):
     """``FusionMyFreeCAD_ConstrainMidpoint`` ribbon command."""
 
     def GetResources(self):
@@ -1774,16 +1777,603 @@ class ConstrainMidpointCommand:
             ),
         }
 
-    def IsActive(self):
-        if getattr(App, "ActiveDocument", None) is None:
-            return False
-        try:
-            return Gui.activeWorkbench().name() == "SketcherWorkbench"
-        except Exception:
-            return False
-
     def Activated(self):
         constrain_midpoint()
+
+
+# ---------------------------------------------------------------------------
+# Smart Slot Generator
+# ---------------------------------------------------------------------------
+
+
+def create_smart_slot(sketch, p1, p2, radius=5.0):
+    """Construct a fully-constrained, parametric Center-to-Center Slot."""
+    import Sketcher
+
+    x1, y1 = float(p1[0]), float(p1[1])
+    x2, y2 = float(p2[0]), float(p2[1])
+    dx, dy = x2 - x1, y2 - y1
+    length = math_hypot(dx, dy)
+    if length <= TOLERANCE:
+        x2 = x1 + 40.0
+        dx = 40.0
+        length = 40.0
+
+    ux, uy = dx / length, dy / length
+    nx, ny = -uy, ux
+
+    # 1. Central construction midline
+    mid_id = _add_line(sketch, (x1, y1), (x2, y2), construction=True)
+
+    # 2. Side line 1
+    s1 = (x1 + radius * nx, y1 + radius * ny)
+    e1 = (x2 + radius * nx, y2 + radius * ny)
+    line1_id = _add_line(sketch, s1, e1, construction=False)
+
+    # 3. Side line 2
+    s2 = (x2 - radius * nx, y2 - radius * ny)
+    e2 = (x1 - radius * nx, y1 - radius * ny)
+    line2_id = _add_line(sketch, s2, e2, construction=False)
+
+    # 4. Arc 1 at p2 (connecting e1 to s2)
+    arc1_id = _add_arc(sketch, (x2, y2), e1, s2, construction=False)
+
+    # 5. Arc 2 at p1 (connecting e2 to s1)
+    arc2_id = _add_arc(sketch, (x1, y1), e2, s1, construction=False)
+
+    # Coincident connections to form closed contour
+    _safe_add_constraint(
+        sketch, Sketcher.Constraint("Coincident", line1_id, _POS_END, arc1_id, _POS_START)
+    )
+    _safe_add_constraint(
+        sketch, Sketcher.Constraint("Coincident", arc1_id, _POS_END, line2_id, _POS_START)
+    )
+    _safe_add_constraint(
+        sketch, Sketcher.Constraint("Coincident", line2_id, _POS_END, arc2_id, _POS_START)
+    )
+    _safe_add_constraint(
+        sketch, Sketcher.Constraint("Coincident", arc2_id, _POS_END, line1_id, _POS_START)
+    )
+
+    # Arc centers attached to midline endpoints
+    _safe_add_constraint(
+        sketch, Sketcher.Constraint("Coincident", arc1_id, _POS_CENTER, mid_id, _POS_END)
+    )
+    _safe_add_constraint(
+        sketch, Sketcher.Constraint("Coincident", arc2_id, _POS_CENTER, mid_id, _POS_START)
+    )
+
+    # Tangents between lines and arcs
+    _safe_add_constraint(sketch, Sketcher.Constraint("Tangent", line1_id, arc1_id))
+    _safe_add_constraint(sketch, Sketcher.Constraint("Tangent", arc1_id, line2_id))
+    _safe_add_constraint(sketch, Sketcher.Constraint("Tangent", line2_id, arc2_id))
+    _safe_add_constraint(sketch, Sketcher.Constraint("Tangent", arc2_id, line1_id))
+
+    # Parallel & Equal lengths
+    _safe_add_constraint(sketch, Sketcher.Constraint("Parallel", line1_id, mid_id))
+    _safe_add_constraint(sketch, Sketcher.Constraint("Equal", line1_id, line2_id))
+    _safe_add_constraint(sketch, Sketcher.Constraint("Equal", arc1_id, arc2_id))
+
+    # Symmetry
+    _safe_add_constraint(
+        sketch, Sketcher.Constraint("Symmetric", line1_id, _POS_START, line2_id, _POS_END, mid_id)
+    )
+
+    # Driving dimensions
+    _safe_add_constraint(sketch, Sketcher.Constraint("Distance", mid_id, length))
+    _safe_add_constraint(sketch, Sketcher.Constraint("Radius", arc1_id, radius))
+
+    _recompute(sketch)
+    return {
+        "status": "ok",
+        "midline": mid_id,
+        "line1": line1_id,
+        "line2": line2_id,
+        "arc1": arc1_id,
+        "arc2": arc2_id,
+    }
+
+
+def add_smart_slot(radius=5.0):
+    """Create a parametric smart slot from active sketch selection or defaults."""
+    sketch = active_sketch()
+    if sketch is None:
+        _notify_slot("start editing a sketch first.", error=True)
+        return {"status": "no-sketch"}
+
+    kind, data, _error = selected_midline_references(sketch)
+    p1, p2 = (-20.0, 0.0), (20.0, 0.0)
+    if kind == "points" and len(data) == 2:
+        p1 = data[0]["point"]
+        p2 = data[1]["point"]
+    elif kind == "line":
+        geos = _geometry_list(sketch)
+        if 0 <= data < len(geos):
+            g = geos[data]
+            sp = geometry_point(g, _POS_START)
+            ep = geometry_point(g, _POS_END)
+            if sp and ep:
+                p1, p2 = sp, ep
+
+    document = getattr(App, "ActiveDocument", None)
+    _open_transaction(document, "Create Smart Slot")
+    try:
+        result = create_smart_slot(sketch, p1, p2, radius=radius)
+        _commit_transaction(document)
+    except Exception as exc:
+        _abort_transaction(document)
+        _notify_slot("failed and was rolled back: {}".format(exc), error=True)
+        return {"status": "error", "error": str(exc)}
+
+    _notify_slot("created parametric smart slot.")
+    return result
+
+
+def _notify_slot(text: str, error: bool = False) -> None:
+    notify("Smart Slot", text, error=error)
+
+
+class SmartSlotCommand(SketcherCommand):
+    """``FusionMyFreeCAD_CreateSlot`` ribbon command."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": "FusionMyFreeCAD_CreateSlot",
+            "MenuText": "Smart Slot",
+            "ToolTip": (
+                "Create a parametric Center-to-Center Slot with auto-applied tangency, "
+                "equality, and symmetry constraints.\n"
+                "- Select 2 points or 1 line to place the slot along reference geometry,\n"
+                "- or click with no selection to generate a standard parametric slot."
+            ),
+        }
+
+    def Activated(self):
+        add_smart_slot()
+
+
+# ---------------------------------------------------------------------------
+# Smart Loop Offset Wrapper
+# ---------------------------------------------------------------------------
+
+
+def detect_contour_chains(sketch, edge_ids=None):
+    """Walk sketch edges and return continuous connected chains."""
+    geos = _geometry_list(sketch)
+    if edge_ids is None:
+        edge_ids = [i for i, g in enumerate(geos) if not getattr(g, "Construction", False)]
+    if not edge_ids:
+        return []
+
+    remaining = list(edge_ids)
+    chains = []
+
+    while remaining:
+        first = remaining.pop(0)
+        chain = [{"geoid": first, "reversed": False}]
+        g_first = geos[first]
+        p_start = geometry_point(g_first, _POS_START)
+        p_end = geometry_point(g_first, _POS_END)
+
+        extended = True
+        while extended:
+            extended = False
+            for idx, cand in enumerate(remaining):
+                g_cand = geos[cand]
+                cs = geometry_point(g_cand, _POS_START)
+                ce = geometry_point(g_cand, _POS_END)
+                if cs is not None and p_end is not None and points_equal(p_end, cs):
+                    chain.append({"geoid": cand, "reversed": False})
+                    remaining.pop(idx)
+                    p_end = ce
+                    extended = True
+                    break
+                elif ce is not None and p_end is not None and points_equal(p_end, ce):
+                    chain.append({"geoid": cand, "reversed": True})
+                    remaining.pop(idx)
+                    p_end = cs
+                    extended = True
+                    break
+
+        is_closed = False
+        if p_start is not None and p_end is not None and points_equal(p_start, p_end):
+            is_closed = True
+        chains.append({"edges": chain, "closed": is_closed})
+
+    return chains
+
+
+def create_smart_offset(sketch, edge_ids, offset_dist=5.0):
+    """Generate a parametric offset of the given edges, maintaining parallel/concentric intent."""
+    import Sketcher
+
+    geos = _geometry_list(sketch)
+    if not edge_ids:
+        return {"status": "no-edges"}
+
+    chains = detect_contour_chains(sketch, edge_ids)
+    if not chains:
+        return {"status": "empty-chains"}
+
+    created_geoids = []
+    parent_child_map = {}
+
+    for chain in chains:
+        edges = chain["edges"]
+        chain_created = []
+
+        # 1. Compute raw offset points for each segment
+        raw_offsets = []
+        for item in edges:
+            gid = item["geoid"]
+            g = geos[gid]
+            kind = _geometry_kind(g)
+            if kind == "line":
+                p1 = geometry_point(g, _POS_START)
+                p2 = geometry_point(g, _POS_END)
+                if p1 is None or p2 is None:
+                    continue
+                dx = p2[0] - p1[0]
+                dy = p2[1] - p1[1]
+                length = math_hypot(dx, dy)
+                if length <= TOLERANCE:
+                    continue
+                nx, ny = -dy / length, dx / length
+                sp = (p1[0] + offset_dist * nx, p1[1] + offset_dist * ny)
+                ep = (p2[0] + offset_dist * nx, p2[1] + offset_dist * ny)
+                raw_offsets.append(
+                    {
+                        "geoid": gid,
+                        "kind": "line",
+                        "start": sp,
+                        "end": ep,
+                        "dir": (dx / length, dy / length),
+                    }
+                )
+            elif kind in ("circle", "arc"):
+                center = geometry_point(g, _POS_CENTER)
+                r = getattr(g, "Radius", 10.0)
+                new_r = max(1.0, r + offset_dist)
+                sp = geometry_point(g, _POS_START)
+                ep = geometry_point(g, _POS_END)
+                raw_offsets.append(
+                    {
+                        "geoid": gid,
+                        "kind": kind,
+                        "center": center,
+                        "radius": new_r,
+                        "start": sp,
+                        "end": ep,
+                    }
+                )
+
+        if not raw_offsets:
+            continue
+
+        # 2. Add offset geometry
+        for item in raw_offsets:
+            if item["kind"] == "line":
+                new_id = _add_line(sketch, item["start"], item["end"], construction=False)
+            elif item["kind"] == "arc":
+                new_id = _add_arc(
+                    sketch, item["center"], item["start"], item["end"], construction=False
+                )
+            else:
+                new_id = _add_line(sketch, item["start"], item["end"], construction=False)
+            chain_created.append((item["geoid"], new_id, item["kind"]))
+            created_geoids.append(new_id)
+            parent_child_map[item["geoid"]] = new_id
+
+        # 3. Add Coincident constraints between adjacent offset segments
+        for i in range(len(chain_created) - (0 if chain["closed"] else 1)):
+            next_i = (i + 1) % len(chain_created)
+            curr_child = chain_created[i][1]
+            next_child = chain_created[next_i][1]
+            _safe_add_constraint(
+                sketch,
+                Sketcher.Constraint("Coincident", curr_child, _POS_END, next_child, _POS_START),
+            )
+
+        # 4. Add Parallel constraints to parent lines & concentricity to parent arcs
+        for p_id, c_id, kind in chain_created:
+            if kind == "line":
+                _safe_add_constraint(sketch, Sketcher.Constraint("Parallel", c_id, p_id))
+            elif kind in ("arc", "circle"):
+                _safe_add_constraint(
+                    sketch, Sketcher.Constraint("Coincident", c_id, _POS_CENTER, p_id, _POS_CENTER)
+                )
+
+        # 5. Insert single driving dimension constraint between first parent and child
+        if chain_created:
+            p0, c0, k0 = chain_created[0]
+            if k0 == "line":
+                _safe_add_constraint(
+                    sketch,
+                    Sketcher.Constraint(
+                        "Distance", p0, _POS_START, c0, _POS_START, abs(offset_dist)
+                    ),
+                )
+            elif k0 in ("arc", "circle"):
+                _safe_add_constraint(
+                    sketch,
+                    Sketcher.Constraint(
+                        "Radius", c0, getattr(geos[p0], "Radius", 10.0) + offset_dist
+                    ),
+                )
+
+    _recompute(sketch)
+    return {
+        "status": "ok",
+        "created": created_geoids,
+        "mapping": parent_child_map,
+    }
+
+
+def add_smart_offset(offset_dist=5.0):
+    """Create a parametric loop offset from sketch selection."""
+    sketch = active_sketch()
+    if sketch is None:
+        _notify_offset("start editing a sketch first.", error=True)
+        return {"status": "no-sketch"}
+
+    getter = getattr(Gui.Selection, "getSelectionEx", None)
+    selected_edges = []
+    if callable(getter):
+        for entry in getter() or []:
+            if getattr(entry, "Object", None) is sketch or selection_object_name(entry) == getattr(
+                sketch, "Name", None
+            ):
+                for sub in getattr(entry, "SubElementNames", []) or []:
+                    if sub.startswith("Edge"):
+                        try:
+                            selected_edges.append(int(sub[4:]) - 1)
+                        except ValueError:
+                            pass
+
+    if not selected_edges:
+        geos = _geometry_list(sketch)
+        selected_edges = [i for i, g in enumerate(geos) if not getattr(g, "Construction", False)]
+
+    if not selected_edges:
+        _notify_offset("no sketch edges available to offset.", error=True)
+        return {"status": "no-edges"}
+
+    document = getattr(App, "ActiveDocument", None)
+    _open_transaction(document, "Smart Loop Offset")
+    try:
+        result = create_smart_offset(sketch, selected_edges, offset_dist=offset_dist)
+        _commit_transaction(document)
+    except Exception as exc:
+        _abort_transaction(document)
+        _notify_offset("offset failed: {}".format(exc), error=True)
+        return {"status": "error", "error": str(exc)}
+
+    _notify_offset(f"offset {len(result.get('created', []))} segment(s) parametrically.")
+    return result
+
+
+def _notify_offset(text: str, error: bool = False) -> None:
+    notify("Smart Offset", text, error=error)
+
+
+class SmartOffsetCommand(SketcherCommand):
+    """``FusionMyFreeCAD_SmartOffset`` ribbon command."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": "FusionMyFreeCAD_SmartOffset",
+            "MenuText": "Smart Offset",
+            "ToolTip": (
+                "Create a parametric loop offset with preserved parallel, tangent, and "
+                "coincident relationships driven by a single offset dimension."
+            ),
+        }
+
+    def Activated(self):
+        add_smart_offset()
+
+
+# ---------------------------------------------------------------------------
+# Trimming Coincident Repair
+# ---------------------------------------------------------------------------
+
+
+def capture_curve_attachments(sketch, geoid):
+    """Record all coincident and point-on-object constraints touching geoid."""
+    records = []
+    for idx, c in enumerate(getattr(sketch, "Constraints", []) or []):
+        ctype = getattr(c, "Type", "")
+        if ctype in ("Coincident", "PointOnObject"):
+            if c.First == geoid or c.Second == geoid or getattr(c, "Third", -2000) == geoid:
+                records.append(
+                    {
+                        "index": idx,
+                        "type": ctype,
+                        "first": c.First,
+                        "first_pos": getattr(c, "FirstPos", 0),
+                        "second": c.Second,
+                        "second_pos": getattr(c, "SecondPos", 0),
+                        "third": getattr(c, "Third", -2000),
+                    }
+                )
+    return records
+
+
+def repair_trimmed_coincidents(sketch, target_geoid, new_endpoint=None):
+    """Reconnect broken constraints after a trim operation."""
+    import Sketcher
+
+    attachments = capture_curve_attachments(sketch, target_geoid)
+    if not attachments:
+        return 0
+
+    reconnected = 0
+    geos = _geometry_list(sketch)
+    if not (0 <= target_geoid < len(geos)):
+        return 0
+
+    for rec in attachments:
+        ctype = rec["type"]
+        other_id = rec["second"] if rec["first"] == target_geoid else rec["first"]
+        other_pos = rec["second_pos"] if rec["first"] == target_geoid else rec["first_pos"]
+        target_pos = rec["first_pos"] if rec["first"] == target_geoid else rec["second_pos"]
+
+        if ctype == "Coincident":
+            c = Sketcher.Constraint("Coincident", target_geoid, target_pos, other_id, other_pos)
+            if _safe_add_constraint(sketch, c):
+                reconnected += 1
+        elif ctype == "PointOnObject":
+            c = Sketcher.Constraint("PointOnObject", other_id, other_pos, target_geoid)
+            if _safe_add_constraint(sketch, c):
+                reconnected += 1
+
+    _recompute(sketch)
+    return reconnected
+
+
+# ---------------------------------------------------------------------------
+# Human-Readable Solver Diagnostics
+# ---------------------------------------------------------------------------
+
+
+def _format_constraint_readable(sketch, idx):
+    """Return a human-readable description of the constraint at idx."""
+    import math
+
+    constraints = list(getattr(sketch, "Constraints", []) or [])
+    if not (0 <= idx < len(constraints)):
+        return f"Constraint #{idx}"
+    c = constraints[idx]
+    ctype = getattr(c, "Type", "Unknown")
+    geos = _geometry_list(sketch)
+
+    def describe_element(geoid, posid):
+        if geoid == -1:
+            return "X-Axis"
+        if geoid == -2:
+            return "Y-Axis"
+        if geoid == -3:
+            return "Origin"
+        if 0 <= geoid < len(geos):
+            g = geos[geoid]
+            kind = _geometry_kind(g).capitalize()
+            pos_name = {1: "Start", 2: "End", 3: "Center"}.get(posid, "")
+            if pos_name:
+                return f"{kind} {geoid} ({pos_name})"
+            return f"{kind} {geoid}"
+        return f"Geo {geoid}"
+
+    first_str = describe_element(getattr(c, "First", -2000), getattr(c, "FirstPos", 0))
+    second_id = getattr(c, "Second", -2000)
+    second_str = (
+        describe_element(second_id, getattr(c, "SecondPos", 0)) if second_id != -2000 else ""
+    )
+    val = getattr(c, "Value", 0.0)
+
+    if val and ctype in ("Distance", "DistanceX", "DistanceY", "Radius", "Diameter", "Angle"):
+        val_str = f" ({val:.2f} mm)" if ctype != "Angle" else f" ({math.degrees(val):.1f}°)"
+    else:
+        val_str = ""
+
+    if second_str:
+        return f"Constraint #{idx}: {ctype}{val_str} between {first_str} and {second_str}"
+    return f"Constraint #{idx}: {ctype}{val_str} on {first_str}"
+
+
+def diagnose_sketch_solver(sketch):
+    """Analyze sketch solver state and return human-readable diagnostic report."""
+    redundant = list(getattr(sketch, "RedundantConstraints", []) or [])
+    conflicting = list(getattr(sketch, "ConflictingConstraints", []) or [])
+    malformed = list(getattr(sketch, "MalformedConstraints", []) or [])
+    partial = list(getattr(sketch, "PartiallyRedundantConstraints", []) or [])
+    dof = getattr(sketch, "DoF", 0)
+
+    report = {
+        "is_clean": not (redundant or conflicting or malformed),
+        "dof": dof,
+        "redundant": [_format_constraint_readable(sketch, i) for i in redundant],
+        "conflicting": [_format_constraint_readable(sketch, i) for i in conflicting],
+        "malformed": [_format_constraint_readable(sketch, i) for i in malformed],
+        "partial": [_format_constraint_readable(sketch, i) for i in partial],
+        "raw_redundant": redundant,
+        "raw_conflicting": conflicting,
+    }
+    return report
+
+
+def remove_redundant_constraints(sketch):
+    """Remove all flagged redundant constraints in one atomic transaction."""
+    redundant = sorted(getattr(sketch, "RedundantConstraints", []) or [], reverse=True)
+    if not redundant:
+        return 0
+
+    document = getattr(App, "ActiveDocument", None)
+    _open_transaction(document, "Remove Redundant Constraints")
+    removed = 0
+    try:
+        for idx in redundant:
+            _drop_constraint(sketch, idx)
+            removed += 1
+        _recompute(sketch)
+        _commit_transaction(document)
+    except Exception:
+        _abort_transaction(document)
+        raise
+    return removed
+
+
+def run_solver_diagnostics():
+    """Diagnose the active sketch and report readable diagnostic messages."""
+    sketch = active_sketch()
+    if sketch is None:
+        _notify_diagnostics("start editing a sketch first.", error=True)
+        return {"status": "no-sketch"}
+
+    report = diagnose_sketch_solver(sketch)
+    if report["is_clean"]:
+        msg = f"Sketch is healthy: DoF {report['dof']}, 0 conflicts, 0 redundant constraints."
+        _notify_diagnostics(msg)
+        return {"status": "clean", "report": report}
+
+    App.Console.PrintWarning("=== FusionMyFreeCAD Solver Diagnostics ===\n")
+    if report["conflicting"]:
+        App.Console.PrintError("Conflicting constraints:\n")
+        for line in report["conflicting"]:
+            App.Console.PrintError(f"  - {line}\n")
+    if report["redundant"]:
+        App.Console.PrintWarning("Redundant constraints:\n")
+        for line in report["redundant"]:
+            App.Console.PrintWarning(f"  - {line}\n")
+        removed = remove_redundant_constraints(sketch)
+        App.Console.PrintMessage(f"Auto-removed {removed} redundant constraint(s).\n")
+
+    summary = (
+        f"Diagnosed: {len(report['conflicting'])} conflicting, "
+        f"{len(report['redundant'])} redundant."
+    )
+    _notify_diagnostics(summary, error=bool(report["conflicting"]))
+    return {"status": "diagnosed", "report": report}
+
+
+def _notify_diagnostics(text: str, error: bool = False) -> None:
+    notify("Diagnostics", text, error=error)
+
+
+class SolverDiagnosticsCommand(SketcherCommand):
+    """``FusionMyFreeCAD_SolverDiagnostics`` ribbon command."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": "FusionMyFreeCAD_SolverDiagnostics",
+            "MenuText": "Solver Diagnostics",
+            "ToolTip": (
+                "Inspect sketch solver conflicts and redundant constraints with "
+                "human-readable geometry descriptions and 1-click auto-cleanup."
+            ),
+        }
+
+    def Activated(self):
+        run_solver_diagnostics()
 
 
 def _register_icon_path():
@@ -1816,3 +2406,6 @@ def register(add_command=None):
     register_with("FusionMyFreeCAD_MirrorWithConstraints", MirrorWithConstraintsCommand())
     register_with("FusionMyFreeCAD_AddMidline", AddMidlineCommand())
     register_with("FusionMyFreeCAD_ConstrainMidpoint", ConstrainMidpointCommand())
+    register_with("FusionMyFreeCAD_CreateSlot", SmartSlotCommand())
+    register_with("FusionMyFreeCAD_SmartOffset", SmartOffsetCommand())
+    register_with("FusionMyFreeCAD_SolverDiagnostics", SolverDiagnosticsCommand())

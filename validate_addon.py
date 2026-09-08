@@ -23,15 +23,18 @@ def main() -> int:
     if result.returncode != 0:
         return result.returncode
 
-    package_files = [
-        ROOT / "Init.py",
-        ROOT / "InitGui.py",
-        ROOT / "fusion_bootstrap.py",
-        ROOT / "fusion_sketch_tools.py",
-        ROOT / "package.xml",
-        ROOT / "LICENSE",
-        ROOT / "THIRD_PARTY_NOTICES.md",
-    ]
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from fusion_common import RUNTIME_MODULES
+
+    package_files = [ROOT / name for name in RUNTIME_MODULES]
+    package_files.extend(
+        [
+            ROOT / "package.xml",
+            ROOT / "LICENSE",
+            ROOT / "THIRD_PARTY_NOTICES.md",
+        ]
+    )
     package_files.extend(
         path
         for package_root in (ROOT / "Resources", ROOT / "bundled-addons")

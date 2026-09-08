@@ -1,0 +1,182 @@
+/* ==========================================================================
+   MODERN ZINC CAD UI STYLESHEET FOR FREECAD
+   Tailwind Zinc & Radix Tokens — 0px Bevels, 1px Subtle Borders
+   ========================================================================== */
+
+* {
+    font-family: "Inter", "Segoe UI Variable Text", "SF Pro Text", -apple-system, sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    color: #e4e4e7;
+    background-color: transparent;
+    selection-background-color: #2563eb;
+    selection-color: #ffffff;
+    outline: none;
+}
+
+/* Base Window Surfaces */
+QMainWindow, QDialog {
+    background-color: #18181b;
+    color: #e4e4e7;
+}
+
+QWidget:disabled {
+    color: #71717a;
+}
+
+/* Toolbars: Clean Modern Horizontal Bar */
+QToolBar {
+    background-color: #18181b;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    spacing: 3px;
+    padding: 3px 6px;
+}
+
+QToolBar::separator {
+    width: 1px;
+    background-color: #27272a;
+    margin: 5px 6px;
+}
+
+/* Push & Tool Buttons */
+QPushButton, QToolButton {
+    background-color: #27272a;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 4px 8px;
+    min-height: 22px;
+    color: #e4e4e7;
+}
+
+QPushButton:hover, QToolButton:hover {
+    background-color: #3f3f46;
+    border-color: #52525b;
+    color: #fafafa;
+}
+
+QPushButton:pressed, QToolButton:pressed, QToolButton:checked {
+    background-color: #09090b;
+    border-color: #3b82f6;
+    color: #60a5fa;
+}
+
+/* Dock Widgets */
+QDockWidget {
+    background-color: #18181b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    titlebar-close-icon: none;
+    titlebar-normal-icon: none;
+}
+
+QDockWidget::title {
+    background-color: #202124;
+    color: #a1a1aa;
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-weight: 600;
+    text-align: left;
+}
+
+/* Model Tree, Lists & Table Views */
+QTreeView, QListView, QTableView {
+    background-color: #09090b;
+    border: 1px solid #27272a;
+    border-radius: 6px;
+    alternate-background-color: #121215;
+    padding: 3px;
+    color: #e4e4e7;
+}
+
+QTreeView::item {
+    min-height: 26px;
+    border-radius: 4px;
+    padding-left: 4px;
+}
+
+QTreeView::item:hover {
+    background-color: #27272a;
+}
+
+QTreeView::item:selected {
+    background-color: #1e3a8a;
+    color: #93c5fd;
+}
+
+/* Modern Tab Bar */
+QTabBar::tab {
+    background-color: transparent;
+    color: #a1a1aa;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 6px 14px;
+    margin-right: 4px;
+}
+
+QTabBar::tab:hover {
+    color: #fafafa;
+}
+
+QTabBar::tab:selected {
+    color: #ffffff;
+    font-weight: 500;
+    border-bottom: 2px solid #3b82f6;
+}
+
+/* Menus & Popups */
+QMenu {
+    background-color: #202124;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    padding: 5px;
+}
+
+QMenu::item {
+    padding: 6px 24px 6px 10px;
+    border-radius: 4px;
+    color: #e4e4e7;
+}
+
+QMenu::item:selected {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+/* Input Fields & Spinboxes */
+QLineEdit, QSpinBox, QDoubleSpinBox {
+    background-color: #27272a;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 5px;
+    padding: 4px 8px;
+    color: #f4f4f5;
+}
+
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+    border-color: #3b82f6;
+    background-color: #18181b;
+}
+
+/* Splitters */
+QSplitter::handle {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+QSplitter::handle:horizontal {
+    width: 2px;
+}
+
+QSplitter::handle:vertical {
+    height: 2px;
+}
+
+QSplitter::handle:hover {
+    background-color: #3b82f6;
+}
+
+/* Status Bar */
+QStatusBar {
+    background-color: #18181b;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    color: #71717a;
+}

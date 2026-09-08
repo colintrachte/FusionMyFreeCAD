@@ -18,6 +18,12 @@ def env(tmp_path):
     environment = Environment(tmp_path / "FreeCAD").install()
     yield environment
     FakeTimer.reset()
+    for name in [
+        k
+        for k in list(sys.modules.keys())
+        if k.startswith("fusion_") or k == "_fusion_my_freecad_runtime"
+    ]:
+        sys.modules.pop(name, None)
     for name in (
         "FreeCAD",
         "FreeCADGui",
@@ -27,9 +33,6 @@ def env(tmp_path):
         "PySide.QtWidgets",
         "Sketcher",
         "Part",
-        "fusion_bootstrap",
-        "fusion_sketch_tools",
-        "_fusion_my_freecad_runtime",
     ):
         sys.modules.pop(name, None)
 

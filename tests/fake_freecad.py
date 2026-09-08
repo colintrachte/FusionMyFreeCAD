@@ -26,13 +26,13 @@ class ParameterGroup:
     """Mimics FreeCAD's ParameterGrp Get/Set/Rem accessors."""
 
     def __init__(self):
-        self.values = {"String": {}, "Bool": {}, "Int": {}, "Float": {}}
+        self.values = {"String": {}, "Bool": {}, "Int": {}, "Float": {}, "Unsigned": {}}
 
     def __getattr__(self, name):
         if (
             name.startswith("Get")
             and name.endswith("s")
-            and name[3:-1] in ("String", "Bool", "Int", "Float")
+            and name[3:-1] in ("String", "Bool", "Int", "Float", "Unsigned")
         ):
             kind = name[3:-1]
             return lambda: list(self.values[kind])
@@ -85,9 +85,18 @@ class FakeObject:
         self.Name = name
         self.Label = name
         self.Placement = FakePlacement()
+        self.Reversed = False
+        self.Length = 0.0
+        self.Visibility = True
 
     def isDerivedFrom(self, type_name):
         return type_name == self.TypeId
+
+    def isValid(self):
+        return True
+
+    def recompute(self):
+        pass
 
     def getGlobalPlacement(self):
         return self.Placement
@@ -97,17 +106,61 @@ class FakeSheet(FakeObject):
     def __init__(self, name):
         super().__init__("Spreadsheet::Sheet", name)
         self.cells = {}
+        self.aliases = {}
         self.styles = []
         self.widths = {}
 
     def set(self, cell, value):
         self.cells[cell] = value
 
+    def get(self, cell):
+        return self.cells.get(cell, None)
+
+    def setAlias(self, cell, alias):
+        self.aliases[cell] = alias
+
+    def getAlias(self, cell):
+        return self.aliases.get(cell, None)
+
     def setStyle(self, *arguments):
         self.styles.append(arguments)
 
     def setColumnWidth(self, column, width):
         self.widths[column] = width
+
+
+class FakePlane(FakeObject):
+    def __init__(self, name):
+        super().__init__("PartDesign::Plane", name)
+        self.AttachmentSupport = []
+        self.MapMode = ""
+
+
+class FakeBody(FakeObject):
+    def __init__(self, name):
+        super().__init__("PartDesign::Body", name)
+        self.Group = []
+        self.Tip = None
+
+    def newObject(self, type_name, name):
+        obj = FakePlane(name) if type_name == "PartDesign::Plane" else FakeObject(type_name, name)
+        doc = getattr(self, "Document", None)
+        obj.Document = doc
+        self.Group.append(obj)
+        self.Tip = obj
+        if doc is not None and obj not in doc.Objects:
+            doc.Objects.append(obj)
+        return obj
+
+    def addObject(self, obj):
+        if obj not in self.Group:
+            self.Group.append(obj)
+        self.Tip = obj
+        doc = getattr(self, "Document", None)
+        if doc is not None and obj not in doc.Objects:
+            doc.Objects.append(obj)
+        if getattr(obj, "Document", None) is None:
+            obj.Document = doc
 
 
 class FakeDocument:
@@ -119,9 +172,23 @@ class FakeDocument:
         self.open_transaction = None
 
     def addObject(self, type_name, name):
-        obj = FakeSheet(name) if type_name == "Spreadsheet::Sheet" else FakeObject(type_name, name)
+        if type_name == "Spreadsheet::Sheet":
+            obj = FakeSheet(name)
+        elif type_name == "PartDesign::Body":
+            obj = FakeBody(name)
+        elif type_name == "PartDesign::Plane":
+            obj = FakePlane(name)
+        else:
+            obj = FakeObject(type_name, name)
+        obj.Document = self
         self.Objects.append(obj)
         return obj
+
+    def getObject(self, name):
+        for obj in self.Objects:
+            if getattr(obj, "Name", None) == name or getattr(obj, "Label", None) == name:
+                return obj
+        return None
 
     def recompute(self):
         self.recomputes += 1
@@ -138,6 +205,13 @@ class FakeDocument:
     def abortTransaction(self):
         self.transactions.append(("abort", self.open_transaction))
         self.open_transaction = None
+
+    def removeObject(self, obj_or_name):
+        name = obj_or_name if isinstance(obj_or_name, str) else getattr(obj_or_name, "Name", None)
+        self.Objects = [o for o in self.Objects if getattr(o, "Name", None) != name]
+        for obj in self.Objects:
+            if getattr(obj, "TypeId", "") == "PartDesign::Body" and hasattr(obj, "Group"):
+                obj.Group = [g for g in obj.Group if getattr(g, "Name", None) != name]
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +297,108 @@ class FakePoint:
         self.Y = float(point.y if hasattr(point, "y") else point[1])
         self.Z = float(point.z if hasattr(point, "z") else (point[2] if len(point) > 2 else 0.0))
         self.Construction = construction
+
+
+class FakeCircle:
+    """Stand-in for Part.Circle inside a sketch."""
+
+    def __init__(self, center, axis_or_radius=None, radius=1.0, construction=False):
+        self.TypeId = "Part::GeomCircle"
+        self.Center = (
+            FakeVector(center[0], center[1], 0.0)
+            if hasattr(center, "__getitem__")
+            else FakeVector(center.x, center.y, getattr(center, "z", 0.0))
+        )
+        if isinstance(axis_or_radius, (int, float)):
+            self.Radius = float(axis_or_radius)
+        elif radius is not None:
+            self.Radius = float(radius)
+        else:
+            self.Radius = 1.0
+        self.Construction = construction
+
+    def reflected(self, axis_a, axis_b):
+        return FakeCircle(
+            _reflect(self.Center, axis_a, axis_b),
+            self.Radius,
+            construction=self.Construction,
+        )
+
+
+class FakeArcOfCircle:
+    """Stand-in for Part.ArcOfCircle inside a sketch."""
+
+    def __init__(self, circle_or_p1, p2_or_u1=None, p3_or_u2=None, construction=False):
+        import math
+
+        self.TypeId = "Part::GeomArcOfCircle"
+        self.Construction = construction
+        if hasattr(circle_or_p1, "Center") and hasattr(circle_or_p1, "Radius"):
+            self.Center = FakeVector(circle_or_p1.Center.x, circle_or_p1.Center.y, 0.0)
+            self.Radius = float(circle_or_p1.Radius)
+            u1 = float(p2_or_u1) if p2_or_u1 is not None else 0.0
+            u2 = float(p3_or_u2) if p3_or_u2 is not None else math.pi
+            self.StartPoint = FakeVector(
+                self.Center.x + self.Radius * math.cos(u1),
+                self.Center.y + self.Radius * math.sin(u1),
+                0.0,
+            )
+            self.EndPoint = FakeVector(
+                self.Center.x + self.Radius * math.cos(u2),
+                self.Center.y + self.Radius * math.sin(u2),
+                0.0,
+            )
+        elif hasattr(circle_or_p1, "x") or (
+            hasattr(circle_or_p1, "__len__") and len(circle_or_p1) >= 2
+        ):
+            p1 = circle_or_p1 if hasattr(circle_or_p1, "x") else FakeVector(*circle_or_p1)
+            p3 = (
+                p3_or_u2
+                if hasattr(p3_or_u2, "x")
+                else (FakeVector(*p3_or_u2) if p3_or_u2 is not None else FakeVector(0.0, 0.0, 0.0))
+            )
+            self.StartPoint = p1
+            self.EndPoint = p3
+            if p2_or_u1 is not None and (
+                hasattr(p2_or_u1, "x") or (hasattr(p2_or_u1, "__len__") and len(p2_or_u1) >= 2)
+            ):
+                p2 = p2_or_u1 if hasattr(p2_or_u1, "x") else FakeVector(*p2_or_u1)
+                ax, ay = p1.x, p1.y
+                bx, by = p2.x, p2.y
+                cx, cy = p3.x, p3.y
+                d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+                if abs(d) > 1e-6:
+                    ux = (
+                        (ax * ax + ay * ay) * (by - cy)
+                        + (bx * bx + by * by) * (cy - ay)
+                        + (cx * cx + cy * cy) * (ay - by)
+                    ) / d
+                    uy = (
+                        (ax * ax + ay * ay) * (cx - bx)
+                        + (bx * bx + by * by) * (ax - cx)
+                        + (cx * cx + cy * cy) * (bx - ax)
+                    ) / d
+                    self.Center = FakeVector(ux, uy, 0.0)
+                else:
+                    self.Center = FakeVector((ax + cx) / 2.0, (ay + cy) / 2.0, 0.0)
+            else:
+                self.Center = FakeVector((p1.x + p3.x) / 2.0, (p1.y + p3.y) / 2.0, 0.0)
+            dx = self.StartPoint.x - self.Center.x
+            dy = self.StartPoint.y - self.Center.y
+            self.Radius = math.hypot(dx, dy)
+        else:
+            self.StartPoint = FakeVector(0.0, 0.0, 0.0)
+            self.EndPoint = FakeVector(1.0, 0.0, 0.0)
+            self.Center = FakeVector(0.5, 0.0, 0.0)
+            self.Radius = 0.5
+
+    def reflected(self, axis_a, axis_b):
+        return FakeArcOfCircle(
+            _reflect(self.StartPoint, axis_a, axis_b),
+            _reflect(self.Center, axis_a, axis_b),
+            _reflect(self.EndPoint, axis_a, axis_b),
+            self.Construction,
+        )
 
 
 class FakeConstraint:
@@ -509,25 +685,55 @@ class FakeAction:
 
 
 class FakeDock:
-    def __init__(self, object_name="", window_title=""):
-        self._object_name = object_name
-        self._window_title = window_title
+    def __init__(self, *args, **kwargs):
+        self._object_name = kwargs.get("object_name", "")
+        self._window_title = kwargs.get("window_title", "")
+        self._parent = kwargs.get("parent", None)
+        if args:
+            if len(args) == 1:
+                if isinstance(args[0], str):
+                    self._window_title = args[0]
+                else:
+                    self._parent = args[0]
+            elif len(args) == 2:
+                if isinstance(args[0], str) and isinstance(args[1], str):
+                    self._object_name = args[0]
+                    self._window_title = args[1]
+                elif isinstance(args[0], str):
+                    self._window_title = args[0]
+                    self._parent = args[1]
         self.visible = False
         self.raised = False
         self._width = 100
         self.tabs = None
+        self._widget = None
 
     def objectName(self):
         return self._object_name
 
+    def setObjectName(self, name):
+        self._object_name = name
+
     def windowTitle(self):
         return self._window_title
+
+    def setWindowTitle(self, title):
+        self._window_title = title
+
+    def setWidget(self, widget):
+        self._widget = widget
+
+    def widget(self):
+        return self._widget
 
     def show(self):
         self.visible = True
 
     def hide(self):
         self.visible = False
+
+    def isVisible(self):
+        return self.visible
 
     def raise_(self):
         self.raised = True
@@ -543,6 +749,9 @@ class FakeDock:
 
     def findChild(self, _type):
         return self.tabs
+
+    def closeEvent(self, event):
+        pass
 
 
 class FakeTabWidget:
@@ -563,6 +772,288 @@ class FakeTabWidget:
 class FakeQtObject:
     def __init__(self, *_args, **_kwargs):
         pass
+
+
+class FakeLayout:
+    def __init__(self, parent=None):
+        self._parent = parent
+        self.widgets = []
+        self.layouts = []
+
+    def addWidget(self, widget):
+        self.widgets.append(widget)
+
+    def addLayout(self, layout):
+        self.layouts.append(layout)
+
+    def setContentsMargins(self, *args):
+        pass
+
+    def setSpacing(self, *args):
+        pass
+
+    def addStretch(self, *args):
+        pass
+
+
+class FakeQtWidget(FakeQtObject):
+    def __init__(self, parent=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._parent = parent
+        self._width = 800
+        self._height = 600
+        self._x = 0
+        self._y = 0
+        self._visible = True
+        self._installed_filters = []
+        self._text = ""
+        self.clicked = Signal()
+        self.returnPressed = Signal()
+
+    def parent(self):
+        return self._parent
+
+    def width(self):
+        return self._width
+
+    def height(self):
+        return self._height
+
+    def move(self, x, y):
+        self._x = x
+        self._y = y
+
+    def show(self):
+        self._visible = True
+
+    def hide(self):
+        self._visible = False
+
+    def close(self):
+        self._visible = False
+
+    def isVisible(self):
+        return self._visible
+
+    def setObjectName(self, name):
+        self._name = name
+
+    def objectName(self):
+        return getattr(self, "_name", "")
+
+    def setAttribute(self, *args):
+        pass
+
+    def setStyleSheet(self, *args):
+        pass
+
+    def installEventFilter(self, flt):
+        self._installed_filters.append(flt)
+
+    def eventFilter(self, watched, event):
+        return False
+
+    def text(self):
+        return self._text
+
+    def setText(self, val):
+        self._text = str(val)
+
+    def setToolTip(self, *args):
+        pass
+
+    def adjustSize(self):
+        pass
+
+    def setLayout(self, layout):
+        self._layout = layout
+
+
+class FakePushButton(FakeQtWidget):
+    def __init__(self, text="", parent=None):
+        super().__init__(parent)
+        self._text = text
+        self._tooltip = ""
+        self.clicked = Signal()
+
+    def text(self):
+        return self._text
+
+    def setText(self, text):
+        self._text = str(text)
+
+    def setToolTip(self, tip):
+        self._tooltip = tip
+
+
+class FakeTableWidgetItem:
+    def __init__(self, text=""):
+        self._text = str(text)
+        self._flags = 0xFFFF
+        self._roles = {}
+
+    def text(self):
+        return self._text
+
+    def setText(self, text):
+        self._text = str(text)
+
+    def flags(self):
+        return self._flags
+
+    def setFlags(self, flags):
+        self._flags = flags
+
+    def data(self, role):
+        return self._roles.get(role, None)
+
+    def setData(self, role, val):
+        self._roles[role] = val
+
+
+class FakeHeaderView:
+    Stretch = "stretch"
+
+    def __init__(self):
+        self.mode = None
+
+    def setSectionResizeMode(self, mode):
+        self.mode = mode
+
+
+class FakeTableWidget(FakeQtWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.columns = 0
+        self.headers = []
+        self._rows = []
+        self.cellChanged = Signal()
+        self._header = FakeHeaderView()
+        self._current_row = -1
+
+    def horizontalHeader(self):
+        return self._header
+
+    def setColumnCount(self, count):
+        self.columns = count
+
+    def setHorizontalHeaderLabels(self, labels):
+        self.headers = list(labels)
+
+    def rowCount(self):
+        return len(self._rows)
+
+    def setRowCount(self, count):
+        while len(self._rows) > count:
+            self._rows.pop()
+        while len(self._rows) < count:
+            self._rows.append([None] * self.columns)
+
+    def insertRow(self, index):
+        self._rows.insert(index, [None] * self.columns)
+
+    def removeRow(self, index):
+        if 0 <= index < len(self._rows):
+            self._rows.pop(index)
+
+    def setItem(self, row, col, item):
+        while len(self._rows) <= row:
+            self._rows.append([None] * self.columns)
+        while len(self._rows[row]) <= col:
+            self._rows[row].append(None)
+        self._rows[row][col] = item
+
+    def item(self, row, col):
+        if 0 <= row < len(self._rows) and 0 <= col < len(self._rows[row]):
+            return self._rows[row][col]
+        return None
+
+    def currentRow(self):
+        return self._current_row
+
+    def setCurrentRow(self, row):
+        self._current_row = row
+
+    def currentColumn(self):
+        return getattr(self, "_current_col", -1)
+
+    def setCurrentCell(self, row, col):
+        self._current_row = row
+        self._current_col = col
+
+    def triggerCellChanged(self, row, col):
+        self.cellChanged.emit(row, col)
+
+
+class FakeCoinNode:
+    def __init__(self, name=""):
+        self.name = name
+        self.children = []
+
+    def addChild(self, child):
+        self.children.append(child)
+
+    def insertChild(self, child, idx):
+        self.children.insert(idx, child)
+
+    def removeChild(self, child):
+        if child in self.children:
+            self.children.remove(child)
+
+
+class FakeViewer:
+    def __init__(self, widget=None):
+        self._widget = widget if widget is not None else FakeQtWidget()
+        self.navicube_enabled = False
+        self.navicube_corner = 0
+
+    def setEnabledNaviCube(self, enabled):
+        self.navicube_enabled = enabled
+
+    def setNaviCubeCorner(self, corner):
+        self.navicube_corner = corner
+
+    def getWidget(self):
+        return self._widget
+
+    def getGLWidget(self):
+        return self._widget
+
+    def getSceneGraph(self):
+        return FakeCoinNode("SoSeparator")
+
+
+class FakeView:
+    def __init__(self):
+        self.calls = []
+        self._viewer = FakeViewer()
+
+    def getViewer(self):
+        return self._viewer
+
+    def getWidget(self):
+        return self._viewer.getWidget()
+
+    def getPointOnScreen(self, _pos):
+        return (100, 100)
+
+    def redraw(self):
+        self.calls.append("redraw")
+
+    def viewAxonometric(self):
+        self.calls.append("axonometric")
+
+    def viewTop(self):
+        self.calls.append("top")
+
+    def viewFront(self):
+        self.calls.append("front")
+
+    def fitAll(self):
+        self.calls.append("fitAll")
+
+    def setCameraCenter(self, center, height):
+        self.calls.append(("centerCamera", center, height))
 
 
 class FakeApplication:
@@ -614,6 +1105,13 @@ class FakeMainWindow:
         self.workbenchActivated = Signal()
         self._menu_shown = False
         self.status_messages = []
+        self._stylesheet = ""
+
+    def styleSheet(self):
+        return self._stylesheet
+
+    def setStyleSheet(self, sheet):
+        self._stylesheet = str(sheet) if sheet else ""
 
     def menuBar(self):
         window = self
@@ -658,9 +1156,16 @@ def _qt_modules():
     qtcore.QEvent = types.SimpleNamespace(KeyPress="key-press")
     qtcore.Qt = types.SimpleNamespace(
         LeftDockWidgetArea="left",
+        RightDockWidgetArea="right",
+        DockWidgetArea=types.SimpleNamespace(
+            LeftDockWidgetArea="left",
+            RightDockWidgetArea="right",
+        ),
         ApplicationShortcut="application",
         Key_Return="return",
         Key_Enter="enter",
+        UserRole=0x0100,
+        ItemIsEditable=1,
     )
 
     qtgui = types.ModuleType("PySide.QtGui")
@@ -673,6 +1178,16 @@ def _qt_modules():
     qtwidgets.QToolBar = type("QToolBar", (), {})
     qtwidgets.QAction = FakeAction
     qtwidgets.QDialogButtonBox = FakeDialogButtonBox
+    qtwidgets.QWidget = FakeQtWidget
+    qtwidgets.QFrame = FakeQtWidget
+    qtwidgets.QToolButton = FakeQtWidget
+    qtwidgets.QLineEdit = FakeQtWidget
+    qtwidgets.QPushButton = FakePushButton
+    qtwidgets.QTableWidget = FakeTableWidget
+    qtwidgets.QTableWidgetItem = FakeTableWidgetItem
+    qtwidgets.QHeaderView = FakeHeaderView
+    qtwidgets.QHBoxLayout = FakeLayout
+    qtwidgets.QVBoxLayout = FakeLayout
     qtwidgets.QApplication = types.SimpleNamespace(
         instance=lambda: application,
         focusWidget=lambda: application.focus_widget,
@@ -707,6 +1222,7 @@ class Environment:
         self.saved_parameters = 0
         self.selection_ex = []
         self.command_handlers = {}
+        self.documents = {}
         self.document_observers = []
 
         app = types.ModuleType("FreeCAD")
@@ -717,7 +1233,13 @@ class Environment:
         app.Console = self.console
         app.ActiveDocument = None
         app.newDocument = self._new_document
+        app.getDocument = lambda name: self.documents.get(name)
+        app.listDocuments = lambda: dict(self.documents)
         app.addDocumentObserver = self.document_observers.append
+        app.removeDocumentObserver = lambda obs: (
+            self.document_observers.remove(obs) if obs in self.document_observers else None
+        )
+        app.setActiveDocument = self._set_active_document
         app.Vector = FakeVector
         app.Rotation = FakeRotation
         self.app = app
@@ -733,7 +1255,11 @@ class Environment:
         gui.listCommands = lambda: list(self.registered_commands)
         gui.activeWorkbench = lambda: types.SimpleNamespace(name=lambda: self.active_workbench)
         gui.Control = types.SimpleNamespace(activeDialog=lambda: self.task_dialog_active)
-        gui.ActiveDocument = None
+        self.active_view = FakeView()
+        gui.ActiveDocument = types.SimpleNamespace(
+            getInEdit=lambda: getattr(self, "_in_edit", None),
+            ActiveView=self.active_view,
+        )
         self.selection_observers = []
         gui.Selection = types.SimpleNamespace(
             clearSelection=lambda: self.gui_events.append(("selection", "clear")),
@@ -754,6 +1280,8 @@ class Environment:
         self.part = types.ModuleType("Part")
         self.part.LineSegment = FakeLineSegment
         self.part.Point = FakePoint
+        self.part.Circle = FakeCircle
+        self.part.ArcOfCircle = FakeArcOfCircle
 
         self.pyside, self.qtcore, self.qtgui, self.qtwidgets = _qt_modules()
 
@@ -774,7 +1302,7 @@ class Environment:
         self._in_edit = types.SimpleNamespace(Object=sketch)
         self.gui.ActiveDocument = types.SimpleNamespace(
             getInEdit=lambda: self._in_edit,
-            ActiveView=types.SimpleNamespace(),
+            ActiveView=self.active_view,
         )
         return sketch
 
@@ -790,9 +1318,42 @@ class Environment:
     def _save_parameter(self):
         self.saved_parameters += 1
 
-    def _new_document(self):
-        self.app.ActiveDocument = FakeDocument()
-        return self.app.ActiveDocument
+    def _new_document(self, name=None):
+        doc = FakeDocument()
+        self._doc_counter = getattr(self, "_doc_counter", 0) + 1
+        if name:
+            doc.Name = name
+        elif self._doc_counter > 1:
+            doc.Name = f"Document_{self._doc_counter}"
+        else:
+            doc.Name = "Untitled"
+        self.documents[doc.Name] = doc
+        self._set_active_document(doc)
+        return doc
+
+    def _set_active_document(self, doc_or_name):
+        doc = self.documents.get(doc_or_name) if isinstance(doc_or_name, str) else doc_or_name
+        self.app.ActiveDocument = doc
+        for obs in list(self.document_observers):
+            if hasattr(obs, "slotActiveDocument"):
+                try:
+                    obs.slotActiveDocument(doc)
+                except Exception:
+                    pass
+
+    def close_document(self, doc_or_name):
+        name = doc_or_name if isinstance(doc_or_name, str) else getattr(doc_or_name, "Name", None)
+        doc = self.documents.pop(name, None)
+        if doc is not None:
+            for obs in list(self.document_observers):
+                if hasattr(obs, "slotDeletedDocument"):
+                    try:
+                        obs.slotDeletedDocument(doc)
+                    except Exception:
+                        pass
+            if self.app.ActiveDocument is doc:
+                next_doc = next(iter(self.documents.values()), None)
+                self._set_active_document(next_doc)
 
     def _activate_workbench(self, name):
         self.active_workbench = name
@@ -815,7 +1376,11 @@ class Environment:
 
     def load_bootstrap(self):
         """Import a fresh fusion_bootstrap bound to this environment."""
-        for name in ("fusion_bootstrap", "fusion_sketch_tools", "_fusion_my_freecad_runtime"):
+        for name in [
+            k
+            for k in list(sys.modules.keys())
+            if k.startswith("fusion_") or k == "_fusion_my_freecad_runtime"
+        ]:
             sys.modules.pop(name, None)
         return _import_module("fusion_bootstrap", ROOT / "fusion_bootstrap.py")
 

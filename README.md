@@ -10,15 +10,15 @@ format, and everything it changes can be undone from inside FreeCAD.
 
 ## Status
 
-Version **1.3.3** is available from
-[GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.3) as a
+Version **1.4.0** is available from
+[GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.4.0) as a
 self-contained archive. FusionMyFreeCAD has not yet been submitted to FreeCAD's add-on index;
 catalog publication remains separate work.
 
 ## Install
 
-Download `FusionMyFreeCAD-1.3.3.zip` from the
-[1.3.3 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.3.3), extract its
+Download `FusionMyFreeCAD-1.4.0.zip` from the
+[1.4.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.4.0), extract its
 top-level `FusionMyFreeCAD` folder into FreeCAD's user `Mod` directory, and restart FreeCAD. Full
 platform-by-platform steps, verification, update, and removal instructions are in
 [`docs/INSTALL-FREECAD-ADDON.md`](docs/INSTALL-FREECAD-ADDON.md).
@@ -65,6 +65,28 @@ Each panel's dropdown ends with **Reset this panel**. It restores only that pane
 and pinned commands, leaving every other panel alone. There is deliberately no top-level reset
 button. **Reapply UI** remains the explicit whole-interface reset and clears all ribbon
 personalisation along with restoring the other shipped defaults.
+
+## Modelling and workflow enhancements
+
+FusionMyFreeCAD adds several streamlined tools designed for speed and parity with modern parametric workflows:
+
+### Sketch tools
+- **Mirror + Constraints**: Mirrored geometry receives live **Symmetric** constraints, radius equality, and copied endpoint attachments so profiles remain closed and dynamic.
+- **Add Midline**: Generates a construction centerline between selected parallel edges or symmetric elements.
+- **Constrain Midpoint**: Snaps and constrains a vertex to the midpoint of an edge in one action.
+- **Smart Slot**: Automatically creates a center-to-center slot with tangent end arcs and parallel constraint relationships.
+- **Smart Offset**: Directional curve offset preserving tangential continuity.
+- **Solver Diagnostics**: Translates FreeCAD solver degrees of freedom into human-readable advice indicating which vertices or curves lack constraints.
+
+### Datum planes
+- **Datum Midplane**: Creates a parametric reference plane centered between two selected planar faces.
+
+### 3D and features
+- **Contextual Extrude**: Smart extrusion invoked via `E` or ribbon. Launches the active body's Pad if editing inside a PartDesign Body, or triggers contextual direct extrusion.
+
+### Parameters & viewport
+- **Parameters Dock**: In-canvas sidebar widget for quickly adding, inspecting, and editing spreadsheet parameters and aliases without navigating to the Spreadsheet workbench. Includes document-safe binding and gap tolerance.
+- **Studio Viewport & Modern Zinc Theme**: Clean visual viewport styling and dark theme mode (`Resources/Themes/modern_zinc.qss`).
 
 ## The three UI commands
 

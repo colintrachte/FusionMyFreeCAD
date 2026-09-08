@@ -1,5 +1,5 @@
 {
-  "layoutVersion": "1.3.3",
+  "layoutVersion": "1.4.0",
   "targetFreeCAD": "1.1.x",
   "dropdownButtons": {
     "Fusion_MoreCreate_ddb": [
@@ -290,6 +290,13 @@
         "title": "CONSTRUCT",
         "commands": [
           [
+            "FusionMyFreeCAD_DatumMidplane",
+            "General",
+            "large",
+            "Midplane",
+            "FusionMyFreeCAD_DatumMidplane"
+          ],
+          [
             "PartDesign_Plane",
             "PartDesignWorkbench",
             "large",
@@ -345,6 +352,13 @@
             "large",
             "Parameter Table",
             "Spreadsheet"
+          ],
+          [
+            "FusionMyFreeCAD_ParameterDock",
+            "General",
+            "small",
+            "Parameters Dock",
+            "FusionMyFreeCAD_ParameterDock"
           ]
         ],
         "overflow": []
@@ -429,6 +443,13 @@
             "small",
             "Restore UI",
             "applications-accessories"
+          ],
+          [
+            "FusionMyFreeCAD_StudioViewport",
+            "General",
+            "small",
+            "Studio View",
+            "FusionMyFreeCAD_StudioViewport"
           ]
         ],
         "overflow": []
@@ -915,6 +936,13 @@
             "Sketcher_CreateArc"
           ],
           [
+            "FusionMyFreeCAD_CreateSlot",
+            "General",
+            "small",
+            "Smart Slot",
+            "FusionMyFreeCAD_CreateSlot"
+          ],
+          [
             "Sketcher_CreateSlot",
             "SketcherWorkbench",
             "small",
@@ -1027,6 +1055,13 @@
             "large",
             "Offset",
             "Sketcher_Offset"
+          ],
+          [
+            "FusionMyFreeCAD_SmartOffset",
+            "General",
+            "small",
+            "Smart Offset",
+            "FusionMyFreeCAD_SmartOffset"
           ],
           [
             "FusionMyFreeCAD_AddMidline",
@@ -1213,6 +1248,13 @@
             "small",
             "Midpoint",
             "FusionMyFreeCAD_ConstrainMidpoint"
+          ],
+          [
+            "FusionMyFreeCAD_SolverDiagnostics",
+            "General",
+            "small",
+            "Diagnostics",
+            "FusionMyFreeCAD_SolverDiagnostics"
           ],
           [
             "Sketcher_ConstrainTangent",
