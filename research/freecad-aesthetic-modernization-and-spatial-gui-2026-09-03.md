@@ -292,6 +292,7 @@ import FreeCAD
 import FreeCADGui as Gui
 from pivy import coin
 
+
 def inject_studio_environment():
     view = Gui.ActiveDocument.ActiveView
     viewer = view.getViewer()
@@ -342,8 +343,10 @@ Rather than spawning fragile top-level OS windows, modern HUDs are implemented a
 from PySide import QtCore, QtWidgets
 import FreeCADGui as Gui
 
+
 class InCanvasHUD(QtWidgets.QFrame):
     """Modern translucent HUD anchored directly inside the 3D viewport."""
+
     def __init__(self, viewport_widget):
         super(InCanvasHUD, self).__init__(viewport_widget)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)

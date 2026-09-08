@@ -21,6 +21,8 @@ extend-exclude = [
     "bundled-addons",
     # Historical manual prototype; not part of the cross-platform add-on.
     "prototype",
+    # Research notes and historical rationale; not release inputs.
+    "research",
 ]
 
 [tool.ruff.lint]
