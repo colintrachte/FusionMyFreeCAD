@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import sys
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
@@ -423,6 +424,51 @@ def test_build_addon_package_produces_a_loadable_archive(package):
         assert not any(b"\r" in archive.read(entry) for entry in text_entries)
         # The archive must contain exactly one top-level directory.
         assert {name.split("/")[0] for name in names} == {"FusionMyFreeCAD"}
+
+
+def test_fresh_extracted_archive_startup(tmp_path, env, monkeypatch):
+    """Test startup from an extracted archive with the git checkout excluded from sys.path."""
+    builder = _import_module("build_addon_package", ROOT / "tools" / "build_addon_package.py")
+    builder.main()
+    version = builder.package_version()
+    archive_path = ROOT / "dist" / f"FusionMyFreeCAD-{version}.zip"
+
+    extract_dir = tmp_path / "extracted"
+    with zipfile.ZipFile(archive_path) as archive:
+        archive.extractall(extract_dir)
+
+    addon_root = extract_dir / "FusionMyFreeCAD"
+    from fusion_common import RUNTIME_MODULES
+
+    for mod_name in RUNTIME_MODULES:
+        assert (addon_root / mod_name).is_file(), f"Missing from zip: {mod_name}"
+
+    # Remove ROOT from sys.path and prepend extracted addon_root
+    clean_sys_path = [p for p in sys.path if Path(p).resolve() != ROOT.resolve()]
+    clean_sys_path.insert(0, str(addon_root))
+    monkeypatch.setattr(sys, "path", clean_sys_path)
+
+    # Pop cached modules
+    for name in [
+        k
+        for k in list(sys.modules.keys())
+        if k.startswith("fusion_")
+        or k in ("_fusion_my_freecad_runtime", "fusion_init_gui_extracted")
+    ]:
+        sys.modules.pop(name, None)
+
+    env.install()
+    # Stub vendor loads to test add-on bootstrap & registration cleanly
+    extracted_bootstrap = _import_module("fusion_bootstrap", addon_root / "fusion_bootstrap.py")
+    monkeypatch.setattr(extracted_bootstrap, "load_vendor", lambda *_args: None)
+    monkeypatch.setattr(extracted_bootstrap, "run_runtime", lambda: None)
+
+    init_gui = _import_module("fusion_init_gui_extracted", addon_root / "InitGui.py")
+    assert init_gui is not None
+    assert "FusionMyFreeCAD_CreateSketch" in env.commands
+    assert "FusionMyFreeCAD_ParameterDock" in env.commands
+    assert "FusionMyFreeCAD_DatumMidplane" in env.commands
+    assert "FusionMyFreeCAD_StudioViewport" in env.commands
 
 
 def test_archive_stays_small_enough_to_ship(package):

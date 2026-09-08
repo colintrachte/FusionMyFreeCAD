@@ -1,3 +1,5 @@
 # Release and CI tooling only; the packaged FreeCAD add-on has no PyPI dependencies.
 pytest==9.1.1
 ruff==0.16.5
+coverage>=7.6.0
+pytest-cov>=5.0.0

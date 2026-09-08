@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="studioCanvas" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3f3f46" />
+      <stop offset="100%" stop-color="#18181b" />
+    </radialGradient>
+    <linearGradient id="cubeTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff7eb" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+    <linearGradient id="cubeLeft" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#729fcf" />
+      <stop offset="100%" stop-color="#3465a4" />
+    </linearGradient>
+    <linearGradient id="cubeRight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4a525d" />
+      <stop offset="100%" stop-color="#272a30" />
+    </linearGradient>
+  </defs>
+
+  <!-- Viewport background disc -->
+  <circle cx="32" cy="32" r="30" fill="url(#studioCanvas)" stroke="#52525b" stroke-width="1.5" />
+
+  <!-- Studio ground ellipse -->
+  <ellipse cx="32" cy="46" rx="22" ry="7" fill="rgba(0,0,0,0.35)" />
+
+  <!-- Shaded 3D Studio Cube -->
+  <!-- Left face (cool fill) -->
+  <polygon points="18,33 32,41 32,53 18,45" fill="url(#cubeLeft)" stroke="#34373d" stroke-width="1.5" stroke-linejoin="round" />
+  <!-- Right face (ambient shadow) -->
+  <polygon points="32,41 46,33 46,45 32,53" fill="url(#cubeRight)" stroke="#34373d" stroke-width="1.5" stroke-linejoin="round" />
+  <!-- Top face (warm key highlight) -->
+  <polygon points="18,33 32,25 46,33 32,41" fill="url(#cubeTop)" stroke="#34373d" stroke-width="1.5" stroke-linejoin="round" />
+
+  <!-- Studio key light ray (warm sun top-left) -->
+  <circle cx="14" cy="14" r="4.5" fill="#fce94f" stroke="#c4a000" stroke-width="1.2" />
+  <line x1="20" y1="18" x2="26" y2="23" stroke="#fce94f" stroke-width="2" stroke-linecap="round" />
+</svg>

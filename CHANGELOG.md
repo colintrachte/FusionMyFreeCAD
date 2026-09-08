@@ -2,6 +2,32 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
+## 1.4.0 — 2026-09-07
+
+### Added
+- **Sketcher workflow commands**:
+  - `FusionMyFreeCAD_AddMidline`: Generates construction centerlines between symmetric elements.
+  - `FusionMyFreeCAD_ConstrainMidpoint`: One-step midpoint constraint on vertex and edge.
+  - `FusionMyFreeCAD_SmartSlot`: Parameterized center-to-center slot with tangent arcs.
+  - `FusionMyFreeCAD_SmartOffset`: Directional profile offset tool.
+  - `FusionMyFreeCAD_SolverDiagnostics`: Plain-language solver diagnostics for under-constrained sketches.
+- **Datum Plane tools**:
+  - `FusionMyFreeCAD_DatumMidplane`: Constructs a parametric midplane bisecting two selected faces.
+- **In-Canvas Parameters Dock**:
+  - `FusionMyFreeCAD_ParameterDock`: In-canvas dock widget for creating and editing variables and aliases. Multi-document safe with observer-driven synchronization and gap-tolerant spreadsheet reading.
+- **Studio Viewport & Theme**:
+  - `FusionMyFreeCAD_StudioViewport`: Clean canvas viewport preset with subtle NaviCube positioning.
+  - `FusionMyFreeCAD_ModernZinc`: Sleek Zinc stylesheet.
+  - `FusionMyFreeCAD_RestoreViewport`: One-click viewport and style restoration.
+- **FreeCAD Core Suggestions Box**:
+  - Cataloged core-bound features (e.g. dynamic Heads-Up Display and Ghost Sketches) in `docs/freecad_core_suggestions_box.md` to keep FMF runtime strictly focused on reliable add-on enhancements.
+
+### Reliability & Infrastructure
+- **Shared Infrastructure (`fusion_common.py`)**: Centralized `RUNTIME_MODULES` canonical manifest, unified atomic `transaction(doc, label)` context manager, standard `notify()`, base `SketcherCommand`, and swallowed exception logging (`log_swallowed`).
+- **Release Packaging Gate**: `tools/build_addon_package.py` and `validate_addon.py` now import `RUNTIME_MODULES` from `fusion_common.py` as single source of truth, and verify that all packaged runtime modules and assets are tracked in git.
+- **Test Suite Hardening**: Fixed test-induced global state mutation by dynamic module eviction; 100% pass across all 198 tests with zero flakiness.
+- **Repository Hygiene**: Replaced the 15.7 MB static PDF in `docs/` with official web documentation links (`docs/FREECAD-MANUAL-LINK.md`) and made agent guide paths portable.
+
 ## 1.3.3 — 2026-09-03
 
 ### Replaces the withdrawn 1.3.2

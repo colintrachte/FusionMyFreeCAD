@@ -875,6 +875,13 @@ def restore():
         problems.append("Applied-version marker: {}".format(error))
 
     try:
+        import fusion_viewport
+
+        fusion_viewport.restore_all_appearance()
+    except Exception as error:
+        problems.append("Appearance restoration: {}".format(error))
+
+    try:
         main_window = Gui.getMainWindow()
         main_window.menuBar().show()
         from PySide import QtWidgets
@@ -1397,10 +1404,7 @@ def register_commands():
     Gui.addCommand("FusionMyFreeCAD_Verify", VerifyCommand())
     Gui.addCommand("FusionMyFreeCAD_Reapply", ReapplyCommand())
     Gui.addCommand("FusionMyFreeCAD_Restore", RestoreCommand())
-    # Sketch tools live in their own module so this one does not keep growing.
-    import fusion_sketch_tools
 
-    fusion_sketch_tools.register()
     if _sketch_edit_observer is None and hasattr(Gui, "addDocumentObserver"):
         _sketch_edit_observer = _SketchEditWorkbenchObserver()
         Gui.addDocumentObserver(_sketch_edit_observer)
@@ -1414,6 +1418,17 @@ def register_commands():
     ):
         _pad_selection_observer = _PadSelectionObserver()
         Gui.Selection.addObserver(_pad_selection_observer)
+
+    # Sketch tools live in their own module so this one does not keep growing.
+    import fusion_datum_tools
+    import fusion_parameters_dock
+    import fusion_sketch_tools
+    import fusion_viewport
+
+    fusion_sketch_tools.register()
+    fusion_datum_tools.register()
+    fusion_parameters_dock.register()
+    fusion_viewport.register()
 
 
 # ---------------------------------------------------------------------------

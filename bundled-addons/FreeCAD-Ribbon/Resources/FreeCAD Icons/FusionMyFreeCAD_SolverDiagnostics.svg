@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="lensGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#729fcf" stop-opacity="0.3" />
+    </linearGradient>
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8ae234" />
+      <stop offset="100%" stop-color="#4e9a06" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background CAD sketch geometry -->
+  <line x1="10" y1="44" x2="38" y2="44" stroke="#888a85" stroke-width="2.5" stroke-linecap="round" />
+  <line x1="10" y1="44" x2="10" y2="16" stroke="#888a85" stroke-width="2.5" stroke-linecap="round" />
+  <line x1="10" y1="16" x2="38" y2="16" stroke="#888a85" stroke-width="2.5" stroke-linecap="round" />
+
+  <!-- Magnifying glass / Diagnostic lens -->
+  <circle cx="28" cy="28" r="16" fill="url(#lensGrad)" stroke="#204a87" stroke-width="3" />
+  <line x1="40" y1="40" x2="56" y2="56" stroke="#2e3436" stroke-width="5" stroke-linecap="round" />
+
+  <!-- Heartbeat / Diagnostic pulse in lens -->
+  <polyline points="18,28 23,28 26,20 30,36 33,26 36,28 39,28" fill="none" stroke="#ef2929" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Diagnostic badge (checkmark) -->
+  <circle cx="48" cy="16" r="8" fill="url(#badgeGrad)" stroke="#204a87" stroke-width="1.5" />
+  <polyline points="44,16 47,19 52,13" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

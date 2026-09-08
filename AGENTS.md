@@ -13,5 +13,5 @@
 - **FreeCAD 1.1 Executables:**
   - GUI: `C:\Program Files\FreeCAD 1.1\bin\freecad.exe`
   - Headless/CLI: `C:\Program Files\FreeCAD 1.1\bin\freecadcmd.exe`
-- **Addon Mod Path:** `<user-home>\AppData\Roaming\FreeCAD\v1-1\Mod\FusionMyFreeCAD`
+- **Addon Mod Path:** `%APPDATA%\FreeCAD\v1-1\Mod\FusionMyFreeCAD` (PowerShell: `$env:APPDATA\FreeCAD\v1-1\Mod\FusionMyFreeCAD`, Linux: `~/.local/share/FreeCAD/Mod/FusionMyFreeCAD`)
 - **Local Dev Deploy:** `powershell -ExecutionPolicy Bypass -File .\tools\install-dev.ps1`

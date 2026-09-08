@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import hashlib
+import subprocess
+import sys
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from fusion_common import RUNTIME_MODULES  # noqa: E402
+
 PACKAGE_NAME = "FusionMyFreeCAD"
-PACKAGE_FILES = (
-    "Init.py",
-    "InitGui.py",
-    "fusion_bootstrap.py",
-    "fusion_sketch_tools.py",
+PACKAGE_METADATA_FILES = (
     "package.xml",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
@@ -24,6 +27,7 @@ PACKAGE_FILES = (
     # add-on, so it has to travel inside the archive.
     "tools/RestoreFusionMyFreeCAD.FCMacro",
 )
+PACKAGE_FILES = RUNTIME_MODULES + PACKAGE_METADATA_FILES
 PACKAGE_DIRECTORIES = ("Resources", "bundled-addons")
 BINARY_SUFFIXES = {".png", ".qm"}
 
@@ -54,6 +58,35 @@ def package_sources() -> list[Path]:
         raise FileNotFoundError(
             "Required package files are missing: " + ", ".join(map(str, missing))
         )
+
+    # Git tracking verification: ensure all packaged files are tracked in git
+    if (ROOT / ".git").is_dir():
+        try:
+            res = subprocess.run(
+                ["git", "ls-files"],
+                cwd=str(ROOT),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                check=True,
+            )
+            tracked_set = {Path(p.strip()).as_posix() for p in res.stdout.splitlines() if p.strip()}
+            untracked = [
+                path.relative_to(ROOT).as_posix()
+                for path in paths
+                if path.relative_to(ROOT).as_posix() not in tracked_set
+            ]
+            if untracked:
+                raise RuntimeError(
+                    "Refusing to package untracked git files:\n  "
+                    + "\n  ".join(untracked[:10])
+                    + (f"\n  ...and {len(untracked) - 10} more" if len(untracked) > 10 else "")
+                    + "\nStage or commit all package assets before building release archive."
+                )
+        except (subprocess.CalledProcessError, OSError):
+            pass
+
     return sorted(set(paths), key=lambda path: path.relative_to(ROOT).as_posix())
 
 

@@ -29,11 +29,19 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
         "FusionMyFreeCAD_AddMidline",
         "FusionMyFreeCAD_ConstrainMidpoint",
         "FusionMyFreeCAD_CreateSketch",
+        "FusionMyFreeCAD_CreateSlot",
+        "FusionMyFreeCAD_DatumMidplane",
         "FusionMyFreeCAD_MirrorWithConstraints",
+        "FusionMyFreeCAD_ModernZincTheme",
+        "FusionMyFreeCAD_ParameterDock",
         "FusionMyFreeCAD_ParameterTable",
-        "FusionMyFreeCAD_Verify",
         "FusionMyFreeCAD_Reapply",
         "FusionMyFreeCAD_Restore",
+        "FusionMyFreeCAD_RestoreViewport",
+        "FusionMyFreeCAD_SmartOffset",
+        "FusionMyFreeCAD_SolverDiagnostics",
+        "FusionMyFreeCAD_StudioViewport",
+        "FusionMyFreeCAD_Verify",
     }
     assert bootstrap.startup_failures() == []
     assert len(env.selection_observers) == 1
