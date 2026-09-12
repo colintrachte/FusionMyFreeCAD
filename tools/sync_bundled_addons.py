@@ -297,8 +297,12 @@ PANEL_TITLE_DRAWER_PATCH = (
         "        A panel built without an option button has no drawer, and FCBinding\n"
         "        hides the button on panels whose commands all fit, so the title must\n"
         "        stay inert there instead of swallowing the click.\n"
+        "\n"
+        "        Reads __dict__ directly: __getattr__ below raises AssertionError for any\n"
+        "        name that is not add[Small|Medium|Large]*, and getattr's default only\n"
+        "        swallows AttributeError.\n"
         '        """\n'
-        '        option = getattr(self, "_panelOption", None)\n'
+        '        option = self.__dict__.get("_panelOption")\n'
         "        return option is not None and option.isVisible() and option.menu() is not None\n"
         "\n"
         "    def openDrawer(self):\n"
@@ -387,8 +391,11 @@ FCBINDING_DIVIDER_PATCH = (
         "        # Set the font for the panel title\n        Font = QFont()\n",
         "        # FusionMyFreeCAD local change: let this panel's divider resize it.\n"
         "        # setPanelProperties runs for every panel, including rebuilt ones, so the\n"
-        "        # connection is guarded rather than made unconditionally.\n"
-        '        if getattr(panel, "_fmfResizeConnected", False) is False:\n'
+        "        # connection is guarded rather than made unconditionally. The guard reads\n"
+        "        # __dict__ directly because RibbonPanel.__getattr__ raises AssertionError\n"
+        "        # for any name that is not add[Small|Medium|Large]*, and getattr's default\n"
+        "        # only swallows AttributeError.\n"
+        '        if panel.__dict__.get("_fmfResizeConnected") is not True:\n'
         "            try:\n"
         "                panel.panelResizeRequested.connect(self._onPanelResized)\n"
         "                panel._fmfResizeConnected = True\n"
