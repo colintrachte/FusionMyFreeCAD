@@ -868,6 +868,33 @@ class FakeQtWidget(FakeQtObject):
     def setLayout(self, layout):
         self._layout = layout
 
+    def setKeyboardTracking(self, tracking):
+        self._keyboard_tracking = bool(tracking)
+
+    def keyboardTracking(self):
+        return getattr(self, "_keyboard_tracking", False)
+
+    def isChecked(self):
+        return getattr(self, "_checked", False)
+
+    def setChecked(self, checked):
+        self._checked = bool(checked)
+
+    def selectAll(self):
+        self._all_selected = True
+
+    def setFocus(self):
+        self._focused = True
+
+    def interpretText(self):
+        self._text_interpreted = True
+
+    def lineEdit(self):
+        return self
+
+    def insert(self, text):
+        self._text = (getattr(self, "_text", "") or "") + str(text)
+
 
 class FakePushButton(FakeQtWidget):
     def __init__(self, text="", parent=None):
@@ -1064,6 +1091,15 @@ class FakeApplication:
     def installEventFilter(self, event_filter):
         self.filters.append(event_filter)
 
+    def removeEventFilter(self, event_filter):
+        if event_filter in self.filters:
+            self.filters.remove(event_filter)
+
+    def sendEvent(self, receiver, event):
+        if hasattr(receiver, "event"):
+            return receiver.event(event)
+        return False
+
 
 class FakeButton:
     def __init__(self, enabled=True):
@@ -1073,7 +1109,13 @@ class FakeButton:
     def isEnabled(self):
         return self.enabled
 
+    def isVisible(self):
+        return True
+
     def click(self):
+        self.clicks += 1
+
+    def animateClick(self):
         self.clicks += 1
 
 
@@ -1081,6 +1123,8 @@ class FakeDialogButtonBox:
     AcceptRole = "accept"
     YesRole = "yes"
     RejectRole = "reject"
+    Ok = "ok"
+    Cancel = "cancel"
 
     def __init__(self, roles=(AcceptRole, RejectRole), visible=True):
         self.visible = visible
@@ -1095,12 +1139,24 @@ class FakeDialogButtonBox:
     def buttonRole(self, wanted):
         return next(role for button, role in self._buttons if button is wanted)
 
+    def button(self, role_or_type):
+        if role_or_type in ("ok", self.AcceptRole, self.Ok):
+            for b, r in self._buttons:
+                if r == self.AcceptRole:
+                    return b
+        elif role_or_type in ("cancel", self.RejectRole, self.Cancel):
+            for b, r in self._buttons:
+                if r == self.RejectRole:
+                    return b
+        return None
+
 
 class FakeMainWindow:
     def __init__(self):
         self.actions = []
         self.docks = []
         self.button_boxes = []
+        self.widgets = []
         self.areas = {}
         self.workbenchActivated = Signal()
         self._menu_shown = False
@@ -1123,13 +1179,20 @@ class FakeMainWindow:
         return MenuBar()
 
     def findChildren(self, kind):
+        matches = [w for w in self.widgets if isinstance(w, kind)]
         if kind is FakeAction:
-            return list(self.actions)
+            return list(self.actions) + matches
         if kind is FakeDock:
-            return list(self.docks)
+            return list(self.docks) + matches
         if kind is FakeDialogButtonBox:
-            return list(self.button_boxes)
-        return []
+            return list(self.button_boxes) + matches
+        return matches
+
+    def findChild(self, kind, name=""):
+        for child in self.findChildren(kind):
+            if not name or getattr(child, "objectName", lambda: "")() == name:
+                return child
+        return None
 
     def dockWidgetArea(self, dock):
         return self.areas.get(id(dock), "right")
@@ -1153,20 +1216,35 @@ def _qt_modules():
     qtcore = types.ModuleType("PySide.QtCore")
     qtcore.QTimer = FakeTimer
     qtcore.QObject = FakeQtObject
-    qtcore.QEvent = types.SimpleNamespace(KeyPress="key-press")
-    qtcore.Qt = types.SimpleNamespace(
-        LeftDockWidgetArea="left",
-        RightDockWidgetArea="right",
-        DockWidgetArea=types.SimpleNamespace(
+    qtcore.QEvent = types.SimpleNamespace(
+        KeyPress="key-press",
+        Show="show",
+        FocusIn="focus-in",
+        WindowActivate="window-activate",
+    )
+    qt_dict = {
+        "LeftDockWidgetArea": "left",
+        "RightDockWidgetArea": "right",
+        "DockWidgetArea": types.SimpleNamespace(
             LeftDockWidgetArea="left",
             RightDockWidgetArea="right",
         ),
-        ApplicationShortcut="application",
-        Key_Return="return",
-        Key_Enter="enter",
-        UserRole=0x0100,
-        ItemIsEditable=1,
-    )
+        "ApplicationShortcut": "application",
+        "Key_Return": "return",
+        "Key_Enter": "enter",
+        "Key_Escape": "escape",
+        "Key_Period": "period",
+        "Key_Comma": "comma",
+        "Key_Minus": "minus",
+        "Key_Plus": "plus",
+        "Key_Backspace": "backspace",
+        "Key_Delete": "delete",
+        "UserRole": 0x0100,
+        "ItemIsEditable": 1,
+    }
+    for i in range(10):
+        qt_dict[f"Key_{i}"] = f"key_{i}"
+    qtcore.Qt = types.SimpleNamespace(**qt_dict)
 
     qtgui = types.ModuleType("PySide.QtGui")
     qtgui.QKeySequence = FakeKeySequence
@@ -1263,12 +1341,18 @@ class Environment:
         self.selection_observers = []
         gui.Selection = types.SimpleNamespace(
             clearSelection=lambda: self.gui_events.append(("selection", "clear")),
-            addSelection=lambda obj: self.gui_events.append(
-                ("selection", getattr(obj, "Name", str(obj)))
+            addSelection=lambda *args: self.gui_events.append(
+                (
+                    "selection",
+                    args[1] if len(args) > 1 else getattr(args[0], "Name", str(args[0])),
+                )
             ),
             getSelectionEx=lambda *args: list(self.selection_ex),
             getSelection=lambda *args: [entry.Object for entry in self.selection_ex],
             addObserver=self.selection_observers.append,
+            removeObserver=lambda obs: (
+                self.selection_observers.remove(obs) if obs in self.selection_observers else None
+            ),
         )
         gui.activeDocument = lambda: types.SimpleNamespace(
             setEdit=lambda name: self.gui_events.append(("edit", name))

@@ -1419,14 +1419,15 @@ def register_commands():
         _pad_selection_observer = _PadSelectionObserver()
         Gui.Selection.addObserver(_pad_selection_observer)
 
-    # Sketch tools live in their own module so this one does not keep growing.
     import fusion_datum_tools
+    import fusion_dressup_tools
     import fusion_parameters_dock
     import fusion_sketch_tools
     import fusion_viewport
 
     fusion_sketch_tools.register()
     fusion_datum_tools.register()
+    fusion_dressup_tools.register()
     fusion_parameters_dock.register()
     fusion_viewport.register()
 
