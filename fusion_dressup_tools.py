@@ -64,6 +64,13 @@ def _get_qt() -> tuple[Any, Any, Any]:
                 return None, None, None
 
 
+# Qt requires a real QObject for installEventFilter(); a plain Python class is
+# rejected at runtime. Resolved once at import because a class statement cannot
+# pick its base lazily. _get_qt() is fully guarded, so this degrades to object
+# when Qt is unavailable (headless tests), where the filter is never installed.
+_qt_core, _, _ = _get_qt()
+_QObjectBase: Any = getattr(_qt_core, "QObject", object) if _qt_core is not None else object
+
 _numpad_shield_filter: _DressUpNumpadShield | None = None
 _selection_observer: _DressUpSelectionObserver | None = None
 
@@ -228,8 +235,12 @@ def _focus_and_select(spinbox: Any) -> None:
         pass
 
 
-class _DressUpNumpadShield:
+class _DressUpNumpadShield(_QObjectBase):
     """Application-level event filter active during Chamfer and Fillet tasks."""
+
+    def __init__(self, parent: Any = None) -> None:
+        if _QObjectBase is not object:
+            super().__init__(parent)
 
     def eventFilter(self, watched: Any, event: Any) -> bool:
         qt_core, _qt_gui, qt_widgets = _get_qt()
