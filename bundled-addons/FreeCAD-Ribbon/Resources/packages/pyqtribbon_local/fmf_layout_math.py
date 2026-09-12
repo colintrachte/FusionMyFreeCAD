@@ -54,6 +54,42 @@ def column_delta(panel, pixels: int) -> int:
     return int(round(float(pixels) / width))
 
 
+def occupied_column_count(panel) -> int:
+    """How many columns of buttons the panel is showing right now, or 0.
+
+    This is the number a drag has to be relative to. Two earlier attempts used
+    something else and both produced a divider that appeared to do nothing:
+    QGridLayout.columnCount() counts allocated columns, separators and spacers
+    included, and the Ribbon add-on's MAX_COLUMN_PANELS preference is 0 by
+    default, meaning "no limit" rather than "no columns" -- so on a stock
+    profile the drag was added to an invented 6 while the panel was really
+    three columns wide, and every step landed in a dead zone above the content.
+    """
+    try:
+        layout = panel._actionsLayout
+        columns = set()
+        for index in range(layout.count()):
+            item = layout.itemAt(index)
+            widget = item.widget() if item is not None else None
+            if widget is None or widget.width() <= 0:
+                continue
+            name = ""
+            getter = getattr(widget, "objectName", None)
+            if callable(getter):
+                name = getter() or ""
+            # The trailing spacer exists only to keep a one-button panel
+            # top-aligned; it is not a column the user can see.
+            if name == "ExtraSpacer":
+                continue
+            row, column, _rowSpan, _columnSpan = layout.getItemPosition(index)
+            columns.add(int(column))
+        if columns:
+            return len(columns)
+    except Exception:
+        pass
+    return 0
+
+
 def _toolbar_of(bar, workbench_name, panel_name):
     try:
         toolbar = (
@@ -101,5 +137,61 @@ def panel_command_count(bar, workbench_name, panel_name) -> int:
 
 
 def resolve_target(current: int, delta: int, ceiling: int) -> int:
-    """The budget a drag of `delta` columns should land on."""
-    return max(1, min(current + delta, max(1, ceiling)))
+    """The budget a drag of `delta` columns should land on.
+
+    A drag never moves a panel the way it was not dragged. Clamping to the
+    ceiling alone is not enough: a panel can already be wider than its command
+    count -- a stale budget, or a section holding two commands across three
+    columns -- and then a widen would come back under the current width and
+    quietly narrow the section instead.
+    """
+    ceiling = max(1, ceiling)
+    current = max(1, current)
+    if delta == 0:
+        return current
+    target = max(1, current + delta)
+    if delta > 0:
+        return max(current, min(target, ceiling))
+    return min(current, target)
+
+
+def plan_resize(bar, panel, workbench_name, panel_name, delta, default_budget=None) -> dict:
+    """Decide what a divider drag should do, without doing any of it.
+
+    Returns a dict with `status` one of:
+
+    - ``"resize"``  -- apply `target` as the panel's new maxColumns
+    - ``"at-edge"`` -- the drag cannot move this panel any further that way
+    - ``"ignore"``  -- nothing to do
+
+    The whole decision lives here, away from Qt, because every bug in this
+    feature so far has been in the decision rather than in the widget.
+    """
+    if not delta:
+        return {"status": "ignore", "reason": "no movement"}
+
+    # What the user can see is what the drag is relative to. A stored budget
+    # is only a fallback for the moment before the panel has been laid out.
+    current = occupied_column_count(panel)
+    source = "displayed"
+    if current <= 0:
+        current = current_column_budget(bar, workbench_name, panel_name, default_budget)
+        source = "stored"
+
+    ceiling = panel_command_count(bar, workbench_name, panel_name)
+    target = resolve_target(current, delta, ceiling)
+    if target == current:
+        return {
+            "status": "at-edge",
+            "current": current,
+            "target": target,
+            "widening": delta > 0,
+            "source": source,
+        }
+    return {
+        "status": "resize",
+        "current": current,
+        "target": target,
+        "widening": delta > 0,
+        "source": source,
+    }

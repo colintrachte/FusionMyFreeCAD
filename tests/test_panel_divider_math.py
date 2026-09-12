@@ -40,13 +40,25 @@ def math_module():
         sys.modules.pop("fmf_layout_math", None)
 
 
-def _panel(*widths):
-    """A stand-in for a RibbonPanel carrying buttons of the given widths."""
-    items = [
-        types.SimpleNamespace(widget=lambda w=w: types.SimpleNamespace(width=lambda: w))
-        for w in widths
-    ]
-    layout = types.SimpleNamespace(count=lambda: len(items), itemAt=lambda i: items[i])
+def _panel(*widths, columns=None, names=None):
+    """A stand-in for a RibbonPanel carrying buttons of the given widths.
+
+    `columns` gives each button's grid column, so a panel can place several
+    buttons in one column the way a real stack of small buttons does.
+    """
+    if columns is None:
+        columns = range(len(widths))
+    if names is None:
+        names = ["button"] * len(widths)
+    items = []
+    for width, column, name in zip(widths, columns, names, strict=True):
+        widget = types.SimpleNamespace(width=lambda w=width: w, objectName=lambda n=name: n)
+        items.append((types.SimpleNamespace(widget=lambda w=widget: w), (0, column, 1, 1)))
+    layout = types.SimpleNamespace(
+        count=lambda: len(items),
+        itemAt=lambda i: items[i][0],
+        getItemPosition=lambda i: items[i][1],
+    )
     return types.SimpleNamespace(_actionsLayout=layout)
 
 
@@ -195,8 +207,14 @@ def test_a_drag_lands_inside_the_panel_range(math_module, current, delta, ceilin
     assert math_module.resolve_target(current, delta, ceiling) == expected
 
 
-def test_a_zero_ceiling_still_leaves_one_column(math_module):
-    assert math_module.resolve_target(4, 2, 0) == 1
+def test_a_nonsense_ceiling_never_moves_a_panel_backwards(math_module):
+    """A ceiling of 0 means the command list could not be read.
+
+    Clamping to it would collapse the section to one column on a drag that
+    asked for the opposite, so a widen holds its ground instead.
+    """
+    assert math_module.resolve_target(4, 2, 0) == 4
+    assert math_module.resolve_target(4, -2, 0) == 2
 
 
 def test_the_preview_and_the_commit_agree(math_module):
@@ -210,3 +228,121 @@ def test_the_preview_and_the_commit_agree(math_module):
         columns = math_module.column_delta(panel, pixels)
         preview_pixels = columns * math_module.panel_column_width(panel)
         assert math_module.column_delta(panel, preview_pixels) == columns
+
+
+# ---------------------------------------------------------------------------
+# What the drag is measured against
+# ---------------------------------------------------------------------------
+
+
+def test_occupied_columns_counts_columns_not_buttons(math_module):
+    """Small buttons stack, so three buttons can be one column wide."""
+    panel = _panel(40, 40, 40, columns=[0, 0, 1])
+    assert math_module.occupied_column_count(panel) == 2
+
+
+def test_the_trailing_spacer_is_not_a_column(math_module):
+    """It exists to top-align a one-button panel, not to occupy space."""
+    panel = _panel(40, 10, columns=[0, 1], names=["button", "ExtraSpacer"])
+    assert math_module.occupied_column_count(panel) == 1
+
+
+def test_an_unlaid_out_panel_reports_nothing(math_module):
+    assert math_module.occupied_column_count(_panel()) == 0
+    assert math_module.occupied_column_count(types.SimpleNamespace()) == 0
+
+
+# ---------------------------------------------------------------------------
+# Direction safety
+# ---------------------------------------------------------------------------
+
+
+def test_a_widen_never_narrows_and_a_narrow_never_widens(math_module):
+    for current in range(1, 10):
+        for ceiling in range(1, 10):
+            assert math_module.resolve_target(current, 1, ceiling) >= current
+            assert math_module.resolve_target(current, -1, ceiling) <= current
+
+
+def test_widening_a_panel_wider_than_its_contents_does_not_shrink_it(math_module):
+    """A section of two commands spread over three columns.
+
+    Clamping to the command count alone turned the widen into a shrink, so the
+    divider moved the section the opposite way from the drag.
+    """
+    assert math_module.resolve_target(3, 1, 2) == 3
+
+
+# ---------------------------------------------------------------------------
+# The whole decision
+# ---------------------------------------------------------------------------
+
+
+def _plan_bar(order, stored=None):
+    toolbar = {"order": list(order)}
+    if stored is not None:
+        toolbar["maxColumns"] = stored
+    return _bar({"Fusion Create_newPanel": toolbar})
+
+
+def _plan(math_module, panel, bar, delta, default=0):
+    return math_module.plan_resize(
+        bar, panel, "PartDesignWorkbench", "Fusion Create_newPanel", delta, default
+    )
+
+
+def test_a_drag_is_relative_to_what_the_panel_shows(math_module):
+    """Not to MAX_COLUMN_PANELS, which is 0 -- "no limit" -- by default.
+
+    Falling back to an invented budget of 6 while the panel was three columns
+    wide put every step in a dead zone above the content, so neither direction
+    changed anything the user could see.
+    """
+    bar = _plan_bar(["a"] * 16)
+    plan = _plan(math_module, _panel(90, 90, 90), bar, -1)
+    assert plan["source"] == "displayed"
+    assert (plan["current"], plan["target"]) == (3, 2)
+
+
+def test_a_stale_saved_budget_does_not_override_what_is_on_screen(math_module):
+    bar = _plan_bar(["a"] * 16, stored=7)
+    plan = _plan(math_module, _panel(90, 90, 90), bar, 1)
+    assert (plan["current"], plan["target"]) == (3, 4)
+
+
+def test_an_unlaid_out_panel_falls_back_to_the_saved_budget(math_module):
+    bar = _plan_bar(["a"] * 16, stored=5)
+    plan = _plan(math_module, _panel(), bar, 1)
+    assert plan["source"] == "stored"
+    assert (plan["current"], plan["target"]) == (5, 6)
+
+
+def test_a_panel_showing_everything_reports_that_it_cannot_widen(math_module):
+    bar = _plan_bar(["a", "b"])
+    plan = _plan(math_module, _panel(90, 90), bar, 1)
+    assert plan["status"] == "at-edge"
+    assert plan["widening"] is True
+
+
+def test_a_one_column_panel_reports_that_it_cannot_narrow(math_module):
+    bar = _plan_bar(["a", "b", "c"])
+    plan = _plan(math_module, _panel(90), bar, -1)
+    assert plan["status"] == "at-edge"
+    assert plan["widening"] is False
+
+
+def test_a_drag_of_no_columns_is_ignored(math_module):
+    assert _plan(math_module, _panel(90, 90), _plan_bar(["a"] * 5), 0)["status"] == "ignore"
+
+
+def test_every_real_panel_can_be_dragged_both_ways(math_module):
+    """The regression itself: six of eight panels could not move at all.
+
+    Each holds more commands than the three columns a laid-out panel typically
+    shows, so both directions have somewhere to go.
+    """
+    for count in (4, 5, 6, 7, 8, 16):
+        bar = _plan_bar(["a"] * count)
+        panel = _panel(90, 90, 90)
+        assert _plan(math_module, panel, bar, -1)["status"] == "resize"
+        assert _plan(math_module, panel, bar, 1)["status"] == "resize"
