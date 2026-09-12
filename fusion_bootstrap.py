@@ -1421,6 +1421,7 @@ def register_commands():
 
     import fusion_datum_tools
     import fusion_dressup_tools
+    import fusion_export
     import fusion_parameters_dock
     import fusion_sketch_tools
     import fusion_viewport
@@ -1428,6 +1429,7 @@ def register_commands():
     fusion_sketch_tools.register()
     fusion_datum_tools.register()
     fusion_dressup_tools.register()
+    fusion_export.register()
     fusion_parameters_dock.register()
     fusion_viewport.register()
 

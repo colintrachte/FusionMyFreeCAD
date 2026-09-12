@@ -6,6 +6,7 @@
     "FusionMyFreeCAD_ConstrainMidpoint",
     "FusionMyFreeCAD_CreateSlot",
     "FusionMyFreeCAD_DatumMidplane",
+    "FusionMyFreeCAD_Export",
     "FusionMyFreeCAD_MirrorWithConstraints",
     "FusionMyFreeCAD_ParameterDock",
     "FusionMyFreeCAD_SmartOffset",
@@ -18,6 +19,11 @@
     "FusionMyFreeCAD_CreateSketch",
     "FusionMyFreeCAD_CreateSlot",
     "FusionMyFreeCAD_DatumMidplane",
+    "FusionMyFreeCAD_Export",
+    "FusionMyFreeCAD_Export3MF",
+    "FusionMyFreeCAD_ExportDXF",
+    "FusionMyFreeCAD_ExportSTEP",
+    "FusionMyFreeCAD_ExportSTL",
     "FusionMyFreeCAD_MirrorWithConstraints",
     "FusionMyFreeCAD_ParameterDock",
     "FusionMyFreeCAD_ParameterTable",
@@ -199,7 +205,8 @@
       "Fusion Construct_newPanel",
       "Fusion Parameters_newPanel",
       "Fusion Frequent_newPanel",
-      "Fusion Inspect_newPanel"
+      "Fusion Inspect_newPanel",
+      "Fusion Output_newPanel"
     ],
     "PartWorkbench": [
       "Fusion Part Create_newPanel",
@@ -207,7 +214,8 @@
       "Fusion Part Split_newPanel",
       "Fusion Part Repair_newPanel",
       "Fusion Part Frequent_newPanel",
-      "Fusion Part Inspect_newPanel"
+      "Fusion Part Inspect_newPanel",
+      "Fusion Part Output_newPanel"
     ],
     "SketcherWorkbench": [
       "Fusion Sketch Create_newPanel",
@@ -223,7 +231,8 @@
       "Fusion Surface Create_newPanel",
       "Fusion Surface Modify_newPanel",
       "Fusion Surface Frequent_newPanel",
-      "Fusion Surface Inspect_newPanel"
+      "Fusion Surface Inspect_newPanel",
+      "Fusion Surface Output_newPanel"
     ]
   },
   "adaptivePins": {

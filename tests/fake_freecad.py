@@ -1299,6 +1299,18 @@ class Environment:
         self.task_dialog_active = False
         self.saved_parameters = 0
         self.selection_ex = []
+        # Wording taken from a real FreeCAD 1.1 App.getExportFilters(); the DXF
+        # entry is deliberately not the literal fusion_export falls back to, so
+        # the tests exercise resolution rather than the hardcoded string.
+        self.export_filters = [
+            "STEP with colors (*.step *.stp)",
+            "STEP (*.step *.stp)",
+            "Binary STL (*.stl)",
+            "Wavefront OBJ (*.obj)",
+            "3D Manufacturing Format (*.3mf)",
+            "Autodesk DXF 2D (*.dxf)",
+            "Portable Document Format (*.pdf)",
+        ]
         self.command_handlers = {}
         self.documents = {}
         self.document_observers = []
@@ -1317,6 +1329,7 @@ class Environment:
         app.removeDocumentObserver = lambda obs: (
             self.document_observers.remove(obs) if obs in self.document_observers else None
         )
+        app.getExportFilters = lambda: list(self.export_filters)
         app.setActiveDocument = self._set_active_document
         app.Vector = FakeVector
         app.Rotation = FakeRotation
@@ -1349,6 +1362,7 @@ class Environment:
             ),
             getSelectionEx=lambda *args: list(self.selection_ex),
             getSelection=lambda *args: [entry.Object for entry in self.selection_ex],
+            hasSelection=lambda *args: bool(self.selection_ex),
             addObserver=self.selection_observers.append,
             removeObserver=lambda obs: (
                 self.selection_observers.remove(obs) if obs in self.selection_observers else None
@@ -1389,6 +1403,17 @@ class Environment:
             ActiveView=self.active_view,
         )
         return sketch
+
+    def select_objects(self, *objects):
+        """Set the whole-object selection that Gui.Selection.getSelection() reports."""
+        self.selection_ex = [
+            types.SimpleNamespace(
+                Object=obj,
+                ObjectName=getattr(obj, "Name", "Object"),
+                SubElementNames=[],
+            )
+            for obj in objects
+        ]
 
     def select_subelements(self, sketch, sub_element_names):
         self.selection_ex = [
