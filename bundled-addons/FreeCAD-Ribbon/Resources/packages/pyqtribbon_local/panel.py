@@ -50,7 +50,7 @@ from .constants import (
     Small,
 )
 from .gallery import RibbonGallery
-from .fmf_widgets import DraggablePanelSeparator
+from .fmf_widgets import DraggablePanelSeparator, popup_menu_at
 from .separator import RibbonSeparator, RibbonVerticalSeparator
 from .toolbutton import RibbonToolButton
 from .utils import DataFile
@@ -394,9 +394,14 @@ class RibbonPanel(QFrame):
         return menu is not None and len(menu.actions()) > 0
 
     def openDrawer(self):
-        """Open the panel's overflow drawer, as clicking its option button does."""
+        """Open the panel's overflow drawer, aligned with the panel itself.
+
+        Not showMenu(): that anchors to the option button at the right end of
+        the title bar, so a menu opened by clicking the title appeared off to
+        one side of the section it belongs to.
+        """
         if self.isDrawerAvailable():
-            self._panelOption.showMenu()
+            popup_menu_at(self._panelOption.menu(), self)
 
     def panelOptionButton(self) -> RibbonPanelOptionButton:
         """Return the panel option button.

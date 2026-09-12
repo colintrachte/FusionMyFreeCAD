@@ -315,9 +315,14 @@ PANEL_TITLE_DRAWER_PATCH = (
         "        return menu is not None and len(menu.actions()) > 0\n"
         "\n"
         "    def openDrawer(self):\n"
-        '        """Open the panel\'s overflow drawer, as clicking its option button does."""\n'
+        '        """Open the panel\'s overflow drawer, aligned with the panel itself.\n'
+        "\n"
+        "        Not showMenu(): that anchors to the option button at the right end of\n"
+        "        the title bar, so a menu opened by clicking the title appeared off to\n"
+        "        one side of the section it belongs to.\n"
+        '        """\n'
         "        if self.isDrawerAvailable():\n"
-        "            self._panelOption.showMenu()\n"
+        "            popup_menu_at(self._panelOption.menu(), self)\n"
         "\n"
         "    def panelOptionButton(self) -> RibbonPanelOptionButton:\n",
     ),
@@ -327,6 +332,7 @@ PANEL_TITLE_DRAWER_PATCH = (
 # bundled tree before copying, so these are carried across that wipe rather than
 # kept as a second tracked copy somewhere else.
 FMF_OWNED_FILES = (
+    ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "fmf_layout_math.py"),
     ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "fmf_widgets.py"),
     ("FreeCAD-Ribbon", "fmf_ribbon_support.py"),
 )
@@ -337,7 +343,7 @@ FMF_OWNED_FILES = (
 PANEL_DIVIDER_PATCH = (
     (
         "from .separator import RibbonSeparator, RibbonVerticalSeparator\n",
-        "from .fmf_widgets import DraggablePanelSeparator\n"
+        "from .fmf_widgets import DraggablePanelSeparator, popup_menu_at\n"
         "from .separator import RibbonSeparator, RibbonVerticalSeparator\n",
     ),
     (
