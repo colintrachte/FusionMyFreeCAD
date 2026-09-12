@@ -376,8 +376,12 @@ class RibbonPanel(QFrame):
         A panel built without an option button has no drawer, and FCBinding
         hides the button on panels whose commands all fit, so the title must
         stay inert there instead of swallowing the click.
+
+        Reads __dict__ directly: __getattr__ below raises AssertionError for any
+        name that is not add[Small|Medium|Large]*, and getattr's default only
+        swallows AttributeError.
         """
-        option = getattr(self, "_panelOption", None)
+        option = self.__dict__.get("_panelOption")
         return option is not None and option.isVisible() and option.menu() is not None
 
     def openDrawer(self):

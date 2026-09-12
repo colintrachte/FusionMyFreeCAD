@@ -6861,8 +6861,11 @@ class ModernMenu(RibbonBar):
         #
         # FusionMyFreeCAD local change: let this panel's divider resize it.
         # setPanelProperties runs for every panel, including rebuilt ones, so the
-        # connection is guarded rather than made unconditionally.
-        if getattr(panel, "_fmfResizeConnected", False) is False:
+        # connection is guarded rather than made unconditionally. The guard reads
+        # __dict__ directly because RibbonPanel.__getattr__ raises AssertionError
+        # for any name that is not add[Small|Medium|Large]*, and getattr's default
+        # only swallows AttributeError.
+        if panel.__dict__.get("_fmfResizeConnected") is not True:
             try:
                 panel.panelResizeRequested.connect(self._onPanelResized)
                 panel._fmfResizeConnected = True

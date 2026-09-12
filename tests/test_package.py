@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import re
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
@@ -447,6 +448,60 @@ def test_the_files_fusionmyfreecad_owns_are_bundled():
     assert sync.FMF_OWNED_FILES
     for parts in sync.FMF_OWNED_FILES:
         assert BUNDLED.joinpath(*parts).is_file(), parts
+
+
+def test_no_local_hook_probes_a_ribbon_panel_with_getattr():
+    """RibbonPanel.__getattr__ turns any attribute miss into AssertionError.
+
+    It exists to synthesise addSmall*/addMedium*/addLarge* and asserts on every
+    other name, so `getattr(panel, "x", default)` does not fall back -- getattr's
+    default only swallows AttributeError. Reading __dict__ is the safe probe.
+    Every FusionMyFreeCAD hook that asks a panel whether an attribute exists must
+    use it; one that did not took the whole ribbon down on workbench activation.
+    """
+    offenders = []
+    for parts, patches in _sync_tool().LOCAL_PATCHES:
+        for _anchor, replacement in patches:
+            for line in replacement.splitlines():
+                stripped = line.strip()
+                if not stripped.startswith("#") and re.search(
+                    r"getattr\(\s*(self|panel)\s*,", stripped
+                ):
+                    offenders.append("{}: {}".format(parts[-1], stripped))
+    assert offenders == [], (
+        "Probe a RibbonPanel with __dict__.get() instead; getattr raises here: {}".format(offenders)
+    )
+
+
+def test_the_ribbon_panel_getattr_trap_still_behaves_as_assumed():
+    """Pin the upstream behaviour the rule above exists for.
+
+    If upstream ever makes __getattr__ raise AttributeError properly, this fails
+    and the __dict__ probes can be simplified back to getattr.
+    """
+    panel = (
+        BUNDLED / "FreeCAD-Ribbon" / "Resources" / "packages" / "pyqtribbon_local" / "panel.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(panel)
+    panel_class = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef) and node.name == "RibbonPanel"
+    )
+    getattr_def = next(
+        node
+        for node in panel_class.body
+        if isinstance(node, ast.FunctionDef) and node.name == "__getattr__"
+    )
+    assert any(isinstance(node, ast.Assert) for node in ast.walk(getattr_def)), (
+        "RibbonPanel.__getattr__ no longer asserts; the __dict__ probes can be relaxed"
+    )
+    assert not any(
+        isinstance(node, ast.Raise)
+        and isinstance(node.exc, ast.Call)
+        and getattr(node.exc.func, "id", "") == "AttributeError"
+        for node in ast.walk(getattr_def)
+    )
 
 
 def test_the_draggable_divider_reaches_the_panel():
