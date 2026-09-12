@@ -6134,6 +6134,9 @@ class ModernMenu(RibbonBar):
                 maxColumns = max(1, int(panelDefinition["maxColumns"]))
         except (TypeError, ValueError):
             pass
+        # Whether this section carries a width the user dragged it to. Only
+        # then may commands be pulled back out of its drawer to fill the space.
+        fmfHasUserWidth = panelDefinition.get("minWidth") is not None
         explicitPanelMenu = set(panelDefinition.get("panelMenu", []))
         explicitOverflow = set(panelDefinition.get("overflow", []))
         responsiveCommands = panelDefinition.get("responsive", {})
@@ -6226,10 +6229,19 @@ class ModernMenu(RibbonBar):
                     )
                 except (TypeError, ValueError):
                     pass
+                # FusionMyFreeCAD local change: a section the user has widened
+                # should fill the space it was given. Upstream sends every
+                # command on the overflow list to the drawer whatever the room,
+                # so dragging a section wider left it sparse with commands
+                # still hidden behind the dropdown.
+                fmfRoomForMore = (
+                    fmfHasUserWidth and maxColumns > 0 and columnCount < maxColumns
+                )
                 if (
                     CommandName in explicitOverflow
                     and not responsiveVisible
                     and ignoreColumnLimit is False
+                    and not fmfRoomForMore
                 ):
                     ButtonList.append(button)
                     panel.panelOptionButton().show()

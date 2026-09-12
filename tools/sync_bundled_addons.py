@@ -369,6 +369,35 @@ PANEL_DIVIDER_PATCH = (
 # Hooks in FCBinding for the draggable dividers. The arithmetic and the rebuild
 # live in fmf_widgets.resize_panel, so what must survive a refresh here is four
 # short edits rather than a method body.
+# Upstream applies a panel's overflow list before it considers how much room
+# the panel has, so a section dragged wider stayed sparse with its remaining
+# commands hidden. This lets a section the user sized fill the space it was
+# given.
+FCBINDING_OVERFLOW_PATCH = (
+    (
+        "                if (\n"
+        "                    CommandName in explicitOverflow\n"
+        "                    and not responsiveVisible\n"
+        "                    and ignoreColumnLimit is False\n"
+        "                ):\n",
+        "                # FusionMyFreeCAD local change: a section the user has widened\n"
+        "                # should fill the space it was given. Upstream sends every\n"
+        "                # command on the overflow list to the drawer whatever the room,\n"
+        "                # so dragging a section wider left it sparse with commands\n"
+        "                # still hidden behind the dropdown.\n"
+        "                fmfRoomForMore = (\n"
+        "                    fmfHasUserWidth and maxColumns > 0 and columnCount < maxColumns\n"
+        "                )\n"
+        "                if (\n"
+        "                    CommandName in explicitOverflow\n"
+        "                    and not responsiveVisible\n"
+        "                    and ignoreColumnLimit is False\n"
+        "                    and not fmfRoomForMore\n"
+        "                ):\n",
+    ),
+)
+
+
 FCBINDING_DIVIDER_PATCH = (
     (
         "from pyqtribbon_local.separator import RibbonSeparator\n",
@@ -407,6 +436,9 @@ FCBINDING_DIVIDER_PATCH = (
         '                maxColumns = max(1, int(panelDefinition["maxColumns"]))\n'
         "        except (TypeError, ValueError):\n"
         "            pass\n"
+        "        # Whether this section carries a width the user dragged it to. Only\n"
+        "        # then may commands be pulled back out of its drawer to fill the space.\n"
+        '        fmfHasUserWidth = panelDefinition.get("minWidth") is not None\n'
         '        explicitPanelMenu = set(panelDefinition.get("panelMenu", []))\n',
     ),
     (
@@ -469,7 +501,7 @@ LOCAL_PATCHES = (
     ),
     (
         ("FreeCAD-Ribbon", "FCBinding.py"),
-        FCBINDING_DIVIDER_PATCH,
+        FCBINDING_DIVIDER_PATCH + FCBINDING_OVERFLOW_PATCH,
     ),
     (
         ("FreeCAD-Ribbon", "CustomWidgets.py"),
