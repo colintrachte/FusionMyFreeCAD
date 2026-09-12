@@ -240,6 +240,96 @@ def strip_python_dependencies() -> list[str]:
     return removed
 
 
+# Upstream puts the panel's overflow drawer behind a small icon in the title bar.
+# FusionMyFreeCAD makes the whole title open it, which is how a Fusion section
+# header behaves. Each pair is (anchor, replacement); a missing anchor raises so an
+# upstream refactor surfaces here instead of silently dropping the behaviour.
+PANEL_TITLE_DRAWER_PATCH = (
+    (
+        "class RibbonPanelTitle(QLabel):\n"
+        '    """Widget to display the title of a panel."""\n'
+        "    \n"
+        "    pass\n",
+        "class RibbonPanelTitle(QLabel):\n"
+        '    """Widget to display the title of a panel.\n'
+        "\n"
+        "    FusionMyFreeCAD local change: the title doubles as the trigger for the\n"
+        "    panel's overflow drawer, so the whole header reads as the dropdown it\n"
+        "    already is rather than only the small icon beside it.\n"
+        '    """\n'
+        "\n"
+        "    clicked = Signal()\n"
+        "\n"
+        "    #: Set by RibbonPanel to report whether the drawer can currently open.\n"
+        "    #: A plain callable rather than a signal so the cursor can be decided at\n"
+        "    #: hover time; FCBinding shows and hides the option button directly, so\n"
+        "    #: anything cached at construction time would go stale.\n"
+        "    drawerAvailable: Callable[[], bool] = staticmethod(lambda: False)\n"
+        "\n"
+        "    def mousePressEvent(self, event):\n"
+        "        if event.button() == Qt.MouseButton.LeftButton and self.drawerAvailable():\n"
+        "            self.clicked.emit()\n"
+        "            event.accept()\n"
+        "            return\n"
+        "        super().mousePressEvent(event)\n"
+        "\n"
+        "    def enterEvent(self, event):\n"
+        "        self.setCursor(\n"
+        "            Qt.CursorShape.PointingHandCursor\n"
+        "            if self.drawerAvailable()\n"
+        "            else Qt.CursorShape.ArrowCursor\n"
+        "        )\n"
+        "        super().enterEvent(event)\n",
+    ),
+    (
+        "        self._titleLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)\n"
+        "        self._titleLayout.addWidget(self._titleLabel, 0)\n",
+        "        self._titleLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)\n"
+        "        self._titleLabel.drawerAvailable = self.isDrawerAvailable\n"
+        "        self._titleLabel.clicked.connect(self.openDrawer)\n"
+        "        self._titleLayout.addWidget(self._titleLabel, 0)\n",
+    ),
+    (
+        "    def panelOptionButton(self) -> RibbonPanelOptionButton:\n",
+        "    def isDrawerAvailable(self) -> bool:\n"
+        '        """Whether clicking the title can open anything.\n'
+        "\n"
+        "        A panel built without an option button has no drawer, and FCBinding\n"
+        "        hides the button on panels whose commands all fit, so the title must\n"
+        "        stay inert there instead of swallowing the click.\n"
+        '        """\n'
+        '        option = getattr(self, "_panelOption", None)\n'
+        "        return option is not None and option.isVisible() and option.menu() is not None\n"
+        "\n"
+        "    def openDrawer(self):\n"
+        '        """Open the panel\'s overflow drawer, as clicking its option button does."""\n'
+        "        if self.isDrawerAvailable():\n"
+        "            self._panelOption.showMenu()\n"
+        "\n"
+        "    def panelOptionButton(self) -> RibbonPanelOptionButton:\n",
+    ),
+)
+
+PANEL_MODULE = ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "panel.py")
+
+
+def apply_panel_title_drawer() -> None:
+    """Re-apply the clickable panel-title drawer to the freshly copied ribbon."""
+    path = DESTINATION_ROOT.joinpath(*PANEL_MODULE)
+    text = path.read_text(encoding="utf-8")
+    for anchor, replacement in PANEL_TITLE_DRAWER_PATCH:
+        if replacement in text:
+            continue
+        if text.count(anchor) != 1:
+            raise RuntimeError(
+                "panel.py no longer holds exactly one copy of an anchor for the "
+                "clickable title drawer. Re-apply it by hand, then update "
+                "PANEL_TITLE_DRAWER_PATCH:\n{}".format(anchor)
+            )
+        text = text.replace(anchor, replacement)
+    path.write_text(text, encoding="utf-8")
+
+
 def assert_minimal_freecad_icons() -> None:
     """Fail unless the bundle contains exactly the icons used by the layout."""
     directory = DESTINATION_ROOT / "FreeCAD-Ribbon" / "Resources" / "FreeCAD Icons"
@@ -286,6 +376,7 @@ def main() -> None:
     write_source_icon_manifest(arguments.freecad_source, icon_sources)
     sync_search()
     removed = strip_python_dependencies()
+    apply_panel_title_drawer()
     assert_minimal_freecad_icons()
     file_count = sum(1 for path in destination.rglob("*") if path.is_file())
     byte_count = sum(path.stat().st_size for path in destination.rglob("*") if path.is_file())

@@ -30,10 +30,10 @@ upstream first.
 
 ## Local modifications
 
-These changes exist so the package installs without any third-party Python dependency and starts
-without a modal dialog the user cannot dismiss. They are re-applied mechanically by
-`tools/sync_bundled_addons.py` and asserted by `tests/test_package.py`, so an upstream refresh cannot
-drop them silently.
+These changes exist so the package installs without any third-party Python dependency, starts
+without a modal dialog the user cannot dismiss, and behaves the way the Fusion-style interface
+promises. They are re-applied mechanically by `tools/sync_bundled_addons.py` and asserted by
+`tests/test_package.py`, so an upstream refresh cannot drop them silently.
 
 **Dependency removal**
 
@@ -44,6 +44,16 @@ drop them silently.
 - FreeCAD Ribbon's optional icon download and SearchBar's version lookup use `urllib`.
 - The `<depend type="python">` entries the above made unnecessary are stripped from both bundled
   `package.xml` files.
+
+**The panel title opens the overflow drawer**
+
+Upstream reaches a panel's overflow commands through a small icon in its title bar. In
+FusionMyFreeCAD the title itself opens the same menu, so a section header behaves like the dropdown
+it already is. `RibbonPanelTitle` gains a `clicked` signal and a hover cursor; `RibbonPanel` gains
+`isDrawerAvailable()` and `openDrawer()`. The title stays inert on panels built without an option
+button and on panels whose commands all fit, so it never swallows a click that does nothing.
+`tools/sync_bundled_addons.py` re-applies this from `PANEL_TITLE_DRAWER_PATCH` and refuses to guess
+if upstream moves the anchors.
 
 **FreeCAD's command icons are curated**
 
