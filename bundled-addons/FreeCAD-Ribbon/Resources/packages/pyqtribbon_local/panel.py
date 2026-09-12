@@ -373,16 +373,25 @@ class RibbonPanel(QFrame):
     def isDrawerAvailable(self) -> bool:
         """Whether clicking the title can open anything.
 
-        A panel built without an option button has no drawer, and FCBinding
-        hides the button on panels whose commands all fit, so the title must
-        stay inert there instead of swallowing the click.
+        A panel built without an option button has no drawer, so the title stays
+        inert there instead of swallowing the click.
+
+        Visibility is deliberately not part of this. FCBinding only calls
+        show() on the option button when a command actually overflows, but it
+        populates the menu from the panel's whole command inventory on every
+        panel. Requiring the button to be visible therefore left the titles of
+        panels that happen to fit doing nothing, which is not what "every panel
+        has a dropdown" means.
 
         Reads __dict__ directly: __getattr__ below raises AssertionError for any
         name that is not add[Small|Medium|Large]*, and getattr's default only
         swallows AttributeError.
         """
         option = self.__dict__.get("_panelOption")
-        return option is not None and option.isVisible() and option.menu() is not None
+        if option is None:
+            return False
+        menu = option.menu()
+        return menu is not None and len(menu.actions()) > 0
 
     def openDrawer(self):
         """Open the panel's overflow drawer, as clicking its option button does."""
