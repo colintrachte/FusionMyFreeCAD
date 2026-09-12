@@ -147,7 +147,14 @@ python -m pytest tests -q
 ```
 
 `python validate_addon.py` runs the same suite and reports the packaged size.
-`ruff check . && ruff format --check .` matches CI. The development requirements pin the test and
+`ruff check . && ruff format --check .` matches CI. That configuration deliberately
+skips the vendored trees, so the bundled payload has its own narrower gate — run it
+after touching anything under `bundled-addons/`:
+
+```bash
+ruff check --isolated --select F821 --exclude '*.pyi' --exclude '*_ui.py' bundled-addons/
+```
+ The development requirements pin the test and
 formatting tools so local formatting cannot drift from the release gate.
 
 Only the FreeCAD command icons referenced by the layout are bundled; the full collection remains

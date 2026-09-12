@@ -74,6 +74,11 @@ jobs:
       - name: Check formatting
         run: ruff format --check .
 
+      # Mirrors the CI gate: bundled-addons/ is outside ruff's configured scope,
+      # so a release must not be the first thing to run it.
+      - name: Lint the bundled payload for undefined names
+        run: ruff check --isolated --select F821 --exclude '*.pyi' --exclude '*_ui.py' bundled-addons/
+
       - name: Test
         run: python -m pytest tests -q
 

@@ -40,6 +40,15 @@ jobs:
       - name: Check formatting
         run: ruff format --check .
 
+      # ruff's extend-exclude skips bundled-addons/, so edits to the vendored
+      # ribbon and search payload are otherwise never linted -- that is how an
+      # undefined QPoint reached a release and left FreeCAD with a blank window.
+      # Undefined names only: upstream style is not ours to police, but a name
+      # that does not exist is a crash wherever that line runs. Qt Designer
+      # output and .pyi stubs carry forward references that are fine at runtime.
+      - name: Lint the bundled payload for undefined names
+        run: ruff check --isolated --select F821 --exclude '*.pyi' --exclude '*_ui.py' bundled-addons/
+
       - name: Test
         run: python -m pytest tests -q
 
