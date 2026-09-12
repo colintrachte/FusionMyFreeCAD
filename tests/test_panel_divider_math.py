@@ -317,13 +317,6 @@ def test_an_unlaid_out_panel_falls_back_to_the_saved_budget(math_module):
     assert (plan["current"], plan["target"]) == (5, 6)
 
 
-def test_a_panel_showing_everything_reports_that_it_cannot_widen(math_module):
-    bar = _plan_bar(["a", "b"])
-    plan = _plan(math_module, _panel(90, 90), bar, 1)
-    assert plan["status"] == "at-edge"
-    assert plan["widening"] is True
-
-
 def test_a_one_column_panel_reports_that_it_cannot_narrow(math_module):
     bar = _plan_bar(["a", "b", "c"])
     plan = _plan(math_module, _panel(90), bar, -1)
@@ -346,3 +339,69 @@ def test_every_real_panel_can_be_dragged_both_ways(math_module):
         panel = _panel(90, 90, 90)
         assert _plan(math_module, panel, bar, -1)["status"] == "resize"
         assert _plan(math_module, panel, bar, 1)["status"] == "resize"
+
+
+# ---------------------------------------------------------------------------
+# Claiming space that is actually free
+# ---------------------------------------------------------------------------
+
+
+def test_widening_is_not_capped_by_the_command_count(math_module):
+    """A section can be given more room than its commands need.
+
+    maxColumns alone only decides how many columns are shown before the rest go
+    to the drawer, so capping a widen at the command count meant a section that
+    already showed everything could never grow -- even with empty ribbon to the
+    right of it. Six of the eight PartDesign sections were stuck that way.
+    """
+    bar = _plan_bar(["a", "b"])
+    plan = _plan(math_module, _panel(90, 90), bar, 1)
+    assert plan["status"] == "resize"
+    assert (plan["current"], plan["target"]) == (2, 3)
+
+
+def test_widening_still_stops_growing_without_a_drag(math_module):
+    bar = _plan_bar(["a", "b"])
+    assert _plan(math_module, _panel(90, 90), bar, 0)["status"] == "ignore"
+
+
+def test_narrowing_is_still_bounded_at_one_column(math_module):
+    bar = _plan_bar(["a", "b", "c"])
+    plan = _plan(math_module, _panel(90), bar, -1)
+    assert plan["status"] == "at-edge"
+
+
+@pytest.mark.parametrize(
+    ("columns", "width", "expected"),
+    [(1, 90, 102), (3, 40, 132), (0, 90, 12)],
+)
+def test_the_claimed_width_covers_the_columns_asked_for(math_module, columns, width, expected):
+    assert math_module.width_for_columns(columns, width) == expected
+
+
+def test_a_nonsense_column_width_still_yields_a_usable_number(math_module):
+    assert math_module.width_for_columns(2, 0) > 0
+    # A negative column count claims nothing rather than a negative width.
+    assert math_module.width_for_columns(-1, 40) == 0
+
+
+def test_a_saved_budget_is_readable_on_its_own(math_module):
+    """apply_panel_width needs to tell "never set" from "set to something"."""
+    assert (
+        math_module.stored_column_budget(
+            _plan_bar(["a"]), "PartDesignWorkbench", "Fusion Create_newPanel"
+        )
+        is None
+    )
+    bar = _plan_bar(["a"], stored=4)
+    assert (
+        math_module.stored_column_budget(bar, "PartDesignWorkbench", "Fusion Create_newPanel") == 4
+    )
+
+
+def test_an_unreadable_saved_budget_reads_as_unset(math_module):
+    bar = _plan_bar(["a"], stored="wide")
+    assert (
+        math_module.stored_column_budget(bar, "PartDesignWorkbench", "Fusion Create_newPanel")
+        is None
+    )

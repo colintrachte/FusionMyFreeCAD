@@ -103,6 +103,17 @@ def _toolbar_of(bar, workbench_name, panel_name):
     return toolbar if isinstance(toolbar, dict) else None
 
 
+def stored_column_budget(bar, workbench_name, panel_name):
+    """The budget saved for this panel, or None when it has never been set."""
+    toolbar = _toolbar_of(bar, workbench_name, panel_name)
+    if toolbar is None or toolbar.get("maxColumns") is None:
+        return None
+    try:
+        return max(1, int(toolbar["maxColumns"]))
+    except (TypeError, ValueError):
+        return None
+
+
 def current_column_budget(bar, workbench_name, panel_name, default=None) -> int:
     """The column budget in force for this panel right now.
 
@@ -155,6 +166,11 @@ def resolve_target(current: int, delta: int, ceiling: int) -> int:
     return min(current, target)
 
 
+def width_for_columns(columns: int, column_width: int, padding: int = 12) -> int:
+    """The pixel width a panel needs to claim `columns` columns of buttons."""
+    return max(0, int(columns) * max(1, int(column_width)) + max(0, int(padding)))
+
+
 def plan_resize(bar, panel, workbench_name, panel_name, delta, default_budget=None) -> dict:
     """Decide what a divider drag should do, without doing any of it.
 
@@ -178,7 +194,11 @@ def plan_resize(bar, panel, workbench_name, panel_name, delta, default_budget=No
         current = current_column_budget(bar, workbench_name, panel_name, default_budget)
         source = "stored"
 
-    ceiling = panel_command_count(bar, workbench_name, panel_name)
+    # Widening is not capped by the command count. A section can be given more
+    # room than its commands need -- that is the point of dragging a divider
+    # when there is empty ribbon to the right -- and the extra is claimed as
+    # minimum width rather than by revealing commands that do not exist.
+    ceiling = max(panel_command_count(bar, workbench_name, panel_name), current + max(0, delta))
     target = resolve_target(current, delta, ceiling)
     if target == current:
         return {
