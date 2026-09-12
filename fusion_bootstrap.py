@@ -321,6 +321,13 @@ def _apply_customization(ribbon, spec, customization=None):
             toolbar["panelMenu"] = list(toolbar["order"])
             if "enabled" in saved:
                 toolbar["Enabled"] = bool(saved["enabled"])
+            # A panel whose divider the user dragged carries its own column budget.
+            # Absent, the Ribbon add-on falls back to its global preference.
+            if "maxColumns" in saved:
+                try:
+                    toolbar["maxColumns"] = max(1, int(saved["maxColumns"]))
+                except (TypeError, ValueError):
+                    toolbar.pop("maxColumns", None)
     return ribbon
 
 
@@ -397,11 +404,17 @@ def record_customization(ribbon):
             overflow = set(toolbar.get("overflow", []))
             pin_count = int(toolbar.get("pinCount", len(panel["commands"])))
             pinned = [command for command in order if command not in overflow][:pin_count]
-            saved_workbench["panels"][name] = {
+            panel_state = {
                 "order": order,
                 "pinned": pinned,
                 "enabled": bool(toolbar.get("Enabled", True)),
             }
+            if toolbar.get("maxColumns") is not None:
+                try:
+                    panel_state["maxColumns"] = max(1, int(toolbar["maxColumns"]))
+                except (TypeError, ValueError):
+                    pass
+            saved_workbench["panels"][name] = panel_state
         result["workbenches"][workbench] = saved_workbench
     _atomic_json(CUSTOMIZATION_PATH, result)
     state = read_state()

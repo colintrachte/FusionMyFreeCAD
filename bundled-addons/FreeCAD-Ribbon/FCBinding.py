@@ -173,6 +173,7 @@ from pyqtribbon_local.ribbonbar import RibbonMenu, RibbonBar, RibbonTitleWidget,
 from pyqtribbon_local.panel import RibbonPanel, RibbonPanelItemWidget, RibbonPanelTitle
 from pyqtribbon_local.toolbutton import RibbonToolButton, RibbonButtonStyle
 from pyqtribbon_local.separator import RibbonSeparator
+from pyqtribbon_local import fmf_widgets
 from pyqtribbon_local.category import RibbonCategory, RibbonCategoryLayoutButton, RibbonNormalCategory, RibbonContextCategory
 
 # Get the main window of FreeCAD
@@ -2734,6 +2735,10 @@ class ModernMenu(RibbonBar):
             fusion_bootstrap.record_customization(self.ribbonStructure)
         except (ImportError, AttributeError):
             pass
+
+    def _onPanelResized(self, panel, deltaX: int):
+        """FusionMyFreeCAD local change: a divider drag resizes one panel."""
+        fmf_widgets.resize_panel(self, panel, deltaX)
 
     def _resetOnePanel(self, panel):
         """Restore one FMF panel while retaining every other customization."""
@@ -6105,9 +6110,6 @@ class ModernMenu(RibbonBar):
         smallButtons = []
         mediumButtons = []
         largeButtons = []
-        # Set the maximum columns
-        maxColumns = Parameters.MAX_COLUMN_PANELS
-
         # Define an action list of the actions that are beyond the maximum columns
         ButtonList = []
         PanelMenuButtons = []
@@ -6117,6 +6119,15 @@ class ModernMenu(RibbonBar):
             .get("toolbars", {})
             .get(panelName, {})
         )
+        # Set the maximum columns. FusionMyFreeCAD local change: a panel whose
+        # divider the user has dragged carries its own budget; everything else
+        # still follows the global preference.
+        maxColumns = Parameters.MAX_COLUMN_PANELS
+        try:
+            if panelDefinition.get("maxColumns") is not None:
+                maxColumns = max(1, int(panelDefinition["maxColumns"]))
+        except (TypeError, ValueError):
+            pass
         explicitPanelMenu = set(panelDefinition.get("panelMenu", []))
         explicitOverflow = set(panelDefinition.get("overflow", []))
         responsiveCommands = panelDefinition.get("responsive", {})
@@ -6848,6 +6859,16 @@ class ModernMenu(RibbonBar):
         # Set the panelheight. setting the ribbonheigt, cause the first tab to be shown to large
         # add an offset to make room for the panel titles and icons
         #
+        # FusionMyFreeCAD local change: let this panel's divider resize it.
+        # setPanelProperties runs for every panel, including rebuilt ones, so the
+        # connection is guarded rather than made unconditionally.
+        if getattr(panel, "_fmfResizeConnected", False) is False:
+            try:
+                panel.panelResizeRequested.connect(self._onPanelResized)
+                panel._fmfResizeConnected = True
+            except (AttributeError, TypeError):
+                pass
+
         # Set the font for the panel title
         Font = QFont()
         Font.setPixelSize(Parameters.FONTSIZE_PANELS)
