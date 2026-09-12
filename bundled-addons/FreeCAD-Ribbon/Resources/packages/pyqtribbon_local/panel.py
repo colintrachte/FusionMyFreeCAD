@@ -56,9 +56,35 @@ from .utils import DataFile
 
 
 class RibbonPanelTitle(QLabel):
-    """Widget to display the title of a panel."""
-    
-    pass
+    """Widget to display the title of a panel.
+
+    FusionMyFreeCAD local change: the title doubles as the trigger for the
+    panel's overflow drawer, so the whole header reads as the dropdown it
+    already is rather than only the small icon beside it.
+    """
+
+    clicked = Signal()
+
+    #: Set by RibbonPanel to report whether the drawer can currently open.
+    #: A plain callable rather than a signal so the cursor can be decided at
+    #: hover time; FCBinding shows and hides the option button directly, so
+    #: anything cached at construction time would go stale.
+    drawerAvailable: Callable[[], bool] = staticmethod(lambda: False)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.drawerAvailable():
+            self.clicked.emit()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def enterEvent(self, event):
+        self.setCursor(
+            Qt.CursorShape.PointingHandCursor
+            if self.drawerAvailable()
+            else Qt.CursorShape.ArrowCursor
+        )
+        super().enterEvent(event)
 
 
 class RibbonGridLayoutManager(object):
@@ -236,6 +262,8 @@ class RibbonPanel(QFrame):
         self._titleLabel = RibbonPanelTitle()  # type: ignore
         self._titleLabel.setText(title)
         self._titleLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._titleLabel.drawerAvailable = self.isDrawerAvailable
+        self._titleLabel.clicked.connect(self.openDrawer)
         self._titleLayout.addWidget(self._titleLabel, 0)
 
         # Panel option button
@@ -332,6 +360,21 @@ class RibbonPanel(QFrame):
             return self._smallRows
         else:
             raise ValueError("Invalid row span")
+
+    def isDrawerAvailable(self) -> bool:
+        """Whether clicking the title can open anything.
+
+        A panel built without an option button has no drawer, and FCBinding
+        hides the button on panels whose commands all fit, so the title must
+        stay inert there instead of swallowing the click.
+        """
+        option = getattr(self, "_panelOption", None)
+        return option is not None and option.isVisible() and option.menu() is not None
+
+    def openDrawer(self):
+        """Open the panel's overflow drawer, as clicking its option button does."""
+        if self.isDrawerAvailable():
+            self._panelOption.showMenu()
 
     def panelOptionButton(self) -> RibbonPanelOptionButton:
         """Return the panel option button.

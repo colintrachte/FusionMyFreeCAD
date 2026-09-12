@@ -389,6 +389,47 @@ def test_no_stripped_dependency_is_still_imported():
     assert offenders == []
 
 
+def test_the_panel_title_opens_the_overflow_drawer():
+    """The clickable section header is a local change; a refresh must not drop it.
+
+    tools/sync_bundled_addons.py replaces the whole vendored tree and re-applies
+    this from PANEL_TITLE_DRAWER_PATCH. Asserting the result here means a sync
+    against an upstream that moved the anchors fails the suite rather than
+    quietly shipping a ribbon whose titles do nothing.
+    """
+    panel = (
+        BUNDLED / "FreeCAD-Ribbon" / "Resources" / "packages" / "pyqtribbon_local" / "panel.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(panel)
+    classes = {node.name: node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)}
+
+    title = classes["RibbonPanelTitle"]
+    title_members = {node.name for node in title.body if isinstance(node, ast.FunctionDef)}
+    assert {"mousePressEvent", "enterEvent"} <= title_members
+    assert any(
+        isinstance(node, ast.AnnAssign) and getattr(node.target, "id", "") == "drawerAvailable"
+        for node in title.body
+    ), "RibbonPanelTitle must report whether the drawer can open"
+
+    panel_class = classes["RibbonPanel"]
+    panel_members = {node.name for node in panel_class.body if isinstance(node, ast.FunctionDef)}
+    assert {"isDrawerAvailable", "openDrawer"} <= panel_members
+
+
+def test_the_panel_title_patch_still_applies_to_the_bundled_tree():
+    """Re-applying the patch must be a no-op, so a sync cannot double-apply it."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    try:
+        import sync_bundled_addons
+    finally:
+        sys.path.pop(0)
+    panel = (
+        BUNDLED / "FreeCAD-Ribbon" / "Resources" / "packages" / "pyqtribbon_local" / "panel.py"
+    ).read_text(encoding="utf-8")
+    for _anchor, replacement in sync_bundled_addons.PANEL_TITLE_DRAWER_PATCH:
+        assert replacement in panel
+
+
 # ---------------------------------------------------------------------------
 # Archive
 # ---------------------------------------------------------------------------
