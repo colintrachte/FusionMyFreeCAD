@@ -44,7 +44,7 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
         "FusionMyFreeCAD_Verify",
     }
     assert bootstrap.startup_failures() == []
-    assert len(env.selection_observers) == 1
+    assert len(env.selection_observers) == 2  # _PadSelectionObserver, _DressUpSelectionObserver
 
 
 def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher(env, bootstrap):
