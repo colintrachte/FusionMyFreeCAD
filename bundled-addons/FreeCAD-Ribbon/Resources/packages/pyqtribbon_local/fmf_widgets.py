@@ -12,10 +12,8 @@ from PySide.QtWidgets import QRubberBand
 
 from .fmf_layout_math import (
     column_delta,
-    current_column_budget,
     panel_column_width,
-    panel_command_count,
-    resolve_target,
+    plan_resize,
 )
 from .separator import RibbonVerticalSeparator
 
@@ -232,20 +230,25 @@ def resize_panel(bar, panel, columnDelta: int):
         if not workbenchName or not panelName:
             return
 
-        current = current_column_budget(bar, workbenchName, panelName, _global_column_budget())
-        ceiling = panel_command_count(bar, workbenchName, panelName)
-        target = resolve_target(current, columnDelta, ceiling)
-        if target == current:
-            # Already at the end of its range. Say so rather than looking broken.
+        plan = plan_resize(
+            bar, panel, workbenchName, panelName, columnDelta, _global_column_budget()
+        )
+        label = panel.title() if hasattr(panel, "title") else panelName
+        if plan["status"] != "resize":
+            # Say why rather than looking broken. A section cannot be stretched
+            # past its own contents: the budget decides how many columns of
+            # commands are shown before the rest go to the drawer, so widening
+            # one that already shows everything has nothing left to reveal.
             console = _console()
-            if console is not None:
-                edge = "widest" if columnDelta > 0 else "narrowest"
+            if console is not None and plan["status"] == "at-edge":
                 console.PrintMessage(
-                    "FusionMyFreeCAD: {} is already at its {} ({} column(s)).\n".format(
-                        panel.title() if hasattr(panel, "title") else panelName, edge, target
+                    "FusionMyFreeCAD: {} already shows {} column(s), which is as {} "
+                    "as it goes.\n".format(
+                        label, plan["current"], "wide" if plan["widening"] else "narrow"
                     )
                 )
             return
+        target = plan["target"]
 
         bar._ensureDirectDragState()
         toolbars = (
