@@ -236,7 +236,7 @@ def strip_python_dependencies() -> list[str]:
         removed.extend(f"{addon}: {match.group('name')}" for match in pattern.finditer(text))
         stripped = pattern.sub("", text)
         if stripped != text:
-            path.write_text(stripped, encoding="utf-8")
+            path.write_text(stripped, encoding="utf-8", newline="\n")
     return removed
 
 
@@ -294,16 +294,25 @@ PANEL_TITLE_DRAWER_PATCH = (
         "    def isDrawerAvailable(self) -> bool:\n"
         '        """Whether clicking the title can open anything.\n'
         "\n"
-        "        A panel built without an option button has no drawer, and FCBinding\n"
-        "        hides the button on panels whose commands all fit, so the title must\n"
-        "        stay inert there instead of swallowing the click.\n"
+        "        A panel built without an option button has no drawer, so the title stays\n"
+        "        inert there instead of swallowing the click.\n"
+        "\n"
+        "        Visibility is deliberately not part of this. FCBinding only calls\n"
+        "        show() on the option button when a command actually overflows, but it\n"
+        "        populates the menu from the panel's whole command inventory on every\n"
+        "        panel. Requiring the button to be visible therefore left the titles of\n"
+        '        panels that happen to fit doing nothing, which is not what "every panel\n'
+        '        has a dropdown" means.\n'
         "\n"
         "        Reads __dict__ directly: __getattr__ below raises AssertionError for any\n"
         "        name that is not add[Small|Medium|Large]*, and getattr's default only\n"
         "        swallows AttributeError.\n"
         '        """\n'
         '        option = self.__dict__.get("_panelOption")\n'
-        "        return option is not None and option.isVisible() and option.menu() is not None\n"
+        "        if option is None:\n"
+        "            return False\n"
+        "        menu = option.menu()\n"
+        "        return menu is not None and len(menu.actions()) > 0\n"
         "\n"
         "    def openDrawer(self):\n"
         '        """Open the panel\'s overflow drawer, as clicking its option button does."""\n'
@@ -319,6 +328,7 @@ PANEL_TITLE_DRAWER_PATCH = (
 # kept as a second tracked copy somewhere else.
 FMF_OWNED_FILES = (
     ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "fmf_widgets.py"),
+    ("FreeCAD-Ribbon", "fmf_ribbon_support.py"),
 )
 
 # Hooks into upstream's own modules for the draggable panel dividers. The widget
@@ -407,6 +417,36 @@ FCBINDING_DIVIDER_PATCH = (
     ),
 )
 
+# Hooks in CustomWidgets so every icon drag runs through fmf_ribbon_support.
+# Upstream repeats the same handler five times, hence the counts.
+CUSTOM_WIDGETS_DRAG_PATCH = (
+    (
+        "import Parameters_Ribbon\n",
+        "import Parameters_Ribbon\nimport fmf_ribbon_support  # FusionMyFreeCAD local change\n",
+    ),
+    # The deeper-indented site first: the shallower anchor below is a substring
+    # of this line, so replacing that one first would corrupt this one.
+    (
+        "                if drag is not None:\n"
+        "                    drag.exec_(Qt.DropAction.MoveAction)\n"
+        "            except Exception as e:\n"
+        "                print(e)\n",
+        "                if drag is not None:\n"
+        "                    fmf_ribbon_support.start_drag(drag)\n"
+        "            except Exception as error:\n"
+        "                fmf_ribbon_support.report_drag_failure(error)\n",
+    ),
+    (
+        "                drag.exec_(Qt.DropAction.MoveAction)\n"
+        "            except Exception as e:\n"
+        "                print(e)\n",
+        "                fmf_ribbon_support.start_drag(drag)\n"
+        "            except Exception as error:\n"
+        "                fmf_ribbon_support.report_drag_failure(error)\n",
+        4,
+    ),
+)
+
 LOCAL_PATCHES = (
     (
         ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "panel.py"),
@@ -415,6 +455,10 @@ LOCAL_PATCHES = (
     (
         ("FreeCAD-Ribbon", "FCBinding.py"),
         FCBINDING_DIVIDER_PATCH,
+    ),
+    (
+        ("FreeCAD-Ribbon", "CustomWidgets.py"),
+        CUSTOM_WIDGETS_DRAG_PATCH,
     ),
 )
 
@@ -441,28 +485,62 @@ def restore_fmf_files(saved: dict[tuple, bytes]) -> None:
         path.write_bytes(content)
 
 
+def patch_marker(anchor: str, replacement: str) -> str | None:
+    """The first whole line a patch introduces, or None when it only removes.
+
+    Substring tests are not safe here. Upstream repeats the same drag handler at
+    two indentation levels, so the shallower patch's text is a substring of the
+    deeper one's, and checking `replacement in text` let an applied patch mask an
+    unapplied one -- four of the five drag sites were silently skipped that way.
+    Some patches also insert around their anchor rather than consuming it, so the
+    anchor surviving proves nothing either way. Comparing a whole line against
+    the file's lines avoids both traps.
+    """
+    anchor_lines = set(anchor.splitlines(keepends=True))
+    for line in replacement.splitlines(keepends=True):
+        if line not in anchor_lines and line.strip():
+            return line
+    return None
+
+
+def patch_is_applied(text: str, lines: list[str], anchor: str, replacement: str) -> bool:
+    """Whether this patch has already been made to `text`."""
+    marker = patch_marker(anchor, replacement)
+    if marker is not None:
+        return marker in lines
+    # A patch that only deletes introduces nothing to look for, so the absence
+    # of what it removes is the only evidence available.
+    return anchor not in text
+
+
 def apply_local_patches() -> list[str]:
     """Re-apply every hook FusionMyFreeCAD adds to upstream's own modules.
 
-    Each patch is skipped when its replacement is already present, so running the
-    sync twice is harmless. A missing anchor raises rather than silently shipping
-    a ribbon with the behaviour quietly removed.
+    Each patch is skipped when it is already applied, so running the sync twice
+    is harmless. A missing anchor raises rather than silently shipping a ribbon
+    with the behaviour quietly removed.
     """
     applied = []
     for parts, patches in LOCAL_PATCHES:
         path = DESTINATION_ROOT.joinpath(*parts)
         text = path.read_text(encoding="utf-8")
-        for anchor, replacement in patches:
-            if replacement in text:
+        for patch in patches:
+            # A patch is (anchor, replacement), or (anchor, replacement, count)
+            # where upstream repeats the same code, as the drag handlers do.
+            anchor, replacement = patch[0], patch[1]
+            expected = patch[2] if len(patch) > 2 else 1
+            if patch_is_applied(text, text.splitlines(keepends=True), anchor, replacement):
                 continue
-            if text.count(anchor) != 1:
+            if text.count(anchor) != expected:
                 raise RuntimeError(
-                    "{} no longer holds exactly one copy of a FusionMyFreeCAD anchor. "
-                    "Re-apply it by hand, then update LOCAL_PATCHES:\n{}".format(path.name, anchor)
+                    "{} holds {} copies of a FusionMyFreeCAD anchor, expected {}. "
+                    "Re-apply it by hand, then update LOCAL_PATCHES:\n{}".format(
+                        path.name, text.count(anchor), expected, anchor
+                    )
                 )
             text = text.replace(anchor, replacement)
             applied.append("{}: {}".format(path.name, anchor.strip().splitlines()[0]))
-        path.write_text(text, encoding="utf-8")
+        path.write_text(text, encoding="utf-8", newline="\n")
     return applied
 
 

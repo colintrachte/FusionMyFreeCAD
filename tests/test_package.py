@@ -436,7 +436,13 @@ def test_every_local_ui_patch_is_present_in_the_bundled_tree():
     sync = _sync_tool()
     for parts, patches in sync.LOCAL_PATCHES:
         text = BUNDLED.joinpath(*parts).read_text(encoding="utf-8")
-        for anchor, replacement in patches:
+        for patch in patches:
+            # (anchor, replacement) or (anchor, replacement, occurrences).
+            # Presence is the invariant, not a count: where upstream repeats a
+            # handler the shorter replacement is a substring of the longer one,
+            # and some patches insert around their anchor rather than consuming
+            # it, so counting either side compares the wrong things.
+            anchor, replacement = patch[0], patch[1]
             assert replacement in text, "{} is missing a local patch: {}".format(
                 parts[-1], anchor.strip().splitlines()[0]
             )
@@ -461,7 +467,8 @@ def test_no_local_hook_probes_a_ribbon_panel_with_getattr():
     """
     offenders = []
     for parts, patches in _sync_tool().LOCAL_PATCHES:
-        for _anchor, replacement in patches:
+        for patch in patches:
+            replacement = patch[1]
             for line in replacement.splitlines():
                 stripped = line.strip()
                 if not stripped.startswith("#") and re.search(

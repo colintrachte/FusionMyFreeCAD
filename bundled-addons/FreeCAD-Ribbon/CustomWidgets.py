@@ -77,6 +77,7 @@ from PySide.QtCore import (
 
 import os
 import Parameters_Ribbon
+import fmf_ribbon_support  # FusionMyFreeCAD local change
 from Parameters_Ribbon import Parameters
 import Standard_Functions_Ribbon as StandardFunctions
 import StyleMapping_Ribbon
@@ -222,9 +223,9 @@ class CustomControls(RibbonToolButton):
                 self.render(pixmap)
                 drag.setPixmap(pixmap)
 
-                drag.exec_(Qt.DropAction.MoveAction)
-            except Exception as e:
-                print(e)
+                fmf_ribbon_support.start_drag(drag)
+            except Exception as error:
+                fmf_ribbon_support.report_drag_failure(error)
     
                 
     def actions(self):
@@ -1578,9 +1579,9 @@ class QuickAccessToolButton(QToolButton):
                 self.render(pixmap)
                 drag.setPixmap(pixmap)
 
-                drag.exec_(Qt.DropAction.MoveAction)
-            except Exception as e:
-                print(e)
+                fmf_ribbon_support.start_drag(drag)
+            except Exception as error:
+                fmf_ribbon_support.report_drag_failure(error)
 
 class CustomSeparator(RibbonSeparator):
     def mouseMoveEvent(self, e):
@@ -1594,9 +1595,9 @@ class CustomSeparator(RibbonSeparator):
                 drag.setPixmap(pixmap)
 
                 if drag is not None:
-                    drag.exec_(Qt.DropAction.MoveAction)
-            except Exception as e:
-                print(e)
+                    fmf_ribbon_support.start_drag(drag)
+            except Exception as error:
+                fmf_ribbon_support.report_drag_failure(error)
 
 class DragTargetIndicator(QLabel):
     _topMargins: int = 6
@@ -1692,9 +1693,9 @@ class QuickAccessSeparator(QToolButton):
                 self.render(pixmap)
                 drag.setPixmap(pixmap)
 
-                drag.exec_(Qt.DropAction.MoveAction)
-            except Exception as e:
-                print(e)
+                fmf_ribbon_support.start_drag(drag)
+            except Exception as error:
+                fmf_ribbon_support.report_drag_failure(error)
     
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
@@ -1940,9 +1941,9 @@ class RightToolButton(QToolButton):
                 self.render(pixmap)
                 drag.setPixmap(pixmap)
 
-                drag.exec_(Qt.DropAction.MoveAction)
-            except Exception as e:
-                print(e)
+                fmf_ribbon_support.start_drag(drag)
+            except Exception as error:
+                fmf_ribbon_support.report_drag_failure(error)
                 
                 
 class Toggle(QCheckBox):
