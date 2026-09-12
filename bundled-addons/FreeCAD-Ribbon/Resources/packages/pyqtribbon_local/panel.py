@@ -50,6 +50,7 @@ from .constants import (
     Small,
 )
 from .gallery import RibbonGallery
+from .fmf_widgets import DraggablePanelSeparator
 from .separator import RibbonSeparator, RibbonVerticalSeparator
 from .toolbutton import RibbonToolButton
 from .utils import DataFile
@@ -200,6 +201,10 @@ class RibbonPanel(QFrame):
 
     # Panel options signal
     panelOptionClicked = Signal(bool)
+    # FusionMyFreeCAD local change: emitted as (panel, pixel delta) when the user
+    # finishes dragging this panel's divider. FCBinding turns the delta into a
+    # column budget for this panel alone.
+    panelResizeRequested = Signal(object, int)
 
     @overload
     def __init__(
@@ -278,8 +283,12 @@ class RibbonPanel(QFrame):
 
         self._mainLayout.addWidget(self._titleWidget, 1,0,1,1)
         
-        # Add a separator
-        self._separator = RibbonVerticalSeparator(width=3)
+        # Add a separator. FusionMyFreeCAD local change: draggable, so a panel's
+        # width is the user's to set rather than a single global column budget.
+        self._separator = DraggablePanelSeparator(width=3)
+        self._separator.dividerReleased.connect(
+            lambda delta: self.panelResizeRequested.emit(self, delta)
+        )
         self._mainLayout.addWidget(self._separator, 0,1,2,1)  
                  
     def maximumRows(self) -> int:

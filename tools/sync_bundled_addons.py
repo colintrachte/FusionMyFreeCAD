@@ -310,24 +310,153 @@ PANEL_TITLE_DRAWER_PATCH = (
     ),
 )
 
-PANEL_MODULE = ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "panel.py")
+# Files FusionMyFreeCAD adds that upstream never ships. main() clears the whole
+# bundled tree before copying, so these are carried across that wipe rather than
+# kept as a second tracked copy somewhere else.
+FMF_OWNED_FILES = (
+    ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "fmf_widgets.py"),
+)
+
+# Hooks into upstream's own modules for the draggable panel dividers. The widget
+# itself lives in fmf_widgets.py, so what has to survive a refresh here is only
+# the wiring.
+PANEL_DIVIDER_PATCH = (
+    (
+        "from .separator import RibbonSeparator, RibbonVerticalSeparator\n",
+        "from .fmf_widgets import DraggablePanelSeparator\n"
+        "from .separator import RibbonSeparator, RibbonVerticalSeparator\n",
+    ),
+    (
+        "    # Panel options signal\n    panelOptionClicked = Signal(bool)\n",
+        "    # Panel options signal\n"
+        "    panelOptionClicked = Signal(bool)\n"
+        "    # FusionMyFreeCAD local change: emitted as (panel, pixel delta) when the user\n"
+        "    # finishes dragging this panel's divider. FCBinding turns the delta into a\n"
+        "    # column budget for this panel alone.\n"
+        "    panelResizeRequested = Signal(object, int)\n",
+    ),
+    (
+        "        # Add a separator\n        self._separator = RibbonVerticalSeparator(width=3)\n",
+        "        # Add a separator. FusionMyFreeCAD local change: draggable, so a panel's\n"
+        "        # width is the user's to set rather than a single global column budget.\n"
+        "        self._separator = DraggablePanelSeparator(width=3)\n"
+        "        self._separator.dividerReleased.connect(\n"
+        "            lambda delta: self.panelResizeRequested.emit(self, delta)\n"
+        "        )\n",
+    ),
+)
+
+# Hooks in FCBinding for the draggable dividers. The arithmetic and the rebuild
+# live in fmf_widgets.resize_panel, so what must survive a refresh here is four
+# short edits rather than a method body.
+FCBINDING_DIVIDER_PATCH = (
+    (
+        "from pyqtribbon_local.separator import RibbonSeparator\n",
+        "from pyqtribbon_local.separator import RibbonSeparator\n"
+        "from pyqtribbon_local import fmf_widgets\n",
+    ),
+    (
+        "    def _resetOnePanel(self, panel):\n",
+        "    def _onPanelResized(self, panel, deltaX: int):\n"
+        '        """FusionMyFreeCAD local change: a divider drag resizes one panel."""\n'
+        "        fmf_widgets.resize_panel(self, panel, deltaX)\n"
+        "\n"
+        "    def _resetOnePanel(self, panel):\n",
+    ),
+    (
+        "        # Set the maximum columns\n"
+        "        maxColumns = Parameters.MAX_COLUMN_PANELS\n"
+        "\n"
+        "        # Define an action list of the actions that are beyond the maximum columns\n",
+        "        # Define an action list of the actions that are beyond the maximum columns\n",
+    ),
+    (
+        '        explicitPanelMenu = set(panelDefinition.get("panelMenu", []))\n',
+        "        # Set the maximum columns. FusionMyFreeCAD local change: a panel whose\n"
+        "        # divider the user has dragged carries its own budget; everything else\n"
+        "        # still follows the global preference.\n"
+        "        maxColumns = Parameters.MAX_COLUMN_PANELS\n"
+        "        try:\n"
+        '            if panelDefinition.get("maxColumns") is not None:\n'
+        '                maxColumns = max(1, int(panelDefinition["maxColumns"]))\n'
+        "        except (TypeError, ValueError):\n"
+        "            pass\n"
+        '        explicitPanelMenu = set(panelDefinition.get("panelMenu", []))\n',
+    ),
+    (
+        "        # Set the font for the panel title\n        Font = QFont()\n",
+        "        # FusionMyFreeCAD local change: let this panel's divider resize it.\n"
+        "        # setPanelProperties runs for every panel, including rebuilt ones, so the\n"
+        "        # connection is guarded rather than made unconditionally.\n"
+        '        if getattr(panel, "_fmfResizeConnected", False) is False:\n'
+        "            try:\n"
+        "                panel.panelResizeRequested.connect(self._onPanelResized)\n"
+        "                panel._fmfResizeConnected = True\n"
+        "            except (AttributeError, TypeError):\n"
+        "                pass\n"
+        "\n"
+        "        # Set the font for the panel title\n"
+        "        Font = QFont()\n",
+    ),
+)
+
+LOCAL_PATCHES = (
+    (
+        ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "panel.py"),
+        PANEL_TITLE_DRAWER_PATCH + PANEL_DIVIDER_PATCH,
+    ),
+    (
+        ("FreeCAD-Ribbon", "FCBinding.py"),
+        FCBINDING_DIVIDER_PATCH,
+    ),
+)
 
 
-def apply_panel_title_drawer() -> None:
-    """Re-apply the clickable panel-title drawer to the freshly copied ribbon."""
-    path = DESTINATION_ROOT.joinpath(*PANEL_MODULE)
-    text = path.read_text(encoding="utf-8")
-    for anchor, replacement in PANEL_TITLE_DRAWER_PATCH:
-        if replacement in text:
-            continue
-        if text.count(anchor) != 1:
+def preserve_fmf_files() -> dict[tuple, bytes]:
+    """Read the files FusionMyFreeCAD owns before the bundled tree is replaced."""
+    saved = {}
+    for parts in FMF_OWNED_FILES:
+        path = DESTINATION_ROOT.joinpath(*parts)
+        if not path.is_file():
             raise RuntimeError(
-                "panel.py no longer holds exactly one copy of an anchor for the "
-                "clickable title drawer. Re-apply it by hand, then update "
-                "PANEL_TITLE_DRAWER_PATCH:\n{}".format(anchor)
+                "{} is missing. It is FusionMyFreeCAD's own file and cannot be "
+                "recovered from upstream; restore it from git before syncing.".format(path)
             )
-        text = text.replace(anchor, replacement)
-    path.write_text(text, encoding="utf-8")
+        saved[parts] = path.read_bytes()
+    return saved
+
+
+def restore_fmf_files(saved: dict[tuple, bytes]) -> None:
+    """Put FusionMyFreeCAD's own files back after the bundled tree is replaced."""
+    for parts, content in saved.items():
+        path = DESTINATION_ROOT.joinpath(*parts)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+
+def apply_local_patches() -> list[str]:
+    """Re-apply every hook FusionMyFreeCAD adds to upstream's own modules.
+
+    Each patch is skipped when its replacement is already present, so running the
+    sync twice is harmless. A missing anchor raises rather than silently shipping
+    a ribbon with the behaviour quietly removed.
+    """
+    applied = []
+    for parts, patches in LOCAL_PATCHES:
+        path = DESTINATION_ROOT.joinpath(*parts)
+        text = path.read_text(encoding="utf-8")
+        for anchor, replacement in patches:
+            if replacement in text:
+                continue
+            if text.count(anchor) != 1:
+                raise RuntimeError(
+                    "{} no longer holds exactly one copy of a FusionMyFreeCAD anchor. "
+                    "Re-apply it by hand, then update LOCAL_PATCHES:\n{}".format(path.name, anchor)
+                )
+            text = text.replace(anchor, replacement)
+            applied.append("{}: {}".format(path.name, anchor.strip().splitlines()[0]))
+        path.write_text(text, encoding="utf-8")
+    return applied
 
 
 def assert_minimal_freecad_icons() -> None:
@@ -369,6 +498,7 @@ def main() -> None:
         assert_minimal_freecad_icons()
         print("Refreshed {} curated FreeCAD icons.".format(len(icon_sources)))
         return
+    preserved = preserve_fmf_files()
     if destination.exists():
         shutil.rmtree(destination)
     destination.mkdir()
@@ -376,12 +506,14 @@ def main() -> None:
     write_source_icon_manifest(arguments.freecad_source, icon_sources)
     sync_search()
     removed = strip_python_dependencies()
-    apply_panel_title_drawer()
+    restore_fmf_files(preserved)
+    patched = apply_local_patches()
     assert_minimal_freecad_icons()
     file_count = sum(1 for path in destination.rglob("*") if path.is_file())
     byte_count = sum(path.stat().st_size for path in destination.rglob("*") if path.is_file())
     print(f"Bundled {file_count} runtime files ({byte_count / 1024 / 1024:.2f} MiB).")
     print(f"Stripped Python dependencies: {removed or 'none'}")
+    print(f"Re-applied local UI patches: {len(patched)} ({len(preserved)} owned files restored)")
     print(
         "FreeCAD command icons: {} layout icons copied from {}.".format(
             len(configured_icon_names()), arguments.freecad_source.resolve()

@@ -55,6 +55,21 @@ button and on panels whose commands all fit, so it never swallows a click that d
 `tools/sync_bundled_addons.py` re-applies this from `PANEL_TITLE_DRAWER_PATCH` and refuses to guess
 if upstream moves the anchors.
 
+**Panel dividers are draggable**
+
+Upstream sizes every panel from its contents against one global column budget, so a panel the user
+works in constantly gets the same width as one they never touch. The divider between panels is now
+draggable: a drag sets a `maxColumns` budget for that panel alone, and the commands that no longer
+fit move into its overflow drawer. FusionMyFreeCAD records the budget per panel in its own
+customization file, so it survives a restart and an add-on update, and **Reset this panel** clears it.
+
+The widget and the resize arithmetic live in
+`Resources/packages/pyqtribbon_local/fmf_widgets.py`, which is FusionMyFreeCAD's own file rather
+than upstream's. Only the hooks -- an import, a signal, the separator's construction, a per-panel
+read of `maxColumns`, and one connection -- are edits to upstream modules, and
+`tools/sync_bundled_addons.py` re-applies them from `LOCAL_PATCHES` while carrying `fmf_widgets.py`
+across the refresh.
+
 **FreeCAD's command icons are curated**
 
 FusionMyFreeCAD ships only the command icons referenced by

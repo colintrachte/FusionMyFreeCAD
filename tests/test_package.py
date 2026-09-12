@@ -416,18 +416,56 @@ def test_the_panel_title_opens_the_overflow_drawer():
     assert {"isDrawerAvailable", "openDrawer"} <= panel_members
 
 
-def test_the_panel_title_patch_still_applies_to_the_bundled_tree():
-    """Re-applying the patch must be a no-op, so a sync cannot double-apply it."""
+def _sync_tool():
     sys.path.insert(0, str(ROOT / "tools"))
     try:
         import sync_bundled_addons
+
+        return sync_bundled_addons
     finally:
         sys.path.pop(0)
+
+
+def test_every_local_ui_patch_is_present_in_the_bundled_tree():
+    """Re-applying a patch must be a no-op, so a sync cannot double-apply it.
+
+    This is also what catches a hand-edit to the vendored tree that the sync tool
+    does not know how to reproduce: the next refresh would silently drop it.
+    """
+    sync = _sync_tool()
+    for parts, patches in sync.LOCAL_PATCHES:
+        text = BUNDLED.joinpath(*parts).read_text(encoding="utf-8")
+        for anchor, replacement in patches:
+            assert replacement in text, "{} is missing a local patch: {}".format(
+                parts[-1], anchor.strip().splitlines()[0]
+            )
+
+
+def test_the_files_fusionmyfreecad_owns_are_bundled():
+    """A refresh wipes the tree; these have to be carried across it."""
+    sync = _sync_tool()
+    assert sync.FMF_OWNED_FILES
+    for parts in sync.FMF_OWNED_FILES:
+        assert BUNDLED.joinpath(*parts).is_file(), parts
+
+
+def test_the_draggable_divider_reaches_the_panel():
+    """The widget is FusionMyFreeCAD's, but the wiring lives in upstream's panel."""
     panel = (
         BUNDLED / "FreeCAD-Ribbon" / "Resources" / "packages" / "pyqtribbon_local" / "panel.py"
     ).read_text(encoding="utf-8")
-    for _anchor, replacement in sync_bundled_addons.PANEL_TITLE_DRAWER_PATCH:
-        assert replacement in panel
+    tree = ast.parse(panel)
+    panel_class = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef) and node.name == "RibbonPanel"
+    )
+    assert any(
+        isinstance(node, ast.Assign)
+        and any(getattr(t, "id", "") == "panelResizeRequested" for t in node.targets)
+        for node in panel_class.body
+    ), "RibbonPanel must expose panelResizeRequested"
+    assert "DraggablePanelSeparator(width=3)" in panel
 
 
 # ---------------------------------------------------------------------------
