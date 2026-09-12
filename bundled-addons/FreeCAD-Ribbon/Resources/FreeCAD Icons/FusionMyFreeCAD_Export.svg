@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="exportSolidGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8ae234" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#4e9a06" stop-opacity="0.70" />
+    </linearGradient>
+  </defs>
+
+  <!-- Source solid, drawn as an isometric box -->
+  <polygon points="8,26 24,18 40,26 24,34" fill="url(#exportSolidGrad)" stroke="#4e9a06" stroke-width="2" stroke-linejoin="round" />
+  <polygon points="8,26 24,34 24,52 8,44" fill="#d3d7cf" stroke="#555753" stroke-width="2" stroke-linejoin="round" />
+  <polygon points="40,26 24,34 24,52 40,44" fill="#babdb6" stroke="#555753" stroke-width="2" stroke-linejoin="round" />
+
+  <!-- Departure arrow: the solid leaving the document -->
+  <line x1="40" y1="16" x2="54" y2="16" stroke="#204a87" stroke-width="4" stroke-linecap="round" />
+  <polygon points="52,9 60,16 52,23" fill="#204a87" />
+
+  <!-- Tray the export lands in -->
+  <polyline points="44,44 44,54 60,54 60,44" fill="none" stroke="#204a87" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
