@@ -417,6 +417,9 @@ FCBINDING_DIVIDER_PATCH = (
         "                panel._fmfResizeConnected = True\n"
         "            except (AttributeError, TypeError):\n"
         "                pass\n"
+        "        # A width the user dragged out has to be re-claimed every time the panel\n"
+        "        # is built, or it is lost on the next workbench switch.\n"
+        "        fmf_widgets.apply_panel_width(self, panel)\n"
         "\n"
         "        # Set the font for the panel title\n"
         "        Font = QFont()\n",

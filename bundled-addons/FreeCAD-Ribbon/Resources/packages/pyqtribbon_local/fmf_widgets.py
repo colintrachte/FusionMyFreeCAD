@@ -12,8 +12,11 @@ from PySide.QtWidgets import QRubberBand
 
 from .fmf_layout_math import (
     column_delta,
+    occupied_column_count,
     panel_column_width,
     plan_resize,
+    stored_column_budget,
+    width_for_columns,
 )
 from .separator import RibbonVerticalSeparator
 
@@ -205,6 +208,54 @@ class DraggablePanelSeparator(RibbonVerticalSeparator):
         )
 
 
+def _report(text, quiet=False):
+    """Say what a divider drag did, in the Report view.
+
+    Every failure in this feature so far has been silent -- swallowed into a
+    log nobody reads -- and each one cost a round trip to diagnose. A resize is
+    a deliberate user action, so it is allowed to say what it did.
+    """
+    console = _console()
+    if console is None:
+        return
+    message = "FusionMyFreeCAD divider: {}\n".format(text)
+    if quiet:
+        console.PrintMessage(message)
+    else:
+        console.PrintWarning(message)
+
+
+def apply_panel_width(bar, panel) -> None:
+    """Give a panel the horizontal room its saved budget asks for.
+
+    maxColumns on its own only decides how many columns of commands are shown
+    before the rest go to the drawer, so it can narrow a section but can never
+    widen one past its own contents -- which is not what dragging a divider
+    outwards into empty ribbon is asking for. Claiming the width as a minimum
+    is what actually allocates the space.
+    """
+    try:
+        workbenchName = bar.tabBar().tabData(bar.tabBar().currentIndex())
+        panelName = panel.objectName()
+        if not workbenchName or not panelName:
+            return
+        budget = stored_column_budget(bar, workbenchName, panelName)
+        if budget is None:
+            panel.setMinimumWidth(0)
+            return
+        occupied = occupied_column_count(panel)
+        if occupied and budget <= occupied:
+            # Narrower than or equal to its contents: natural sizing already
+            # gives the right width, and forcing a minimum would fight it.
+            panel.setMinimumWidth(0)
+            return
+        panel.setMinimumWidth(width_for_columns(budget, panel_column_width(panel)))
+    except Exception as error:
+        console = _console()
+        if console is not None:
+            console.PrintLog("FusionMyFreeCAD could not size the panel: {}\n".format(error))
+
+
 def _global_column_budget():
     """The Ribbon add-on's own MAX_COLUMN_PANELS preference, or None."""
     try:
@@ -235,16 +286,11 @@ def resize_panel(bar, panel, columnDelta: int):
         )
         label = panel.title() if hasattr(panel, "title") else panelName
         if plan["status"] != "resize":
-            # Say why rather than looking broken. A section cannot be stretched
-            # past its own contents: the budget decides how many columns of
-            # commands are shown before the rest go to the drawer, so widening
-            # one that already shows everything has nothing left to reveal.
-            console = _console()
-            if console is not None and plan["status"] == "at-edge":
-                console.PrintMessage(
-                    "FusionMyFreeCAD: {} already shows {} column(s), which is as {} "
-                    "as it goes.\n".format(
-                        label, plan["current"], "wide" if plan["widening"] else "narrow"
+            # Say why rather than looking broken.
+            if plan["status"] == "at-edge":
+                _report(
+                    "{} shows {} column(s) and cannot go any {}.".format(
+                        label, plan["current"], "wider" if plan["widening"] else "narrower"
                     )
                 )
             return
@@ -258,6 +304,7 @@ def resize_panel(bar, panel, columnDelta: int):
         )
         toolbar = toolbars.get(panelName)
         if not isinstance(toolbar, dict):
+            _report("{}: no toolbar named that in the ribbon structure.".format(label))
             return
         toolbar["maxColumns"] = target
         bar._saveDirectDragState()
@@ -273,13 +320,19 @@ def resize_panel(bar, panel, columnDelta: int):
             ActivateButtons=True,
         )
         if replacement is None:
+            _report("{}: the rebuild produced no panel.".format(label))
             return
         bar.currentCategory().replacePanel(panel, replacement)
         bar.setPanelProperties(replacement)
+        apply_panel_width(bar, replacement)
         bar.currentCategory()._panels[replacement.objectName()] = replacement
         panel.close()
+        _report(
+            "{}: {} -> {} column(s).".format(label, plan["current"], target),
+            quiet=True,
+        )
     except Exception as error:
-        # A divider drag must never take the ribbon down with it.
-        console = _console()
-        if console is not None:
-            console.PrintLog("FusionMyFreeCAD could not resize the panel: {}\n".format(error))
+        # A divider drag must never take the ribbon down with it, but it must
+        # not fail silently either: silent failure is what made three attempts
+        # at this feature undiagnosable from outside FreeCAD.
+        _report("failed: {}: {}".format(type(error).__name__, error))

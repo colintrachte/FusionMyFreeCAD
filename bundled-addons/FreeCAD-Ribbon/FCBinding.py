@@ -6871,6 +6871,9 @@ class ModernMenu(RibbonBar):
                 panel._fmfResizeConnected = True
             except (AttributeError, TypeError):
                 pass
+        # A width the user dragged out has to be re-claimed every time the panel
+        # is built, or it is lost on the next workbench switch.
+        fmf_widgets.apply_panel_width(self, panel)
 
         # Set the font for the panel title
         Font = QFont()
