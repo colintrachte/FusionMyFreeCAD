@@ -323,11 +323,13 @@ def _apply_customization(ribbon, spec, customization=None):
                 toolbar["Enabled"] = bool(saved["enabled"])
             # A panel whose divider the user dragged carries its own column budget.
             # Absent, the Ribbon add-on falls back to its global preference.
-            if "maxColumns" in saved:
+            for key in ("maxColumns", "minWidth"):
+                if key not in saved:
+                    continue
                 try:
-                    toolbar["maxColumns"] = max(1, int(saved["maxColumns"]))
+                    toolbar[key] = max(1, int(saved[key]))
                 except (TypeError, ValueError):
-                    toolbar.pop("maxColumns", None)
+                    toolbar.pop(key, None)
     return ribbon
 
 
@@ -409,9 +411,11 @@ def record_customization(ribbon):
                 "pinned": pinned,
                 "enabled": bool(toolbar.get("Enabled", True)),
             }
-            if toolbar.get("maxColumns") is not None:
+            for key in ("maxColumns", "minWidth"):
+                if toolbar.get(key) is None:
+                    continue
                 try:
-                    panel_state["maxColumns"] = max(1, int(toolbar["maxColumns"]))
+                    panel_state[key] = max(1, int(toolbar[key]))
                 except (TypeError, ValueError):
                     pass
             saved_workbench["panels"][name] = panel_state

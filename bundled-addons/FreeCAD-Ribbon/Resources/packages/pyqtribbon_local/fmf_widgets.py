@@ -11,12 +11,10 @@ from PySide.QtCore import Qt, QPoint, Signal
 from PySide.QtWidgets import QRubberBand
 
 from .fmf_layout_math import (
-    column_delta,
-    occupied_column_count,
+    columns_for_width,
     panel_column_width,
-    plan_resize,
-    stored_column_budget,
-    width_for_columns,
+    plan_width_resize,
+    stored_panel_width,
 )
 from .separator import RibbonVerticalSeparator
 
@@ -58,17 +56,17 @@ def popup_menu_at(menu, widget) -> bool:
 class DraggablePanelSeparator(RibbonVerticalSeparator):
     """The divider between two panels, draggable to change how wide a panel is.
 
-    FusionMyFreeCAD local change. Upstream sizes every panel from its contents
-    against one global column budget, so a panel the user works in constantly
-    gets the same width as one they never touch.
+    FusionMyFreeCAD local change. Upstream sizes every section from its contents
+    against one global column budget, so a section the user works in constantly
+    gets the same space as one they never touch.
 
-    The drag previews with a rubber band that snaps to whole columns, and
-    reports a column delta rather than a pixel one, so what is committed is
-    exactly what the preview showed. Nothing here changes the layout itself, so
-    a failure to apply the delta cannot leave a panel half-resized.
+    The drag works in pixels against the section's real width, previews with a
+    rubber band sitting exactly where the edge will land, and reports that
+    width. Nothing here changes the layout itself, so a failure to apply the
+    width cannot leave a section half-resized.
     """
 
-    #: Emitted on release with the number of columns to grow (+) or shrink (-).
+    #: Emitted on release with the pixel width the section should end up at.
     dividerReleased = Signal(int)
 
     def __init__(self, width: int = 6, parent=None) -> None:
@@ -80,7 +78,7 @@ class DraggablePanelSeparator(RibbonVerticalSeparator):
         self._hovered = False
         self._dragging = False
         self._startX = None
-        self._previewColumns = 0
+        self._startWidth = None
         self._band = None
 
     # -- geometry ---------------------------------------------------------
@@ -100,13 +98,12 @@ class DraggablePanelSeparator(RibbonVerticalSeparator):
             return int(position().x())
         return int(event.globalPos().x())
 
-    def _snappedOffset(self, rawDelta: int) -> tuple:
-        """Return (columns, pixels) for a raw drag, snapped to whole columns."""
+    def _plan(self, rawDelta: int):
+        """Where this drag would leave the section, as a width plan or None."""
         panel = self._panel()
-        if panel is None:
-            return 0, 0
-        columns = column_delta(panel, rawDelta)
-        return columns, columns * panel_column_width(panel)
+        if panel is None or self._startWidth is None:
+            return None
+        return plan_width_resize(self._startWidth, rawDelta, panel_column_width(panel))
 
     # -- live preview -----------------------------------------------------
 
@@ -159,7 +156,10 @@ class DraggablePanelSeparator(RibbonVerticalSeparator):
         if event.button() == _enum(Qt, "MouseButton", "LeftButton"):
             self._dragging = True
             self._startX = self._globalX(event)
-            self._previewColumns = 0
+            panel = self._panel()
+            # The width at the moment of the press is what the drag is relative
+            # to, so releasing leaves the edge exactly where the band is.
+            self._startWidth = panel.width() if panel is not None else None
             self._showPreview()
             self.update()
             event.accept()
@@ -168,27 +168,25 @@ class DraggablePanelSeparator(RibbonVerticalSeparator):
 
     def mouseMoveEvent(self, event) -> None:
         if self._dragging and self._startX is not None:
-            columns, pixels = self._snappedOffset(self._globalX(event) - self._startX)
-            if columns != self._previewColumns:
-                self._previewColumns = columns
-            self._movePreview(pixels)
+            plan = self._plan(self._globalX(event) - self._startX)
+            if plan is not None:
+                self._movePreview(plan["target"] - plan["current"])
             event.accept()
             return
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event) -> None:
         if self._dragging and self._startX is not None:
-            columns, _pixels = self._snappedOffset(self._globalX(event) - self._startX)
+            plan = self._plan(self._globalX(event) - self._startX)
             self._dragging = False
             self._startX = None
-            self._previewColumns = 0
+            self._startWidth = None
             self._hidePreview()
             self.update()
             event.accept()
-            # A drag too short to cross a column boundary is a click, not a
-            # resize. Emitting 0 would rebuild the panel for no visible change.
-            if columns != 0:
-                self.dividerReleased.emit(columns)
+            # A press that did not move is a click, not a resize.
+            if plan is not None and plan["status"] == "resize":
+                self.dividerReleased.emit(plan["target"])
             return
         super().mouseReleaseEvent(event)
 
@@ -225,76 +223,57 @@ def _report(text, quiet=False):
         console.PrintWarning(message)
 
 
+#: Qt's "no constraint" maximum.
+_UNBOUNDED_WIDTH = 16777215
+
+
 def apply_panel_width(bar, panel) -> None:
-    """Give a panel the horizontal room its saved budget asks for.
+    """Hold a section at the width the user dragged it to.
 
-    maxColumns on its own only decides how many columns of commands are shown
-    before the rest go to the drawer, so it can narrow a section but can never
-    widen one past its own contents -- which is not what dragging a divider
-    outwards into empty ribbon is asking for. Claiming the width as a minimum
-    is what actually allocates the space.
+    Only a stored width does this. Deriving one from the column budget instead
+    claimed 282px for OUTPUT's single button, because a budget of three columns
+    and one command are different quantities -- which is why some sections
+    started far wider than their contents needed.
+
+    A section the user has never dragged is left entirely alone, so the default
+    ribbon sizes itself exactly as upstream does.
     """
     try:
         workbenchName = bar.tabBar().tabData(bar.tabBar().currentIndex())
         panelName = panel.objectName()
         if not workbenchName or not panelName:
             return
-        budget = stored_column_budget(bar, workbenchName, panelName)
-        if budget is None:
+        width = stored_panel_width(bar, workbenchName, panelName)
+        if width is None:
             panel.setMinimumWidth(0)
+            panel.setMaximumWidth(_UNBOUNDED_WIDTH)
             return
-        occupied = occupied_column_count(panel)
-        if occupied and budget <= occupied:
-            # Narrower than or equal to its contents: natural sizing already
-            # gives the right width, and forcing a minimum would fight it.
-            panel.setMinimumWidth(0)
-            return
-        panel.setMinimumWidth(width_for_columns(budget, panel_column_width(panel)))
+        # Pinned both ways: a minimum alone lets a section grow past where it
+        # was dragged, so narrowing one would not appear to take.
+        panel.setMinimumWidth(width)
+        panel.setMaximumWidth(width)
     except Exception as error:
-        console = _console()
-        if console is not None:
-            console.PrintLog("FusionMyFreeCAD could not size the panel: {}\n".format(error))
+        _report("could not size the panel: {}: {}".format(type(error).__name__, error))
 
 
-def _global_column_budget():
-    """The Ribbon add-on's own MAX_COLUMN_PANELS preference, or None."""
-    try:
-        import Parameters_Ribbon
+def resize_panel(bar, panel, targetWidth: int):
+    """Hold this section at `targetWidth` pixels and refit its contents.
 
-        return int(Parameters_Ribbon.Parameters.MAX_COLUMN_PANELS)
-    except Exception:
-        return None
-
-
-def resize_panel(bar, panel, columnDelta: int):
-    """Apply a divider drag as a column budget for this panel alone.
-
-    The budget is stored on the panel in RibbonStructure.json as `maxColumns`,
-    saved through the same path a drag-reorder uses, and the panel is rebuilt in
-    place so the commands that no longer fit drop into its overflow drawer.
+    The width is what the user dragged, so the width is what is stored. The
+    column budget is then derived from it, so the commands that no longer fit
+    in that space drop into the section's drawer rather than the two numbers
+    being set independently and disagreeing.
     """
     try:
-        if not columnDelta:
+        if not targetWidth or targetWidth <= 0:
             return
         workbenchName = bar.tabBar().tabData(bar.tabBar().currentIndex())
         panelName = panel.objectName()
         if not workbenchName or not panelName:
             return
-
-        plan = plan_resize(
-            bar, panel, workbenchName, panelName, columnDelta, _global_column_budget()
-        )
         label = panel.title() if hasattr(panel, "title") else panelName
-        if plan["status"] != "resize":
-            # Say why rather than looking broken.
-            if plan["status"] == "at-edge":
-                _report(
-                    "{} shows {} column(s) and cannot go any {}.".format(
-                        label, plan["current"], "wider" if plan["widening"] else "narrower"
-                    )
-                )
-            return
-        target = plan["target"]
+        was = panel.width()
+        columns = columns_for_width(targetWidth, panel_column_width(panel))
 
         bar._ensureDirectDragState()
         toolbars = (
@@ -306,7 +285,8 @@ def resize_panel(bar, panel, columnDelta: int):
         if not isinstance(toolbar, dict):
             _report("{}: no toolbar named that in the ribbon structure.".format(label))
             return
-        toolbar["maxColumns"] = target
+        toolbar["minWidth"] = int(targetWidth)
+        toolbar["maxColumns"] = columns
         bar._saveDirectDragState()
 
         replacement = bar.CreatePanel(
@@ -328,7 +308,7 @@ def resize_panel(bar, panel, columnDelta: int):
         bar.currentCategory()._panels[replacement.objectName()] = replacement
         panel.close()
         _report(
-            "{}: {} -> {} column(s).".format(label, plan["current"], target),
+            "{}: {}px -> {}px ({} column(s)).".format(label, was, targetWidth, columns),
             quiet=True,
         )
     except Exception as error:

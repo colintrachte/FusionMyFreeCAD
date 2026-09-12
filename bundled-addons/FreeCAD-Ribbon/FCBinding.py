@@ -6121,10 +6121,16 @@ class ModernMenu(RibbonBar):
         )
         # Set the maximum columns. FusionMyFreeCAD local change: a panel whose
         # divider the user has dragged carries its own budget; everything else
-        # still follows the global preference.
+        # still follows the global preference. The budget is only honoured
+        # alongside a stored width, so column budgets written by an earlier
+        # build -- which derived them from the contents rather than from the
+        # space -- go inert instead of truncating a panel nobody resized.
         maxColumns = Parameters.MAX_COLUMN_PANELS
         try:
-            if panelDefinition.get("maxColumns") is not None:
+            if (
+                panelDefinition.get("minWidth") is not None
+                and panelDefinition.get("maxColumns") is not None
+            ):
                 maxColumns = max(1, int(panelDefinition["maxColumns"]))
         except (TypeError, ValueError):
             pass

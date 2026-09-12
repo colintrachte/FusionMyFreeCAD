@@ -1,22 +1,32 @@
 """Pure geometry decisions behind FusionMyFreeCAD's draggable panel dividers.
 
 Not part of upstream FreeCAD-Ribbon. Deliberately free of Qt and FreeCAD
-imports: this is the arithmetic that decides how far a drag moves a panel edge,
-and it has been wrong twice, so it lives where a test can reach it without
+imports: this is the arithmetic that decides how wide a drag leaves a section,
+and it has been wrong repeatedly, so it lives where a test can reach it without
 standing up a widget toolkit. Everything here is duck-typed against the panel
 and ribbon-bar objects rather than importing them.
+
+Everything is in pixels. Earlier versions counted columns, which meant the
+number a drag was measured against was the section's *contents* rather than its
+*size*: a section three columns of buttons wide reported 3 however much space it
+had been given, so a second drag started where the first did and appeared to do
+nothing. What the user drags is a distance, so a distance is what is measured,
+stored, and restored.
 """
 
-#: Width of one ribbon column when a panel has no laid-out button to measure.
+#: Width of one column when a panel has no laid-out button to measure.
 #: Roughly a small button plus its spacing.
 FALLBACK_COLUMN_WIDTH = 40
 
-#: Column budget assumed when the Ribbon add-on's own preference is unreadable.
-FALLBACK_COLUMN_BUDGET = 6
+#: Narrowest a section may be dragged, in columns.
+MIN_COLUMNS = 1
 
-#: Ceiling on a panel's width when its command list cannot be read. High enough
-#: never to clamp a real panel, low enough to stay a sane number.
-FALLBACK_COLUMN_CEILING = 64
+#: Widest a section may be dragged, in columns. Generous, but finite: a stray
+#: drag should not be able to push every other section off the ribbon.
+MAX_COLUMNS = 24
+
+#: Space a section needs beyond its columns, for margins and the divider.
+COLUMN_PADDING = 12
 
 
 def panel_column_width(panel) -> int:
@@ -42,52 +52,21 @@ def panel_column_width(panel) -> int:
     return FALLBACK_COLUMN_WIDTH
 
 
-def column_delta(panel, pixels: int) -> int:
-    """How many whole columns a drag of `pixels` should move a panel edge by.
+def width_for_columns(columns: int, column_width: int, padding: int = COLUMN_PADDING) -> int:
+    """The pixel width a section needs to hold `columns` columns of buttons."""
+    return max(0, int(columns) * max(1, int(column_width)) + max(0, int(padding)))
 
-    The divider previews with this and the rebuild commits the value it
-    reports, so the edge lands where the preview said it would.
+
+def columns_for_width(width_px: int, column_width: int, padding: int = COLUMN_PADDING) -> int:
+    """How many columns of commands fit in `width_px`.
+
+    This is what keeps the drawer honest: a section shows what its width can
+    hold and the remainder goes to the dropdown, rather than the width and the
+    contents being set independently and allowed to disagree.
     """
-    width = panel_column_width(panel)
-    if width <= 0:
-        return 0
-    return int(round(float(pixels) / width))
-
-
-def occupied_column_count(panel) -> int:
-    """How many columns of buttons the panel is showing right now, or 0.
-
-    This is the number a drag has to be relative to. Two earlier attempts used
-    something else and both produced a divider that appeared to do nothing:
-    QGridLayout.columnCount() counts allocated columns, separators and spacers
-    included, and the Ribbon add-on's MAX_COLUMN_PANELS preference is 0 by
-    default, meaning "no limit" rather than "no columns" -- so on a stock
-    profile the drag was added to an invented 6 while the panel was really
-    three columns wide, and every step landed in a dead zone above the content.
-    """
-    try:
-        layout = panel._actionsLayout
-        columns = set()
-        for index in range(layout.count()):
-            item = layout.itemAt(index)
-            widget = item.widget() if item is not None else None
-            if widget is None or widget.width() <= 0:
-                continue
-            name = ""
-            getter = getattr(widget, "objectName", None)
-            if callable(getter):
-                name = getter() or ""
-            # The trailing spacer exists only to keep a one-button panel
-            # top-aligned; it is not a column the user can see.
-            if name == "ExtraSpacer":
-                continue
-            row, column, _rowSpan, _columnSpan = layout.getItemPosition(index)
-            columns.add(int(column))
-        if columns:
-            return len(columns)
-    except Exception:
-        pass
-    return 0
+    column_width = max(1, int(column_width))
+    usable = max(0, int(width_px) - max(0, int(padding)))
+    return max(MIN_COLUMNS, usable // column_width)
 
 
 def _toolbar_of(bar, workbench_name, panel_name):
@@ -103,115 +82,45 @@ def _toolbar_of(bar, workbench_name, panel_name):
     return toolbar if isinstance(toolbar, dict) else None
 
 
-def stored_column_budget(bar, workbench_name, panel_name):
-    """The budget saved for this panel, or None when it has never been set."""
+def stored_panel_width(bar, workbench_name, panel_name):
+    """The width in pixels the user dragged this section to, or None.
+
+    Width is stored directly rather than derived from the column budget. The
+    budget says how many columns of commands are shown before the rest go to
+    the drawer, which is a different quantity: OUTPUT holds one command but had
+    a budget of three, and deriving a width from that claimed 282px for a
+    single button. That is why some sections started far wider than the space
+    their contents needed.
+
+    A section the user has never dragged returns None and is left to size
+    itself exactly as upstream does.
+    """
     toolbar = _toolbar_of(bar, workbench_name, panel_name)
-    if toolbar is None or toolbar.get("maxColumns") is None:
+    if toolbar is None or toolbar.get("minWidth") is None:
         return None
     try:
-        return max(1, int(toolbar["maxColumns"]))
+        value = int(toolbar["minWidth"])
     except (TypeError, ValueError):
         return None
+    return value if value > 0 else None
 
 
-def current_column_budget(bar, workbench_name, panel_name, default=None) -> int:
-    """The column budget in force for this panel right now.
+def plan_width_resize(current_px, delta_px, column_width) -> dict:
+    """Decide the width a drag should leave a section at.
 
-    This has to be the number CreatePanel reads -- the panel's own maxColumns
-    when it has one, the global preference otherwise. Deriving it from the
-    laid-out grid instead, as this did at first, counts separator and spacer
-    columns, so a drag was added to a base the rebuild never used and often
-    produced a target identical to the current one, which looked like the
-    divider simply refusing to move.
+    `status` is ``"resize"`` with a `target`, or ``"at-edge"`` when the drag
+    would push past the narrowest or widest a section may be. The preview and
+    the commit both call this, so the edge lands where the band showed it.
     """
-    toolbar = _toolbar_of(bar, workbench_name, panel_name)
-    if toolbar is not None and toolbar.get("maxColumns") is not None:
-        try:
-            return max(1, int(toolbar["maxColumns"]))
-        except (TypeError, ValueError):
-            pass
-    try:
-        resolved = int(default)
-    except (TypeError, ValueError):
-        resolved = FALLBACK_COLUMN_BUDGET
-    return max(1, resolved if resolved > 0 else FALLBACK_COLUMN_BUDGET)
-
-
-def panel_command_count(bar, workbench_name, panel_name) -> int:
-    """How many commands the panel holds, which is the ceiling on its width."""
-    toolbar = _toolbar_of(bar, workbench_name, panel_name)
-    if toolbar is not None:
-        count = len(toolbar.get("order", []))
-        if count > 0:
-            return count
-    return FALLBACK_COLUMN_CEILING
-
-
-def resolve_target(current: int, delta: int, ceiling: int) -> int:
-    """The budget a drag of `delta` columns should land on.
-
-    A drag never moves a panel the way it was not dragged. Clamping to the
-    ceiling alone is not enough: a panel can already be wider than its command
-    count -- a stale budget, or a section holding two commands across three
-    columns -- and then a widen would come back under the current width and
-    quietly narrow the section instead.
-    """
-    ceiling = max(1, ceiling)
-    current = max(1, current)
-    if delta == 0:
-        return current
-    target = max(1, current + delta)
-    if delta > 0:
-        return max(current, min(target, ceiling))
-    return min(current, target)
-
-
-def width_for_columns(columns: int, column_width: int, padding: int = 12) -> int:
-    """The pixel width a panel needs to claim `columns` columns of buttons."""
-    return max(0, int(columns) * max(1, int(column_width)) + max(0, int(padding)))
-
-
-def plan_resize(bar, panel, workbench_name, panel_name, delta, default_budget=None) -> dict:
-    """Decide what a divider drag should do, without doing any of it.
-
-    Returns a dict with `status` one of:
-
-    - ``"resize"``  -- apply `target` as the panel's new maxColumns
-    - ``"at-edge"`` -- the drag cannot move this panel any further that way
-    - ``"ignore"``  -- nothing to do
-
-    The whole decision lives here, away from Qt, because every bug in this
-    feature so far has been in the decision rather than in the widget.
-    """
-    if not delta:
-        return {"status": "ignore", "reason": "no movement"}
-
-    # What the user can see is what the drag is relative to. A stored budget
-    # is only a fallback for the moment before the panel has been laid out.
-    current = occupied_column_count(panel)
-    source = "displayed"
-    if current <= 0:
-        current = current_column_budget(bar, workbench_name, panel_name, default_budget)
-        source = "stored"
-
-    # Widening is not capped by the command count. A section can be given more
-    # room than its commands need -- that is the point of dragging a divider
-    # when there is empty ribbon to the right -- and the extra is claimed as
-    # minimum width rather than by revealing commands that do not exist.
-    ceiling = max(panel_command_count(bar, workbench_name, panel_name), current + max(0, delta))
-    target = resolve_target(current, delta, ceiling)
-    if target == current:
-        return {
-            "status": "at-edge",
-            "current": current,
-            "target": target,
-            "widening": delta > 0,
-            "source": source,
-        }
+    column_width = max(1, int(column_width))
+    low = width_for_columns(MIN_COLUMNS, column_width)
+    high = width_for_columns(MAX_COLUMNS, column_width)
+    current = max(0, int(current_px))
+    target = max(low, min(current + int(delta_px), high))
     return {
-        "status": "resize",
+        "status": "at-edge" if target == current else "resize",
         "current": current,
         "target": target,
-        "widening": delta > 0,
-        "source": source,
+        "widening": int(delta_px) > 0,
+        "columns": columns_for_width(target, column_width),
     }

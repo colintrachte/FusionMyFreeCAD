@@ -394,10 +394,16 @@ FCBINDING_DIVIDER_PATCH = (
         '        explicitPanelMenu = set(panelDefinition.get("panelMenu", []))\n',
         "        # Set the maximum columns. FusionMyFreeCAD local change: a panel whose\n"
         "        # divider the user has dragged carries its own budget; everything else\n"
-        "        # still follows the global preference.\n"
+        "        # still follows the global preference. The budget is only honoured\n"
+        "        # alongside a stored width, so column budgets written by an earlier\n"
+        "        # build -- which derived them from the contents rather than from the\n"
+        "        # space -- go inert instead of truncating a panel nobody resized.\n"
         "        maxColumns = Parameters.MAX_COLUMN_PANELS\n"
         "        try:\n"
-        '            if panelDefinition.get("maxColumns") is not None:\n'
+        "            if (\n"
+        '                panelDefinition.get("minWidth") is not None\n'
+        '                and panelDefinition.get("maxColumns") is not None\n'
+        "            ):\n"
         '                maxColumns = max(1, int(panelDefinition["maxColumns"]))\n'
         "        except (TypeError, ValueError):\n"
         "            pass\n"

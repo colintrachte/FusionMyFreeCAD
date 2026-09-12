@@ -83,3 +83,38 @@ def test_resetting_one_panel_clears_its_budget(installed):
     installed.reset_panel_customization(workbench, panel)
 
     assert "maxColumns" not in _toolbar(installed, workbench, panel)
+
+
+def test_a_dragged_width_survives_a_restart(installed):
+    """The width is what the user dragged, so the width is what persists."""
+    workbench, panel = _first_panel(installed)
+    ribbon, _version = installed._merge_layout()
+    ribbon["workbenches"][workbench]["toolbars"][panel]["minWidth"] = 412
+    installed.record_customization(ribbon)
+
+    stored = json.loads(open(installed.CUSTOMIZATION_PATH, encoding="utf-8").read())
+    assert stored["workbenches"][workbench]["panels"][panel]["minWidth"] == 412
+    assert _toolbar(installed, workbench, panel)["minWidth"] == 412
+
+
+def test_an_unreadable_width_is_dropped_rather_than_raising(installed):
+    workbench, panel = _first_panel(installed)
+    customization = installed._read_customization()
+    customization.setdefault("workbenches", {}).setdefault(workbench, {}).setdefault(
+        "panels", {}
+    ).setdefault(panel, {})["minWidth"] = "wide"
+    installed._atomic_json(installed.CUSTOMIZATION_PATH, customization)
+
+    assert "minWidth" not in _toolbar(installed, workbench, panel)
+
+
+def test_resetting_one_panel_clears_its_width(installed):
+    workbench, panel = _first_panel(installed)
+    ribbon, _version = installed._merge_layout()
+    ribbon["workbenches"][workbench]["toolbars"][panel]["minWidth"] = 300
+    installed.record_customization(ribbon)
+    assert _toolbar(installed, workbench, panel)["minWidth"] == 300
+
+    installed.reset_panel_customization(workbench, panel)
+
+    assert "minWidth" not in _toolbar(installed, workbench, panel)
