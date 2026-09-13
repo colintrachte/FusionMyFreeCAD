@@ -188,8 +188,13 @@
     "Sketcher_Translate",
     "Sketcher_Trimming",
     "Sketcher_ValidateSketch",
+    "Std_BoxElementSelection",
+    "Std_BoxSelection",
     "Std_Measure",
+    "Std_Properties",
+    "Std_UnitsCalculator",
     "Std_ViewFitAll",
+    "Std_WhatsThis",
     "Surface_BlendCurve",
     "Surface_CurveOnMesh",
     "Surface_ExtendFace",
@@ -206,7 +211,8 @@
       "Fusion Parameters_newPanel",
       "Fusion Frequent_newPanel",
       "Fusion Inspect_newPanel",
-      "Fusion Output_newPanel"
+      "Fusion Output_newPanel",
+      "Fusion Utilities_newPanel"
     ],
     "PartWorkbench": [
       "Fusion Part Create_newPanel",
@@ -215,7 +221,8 @@
       "Fusion Part Repair_newPanel",
       "Fusion Part Frequent_newPanel",
       "Fusion Part Inspect_newPanel",
-      "Fusion Part Output_newPanel"
+      "Fusion Part Output_newPanel",
+      "Fusion Part Utilities_newPanel"
     ],
     "SketcherWorkbench": [
       "Fusion Sketch Create_newPanel",
@@ -225,14 +232,16 @@
       "Fusion Sketch Inspect_newPanel",
       "Fusion Sketch Insert_newPanel",
       "Fusion Sketch Select_newPanel",
-      "Fusion Finish_newPanel"
+      "Fusion Finish_newPanel",
+      "Fusion Sketch Utilities_newPanel"
     ],
     "SurfaceWorkbench": [
       "Fusion Surface Create_newPanel",
       "Fusion Surface Modify_newPanel",
       "Fusion Surface Frequent_newPanel",
       "Fusion Surface Inspect_newPanel",
-      "Fusion Surface Output_newPanel"
+      "Fusion Surface Output_newPanel",
+      "Fusion Surface Utilities_newPanel"
     ]
   },
   "adaptivePins": {

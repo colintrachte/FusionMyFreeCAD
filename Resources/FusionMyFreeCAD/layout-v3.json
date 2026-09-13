@@ -496,6 +496,49 @@
             "FusionMyFreeCAD_Export"
           ]
         ]
+      },
+      {
+        "name": "Fusion Utilities_newPanel",
+        "title": "UTILITIES",
+        "commands": [
+          [
+            "Std_UnitsCalculator",
+            "General",
+            "small",
+            "Units Calculator",
+            "accessories-calculator"
+          ],
+          [
+            "Std_Properties",
+            "General",
+            "small",
+            "Properties",
+            "document-properties"
+          ],
+          [
+            "Std_BoxSelection",
+            "General",
+            "small",
+            "Box Selection",
+            "edit-select-box"
+          ]
+        ],
+        "overflow": [
+          [
+            "Std_BoxElementSelection",
+            "General",
+            "small",
+            "Box Element Selection",
+            "edit-element-select-box"
+          ],
+          [
+            "Std_WhatsThis",
+            "General",
+            "small",
+            "What's This?",
+            "WhatsThis"
+          ]
+        ]
       }
     ],
     "PartWorkbench": [
@@ -970,6 +1013,49 @@
             "small",
             "Export as DXF",
             "FusionMyFreeCAD_Export"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Part Utilities_newPanel",
+        "title": "UTILITIES",
+        "commands": [
+          [
+            "Std_UnitsCalculator",
+            "General",
+            "small",
+            "Units Calculator",
+            "accessories-calculator"
+          ],
+          [
+            "Std_Properties",
+            "General",
+            "small",
+            "Properties",
+            "document-properties"
+          ],
+          [
+            "Std_BoxSelection",
+            "General",
+            "small",
+            "Box Selection",
+            "edit-select-box"
+          ]
+        ],
+        "overflow": [
+          [
+            "Std_BoxElementSelection",
+            "General",
+            "small",
+            "Box Element Selection",
+            "edit-element-select-box"
+          ],
+          [
+            "Std_WhatsThis",
+            "General",
+            "small",
+            "What's This?",
+            "WhatsThis"
           ]
         ]
       }
@@ -1615,6 +1701,49 @@
         "responsive": {
           "Sketcher_CancelSketch": 1750
         }
+      },
+      {
+        "name": "Fusion Sketch Utilities_newPanel",
+        "title": "UTILITIES",
+        "commands": [
+          [
+            "Std_UnitsCalculator",
+            "General",
+            "small",
+            "Units Calculator",
+            "accessories-calculator"
+          ],
+          [
+            "Std_Properties",
+            "General",
+            "small",
+            "Properties",
+            "document-properties"
+          ],
+          [
+            "Std_BoxSelection",
+            "General",
+            "small",
+            "Box Selection",
+            "edit-select-box"
+          ]
+        ],
+        "overflow": [
+          [
+            "Std_BoxElementSelection",
+            "General",
+            "small",
+            "Box Element Selection",
+            "edit-element-select-box"
+          ],
+          [
+            "Std_WhatsThis",
+            "General",
+            "small",
+            "What's This?",
+            "WhatsThis"
+          ]
+        ]
       }
     ],
     "SurfaceWorkbench": [
@@ -1791,6 +1920,49 @@
             "small",
             "Export as DXF",
             "FusionMyFreeCAD_Export"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Surface Utilities_newPanel",
+        "title": "UTILITIES",
+        "commands": [
+          [
+            "Std_UnitsCalculator",
+            "General",
+            "small",
+            "Units Calculator",
+            "accessories-calculator"
+          ],
+          [
+            "Std_Properties",
+            "General",
+            "small",
+            "Properties",
+            "document-properties"
+          ],
+          [
+            "Std_BoxSelection",
+            "General",
+            "small",
+            "Box Selection",
+            "edit-select-box"
+          ]
+        ],
+        "overflow": [
+          [
+            "Std_BoxElementSelection",
+            "General",
+            "small",
+            "Box Element Selection",
+            "edit-element-select-box"
+          ],
+          [
+            "Std_WhatsThis",
+            "General",
+            "small",
+            "What's This?",
+            "WhatsThis"
           ]
         ]
       }

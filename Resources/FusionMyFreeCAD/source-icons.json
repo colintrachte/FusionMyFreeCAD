@@ -581,9 +581,21 @@
       "path": "src/Mod/Surface/Gui/Resources/icons/Surface_Sections.svg",
       "sha256": "fe1a5cfe12e2e238d7a00cea1bae543629baf20945c997304b3ef066463da0b3"
     },
+    "WhatsThis": {
+      "path": "src/Gui/Icons/WhatsThis.svg",
+      "sha256": "e22882893e9fdaea69434c298c499fada931a156533c95627471864d262e2e28"
+    },
+    "accessories-calculator": {
+      "path": "src/Gui/Icons/accessories-calculator.svg",
+      "sha256": "c162e42fc2d9359c5ee70f7b874187311751ea35d7d51fb2c1d14b522f01377f"
+    },
     "applications-accessories": {
       "path": "src/Gui/Icons/applications-accessories.svg",
       "sha256": "45031b8f0de1adb58e8aea79639b1dd1dfd0b39e568aa1e6e0c2b0c89851fe9f"
+    },
+    "document-properties": {
+      "path": "src/Gui/Icons/document-properties.svg",
+      "sha256": "65d107e13bade39affec01d7e9857871b3323c6aab75c15d89d87553ea0f8168"
     },
     "edit-copy": {
       "path": "src/Gui/Icons/edit-copy.svg",
@@ -593,9 +605,17 @@
       "path": "src/Gui/Icons/edit-cut.svg",
       "sha256": "07679adb644cbbd26d0ecd2320eebdf53e7549ece1b49d9fc023ea59384e934b"
     },
+    "edit-element-select-box": {
+      "path": "src/Gui/Icons/edit-element-select-box.svg",
+      "sha256": "82d002ce6aeece6f9fba057b89bbc700f191d5ce28e673cfefc346b2326f6f3c"
+    },
     "edit-paste": {
       "path": "src/Gui/Icons/edit-paste.svg",
       "sha256": "559322b58ab30c54b0605b6fcf634a63f51659dbb0c1ad03c2d815fa1bbc4ba7"
+    },
+    "edit-select-box": {
+      "path": "src/Gui/Icons/edit-select-box.svg",
+      "sha256": "8094dbe847d9b407a3b5763c6df50bd815d5b3a3934b63b9b69300c2af9ba8b8"
     },
     "preferences-part_design": {
       "path": "src/Mod/Part/Gui/Resources/icons/preferences-part_design.svg",

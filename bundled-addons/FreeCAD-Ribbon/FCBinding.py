@@ -6680,8 +6680,15 @@ class ModernMenu(RibbonBar):
         spacer.setMinimumSize(0, panel.height() - panel._titleWidget.height())
         panel.addWidget(spacer, rowSpan=6)
 
-        # Enable all buttons, so you can access them with a right click
-        self.activateButtons()
+        # Enable all buttons, so you can access them with a right click.
+        # FusionMyFreeCAD local change: honour the ActivateButtons argument,
+        # which upstream declares and then ignores. Force-enabling every button
+        # in the window is right while arranging the ribbon, where a disabled
+        # button cannot be right-clicked, but it is wrong after an ordinary
+        # rebuild: a divider drag left commands that are genuinely unavailable
+        # looking as though they could be used.
+        if ActivateButtons is True:
+            self.activateButtons()
 
         if panel._actionsLayout.count() > 1:            
             return panel
