@@ -6229,19 +6229,20 @@ class ModernMenu(RibbonBar):
                     )
                 except (TypeError, ValueError):
                     pass
-                # FusionMyFreeCAD local change: a section the user has widened
-                # should fill the space it was given. Upstream sends every
-                # command on the overflow list to the drawer whatever the room,
-                # so dragging a section wider left it sparse with commands
-                # still hidden behind the dropdown.
-                fmfRoomForMore = (
-                    fmfHasUserWidth and maxColumns > 0 and columnCount < maxColumns
-                )
+                # FusionMyFreeCAD local change: once the user has sized a
+                # section by dragging its divider, its width is the only thing
+                # that decides what it shows. The shipped overflow list still
+                # governs every section nobody has touched.
+                #
+                # Consulting both left commands stuck in the drawer: the list
+                # sent them there regardless of room, so shrinking a section
+                # and widening it again never brought them back, and the
+                # section stayed wider than the icons left in it.
                 if (
                     CommandName in explicitOverflow
                     and not responsiveVisible
                     and ignoreColumnLimit is False
-                    and not fmfRoomForMore
+                    and not fmfHasUserWidth
                 ):
                     ButtonList.append(button)
                     panel.panelOptionButton().show()

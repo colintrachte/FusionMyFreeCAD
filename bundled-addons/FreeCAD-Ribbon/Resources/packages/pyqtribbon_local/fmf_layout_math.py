@@ -29,27 +29,55 @@ MAX_COLUMNS = 24
 COLUMN_PADDING = 12
 
 
-def panel_column_width(panel) -> int:
-    """Width in pixels of one column of buttons in `panel`.
+def panel_column_widths(panel) -> list:
+    """The width of each laid-out column of buttons in `panel`.
 
-    Measured from the widest laid-out button, not from the panel's width
-    divided by a column count: the grid allocates columns for separators and
-    spacers too, so dividing by it produced a figure that corresponded to
-    nothing the user could see themselves dragging past.
+    Grouped by grid column, because a column is a stack: three small buttons
+    sit in one, a large button fills one on its own. Measuring individual
+    buttons instead conflates the two.
     """
     try:
         layout = panel._actionsLayout
-        widths = []
+        by_column = {}
         for index in range(layout.count()):
             item = layout.itemAt(index)
             widget = item.widget() if item is not None else None
-            if widget is not None and widget.width() > 0:
-                widths.append(int(widget.width()))
-        if widths:
-            return max(24, max(widths))
+            if widget is None or widget.width() <= 0:
+                continue
+            name = ""
+            getter = getattr(widget, "objectName", None)
+            if callable(getter):
+                name = getter() or ""
+            # The trailing spacer only top-aligns a one-button panel.
+            if name == "ExtraSpacer":
+                continue
+            _row, column, _rowSpan, _columnSpan = layout.getItemPosition(index)
+            column = int(column)
+            by_column[column] = max(by_column.get(column, 0), int(widget.width()))
+        return [width for _column, width in sorted(by_column.items())]
     except Exception:
-        pass
-    return FALLBACK_COLUMN_WIDTH
+        return []
+
+
+def panel_column_width(panel) -> int:
+    """The width in pixels of a representative column of buttons in `panel`.
+
+    The median column, not the widest. A section mixing one large button with
+    stacks of small ones has columns of very different widths, and taking the
+    widest made every column look like the largest: the space a width could
+    hold was underestimated, commands were pushed to the drawer that would
+    have fitted, and the section was left visibly wider than the icons in it.
+    """
+    widths = panel_column_widths(panel)
+    if not widths:
+        return FALLBACK_COLUMN_WIDTH
+    widths = sorted(widths)
+    middle = len(widths) // 2
+    if len(widths) % 2:
+        median = widths[middle]
+    else:
+        median = (widths[middle - 1] + widths[middle]) // 2
+    return max(24, int(median))
 
 
 def width_for_columns(columns: int, column_width: int, padding: int = COLUMN_PADDING) -> int:
