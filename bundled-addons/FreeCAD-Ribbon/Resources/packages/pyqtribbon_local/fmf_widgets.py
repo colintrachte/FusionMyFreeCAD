@@ -297,7 +297,9 @@ def resize_panel(bar, panel, targetWidth: int):
             ignoreColumnLimit=False,
             showEnableControl=False,
             enableSeparator=False,
-            ActivateButtons=True,
+            # Not an arranging operation: leaving every button force-enabled
+            # would make unavailable commands look usable.
+            ActivateButtons=False,
         )
         if replacement is None:
             _report("{}: the rebuild produced no panel.".format(label))

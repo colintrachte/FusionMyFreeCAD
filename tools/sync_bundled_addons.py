@@ -71,7 +71,7 @@ def copy_tree(source_root: Path, destination_root: Path, relative: str | Path) -
 
 
 def configured_icon_names() -> set[str]:
-    """Return the exact FreeCAD icon resources referenced by the shipped layout."""
+    """Every icon the shipped layout references, FusionMyFreeCAD's own included."""
     layout_path = ROOT / "Resources" / "FusionMyFreeCAD" / "layout-v3.json"
     layout = json.loads(layout_path.read_text(encoding="utf-8"))
     return {
@@ -80,6 +80,25 @@ def configured_icon_names() -> set[str]:
         for panel in panels
         for entry in panel["commands"] + panel.get("overflow", [])
     }
+
+
+def authored_icon_names() -> set[str]:
+    """The icons FusionMyFreeCAD draws itself.
+
+    These have no counterpart in FreeCAD's source tree, so looking for one
+    fails the whole sync -- which is what stopped the icon refresh working at
+    all once the first authored icon was added. They also have to survive the
+    prune in sync_layout_icons, which otherwise deletes anything it did not
+    just copy from source.
+    """
+    manifest_path = ROOT / "Resources" / "FusionMyFreeCAD" / "layout-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return set(manifest.get("authoredIcons", []))
+
+
+def freecad_sourced_icon_names() -> set[str]:
+    """The layout's icons that should come from a FreeCAD source checkout."""
+    return configured_icon_names() - authored_icon_names()
 
 
 ICON_SOURCE_OVERRIDES = {
@@ -108,7 +127,7 @@ def freecad_icon_sources(freecad_source: Path) -> dict[str, Path]:
             "FreeCAD source checkout has no src directory: {}".format(freecad_source)
         )
 
-    required = configured_icon_names()
+    required = freecad_sourced_icon_names()
     candidates: dict[str, list[Path]] = {name: [] for name in required}
     for path in source_tree.rglob("*.svg"):
         if path.stem in candidates:
@@ -145,9 +164,13 @@ def sync_layout_icons(freecad_source: Path, destination: Path) -> dict[str, Path
     icon_destination = destination / "Resources" / "FreeCAD Icons"
     icon_destination.mkdir(parents=True, exist_ok=True)
     sources = freecad_icon_sources(freecad_source)
-    required = {"{}.svg".format(name) for name in sources}
+    # Keep FusionMyFreeCAD's own icons: they are not in the source tree, so the
+    # prune below would delete every one of them.
+    keep = {"{}.svg".format(name) for name in sources} | {
+        "{}.svg".format(name) for name in authored_icon_names()
+    }
     for path in icon_destination.iterdir():
-        if path.is_file() and path.name not in required:
+        if path.is_file() and path.name not in keep:
             path.unlink()
     for name, source_icon in sources.items():
         (icon_destination / "{}.svg".format(name)).write_bytes(canonical_svg_bytes(source_icon))
@@ -373,6 +396,32 @@ PANEL_DIVIDER_PATCH = (
 # the panel has, so a section dragged wider stayed sparse with its remaining
 # commands hidden. This lets a section the user sized fill the space it was
 # given.
+# Upstream declares an ActivateButtons argument on CreatePanel and then calls
+# activateButtons() unconditionally, force-enabling every button in the window
+# on any rebuild. That is right while arranging the ribbon and wrong afterwards:
+# a divider drag left unavailable commands looking usable.
+FCBINDING_ACTIVATE_PATCH = (
+    (
+        # The comment alone appears thirteen times upstream; the spacer line
+        # above it is what identifies the call inside CreatePanel.
+        "        panel.addWidget(spacer, rowSpan=6)\n"
+        "\n"
+        "        # Enable all buttons, so you can access them with a right click\n"
+        "        self.activateButtons()\n",
+        "        panel.addWidget(spacer, rowSpan=6)\n"
+        "\n"
+        "        # Enable all buttons, so you can access them with a right click.\n"
+        "        # FusionMyFreeCAD local change: honour the ActivateButtons argument,\n"
+        "        # which upstream declares and then ignores. Force-enabling every button\n"
+        "        # in the window is right while arranging the ribbon, where a disabled\n"
+        "        # button cannot be right-clicked, but it is wrong after an ordinary\n"
+        "        # rebuild: a divider drag left commands that are genuinely unavailable\n"
+        "        # looking as though they could be used.\n"
+        "        if ActivateButtons is True:\n"
+        "            self.activateButtons()\n",
+    ),
+)
+
 FCBINDING_OVERFLOW_PATCH = (
     (
         "                if (\n"
@@ -501,7 +550,7 @@ LOCAL_PATCHES = (
     ),
     (
         ("FreeCAD-Ribbon", "FCBinding.py"),
-        FCBINDING_DIVIDER_PATCH + FCBINDING_OVERFLOW_PATCH,
+        FCBINDING_DIVIDER_PATCH + FCBINDING_OVERFLOW_PATCH + FCBINDING_ACTIVATE_PATCH,
     ),
     (
         ("FreeCAD-Ribbon", "CustomWidgets.py"),
