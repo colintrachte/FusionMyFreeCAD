@@ -43,13 +43,25 @@ def math_module():
         sys.modules.pop("fmf_layout_math", None)
 
 
-def _panel(*widths):
-    """A stand-in for a RibbonPanel carrying buttons of the given widths."""
-    items = [
-        types.SimpleNamespace(widget=lambda w=w: types.SimpleNamespace(width=lambda: w))
-        for w in widths
-    ]
-    layout = types.SimpleNamespace(count=lambda: len(items), itemAt=lambda i: items[i])
+def _panel(*widths, columns=None, names=None):
+    """A stand-in for a RibbonPanel laid out with the given button widths.
+
+    `columns` places buttons in grid columns, so a stack of small buttons can
+    share one column the way a real panel does.
+    """
+    if columns is None:
+        columns = range(len(widths))
+    if names is None:
+        names = ["button"] * len(widths)
+    items = []
+    for width, column, name in zip(widths, columns, names, strict=True):
+        widget = types.SimpleNamespace(width=lambda w=width: w, objectName=lambda n=name: n)
+        items.append((types.SimpleNamespace(widget=lambda w=widget: w), (0, column, 1, 1)))
+    layout = types.SimpleNamespace(
+        count=lambda: len(items),
+        itemAt=lambda i: items[i][0],
+        getItemPosition=lambda i: items[i][1],
+    )
     return types.SimpleNamespace(_actionsLayout=layout)
 
 
@@ -64,8 +76,35 @@ def _bar(toolbars):
 # ---------------------------------------------------------------------------
 
 
-def test_a_column_is_as_wide_as_the_widest_button(math_module):
-    assert math_module.panel_column_width(_panel(32, 90, 40)) == 90
+def test_a_column_is_as_wide_as_its_widest_button(math_module):
+    """Within one column. Three small buttons stacked are still one column."""
+    assert math_module.panel_column_widths(_panel(32, 28, 30, columns=[0, 0, 0])) == [32]
+
+
+def test_a_column_is_measured_by_the_median_not_the_widest(math_module):
+    """A large button beside stacks of small ones must not set the scale.
+
+    Taking the widest made every column look like the largest, so the space a
+    width could hold was underestimated: commands that would have fitted were
+    pushed to the drawer and the section sat visibly wider than its icons.
+    """
+    panel = _panel(90, 32, 34, columns=[0, 1, 2])
+    assert math_module.panel_column_widths(panel) == [90, 32, 34]
+    assert math_module.panel_column_width(panel) == 34
+
+
+def test_an_even_number_of_columns_takes_the_middle_pair(math_module):
+    panel = _panel(30, 40, 50, 60, columns=[0, 1, 2, 3])
+    assert math_module.panel_column_width(panel) == 45
+
+
+def test_the_trailing_spacer_is_not_a_column(math_module):
+    panel = _panel(40, 10, columns=[0, 1], names=["button", "ExtraSpacer"])
+    assert math_module.panel_column_widths(panel) == [40]
+
+
+def test_a_column_is_never_measured_narrower_than_an_icon(math_module):
+    assert math_module.panel_column_width(_panel(4, 6, columns=[0, 1])) == 24
 
 
 def test_a_panel_with_no_laid_out_buttons_falls_back(math_module):
