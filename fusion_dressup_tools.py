@@ -22,6 +22,7 @@ with ZERO popups, zero floating overlays, and zero HUDs:
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 from fusion_common import log_swallowed
@@ -45,7 +46,30 @@ def _get_gui() -> Any:
         return None
 
 
+_qt_cache: tuple[Any, tuple[Any, Any, Any]] | None = None
+
+
 def _get_qt() -> tuple[Any, Any, Any]:
+    """The Qt modules, resolved once per binding.
+
+    This is called from an application-wide event filter, so it runs for every
+    event FreeCAD delivers -- thousands a second while dragging. Re-running the
+    import machinery each time was pure overhead on the hottest path there is.
+
+    Keyed on the binding module itself rather than cached outright, so a test
+    harness that swaps the fake Qt between cases still gets the current one for
+    a single dictionary lookup.
+    """
+    global _qt_cache
+    binding = sys.modules.get("PySide") or sys.modules.get("PySide6")
+    if _qt_cache is not None and _qt_cache[0] is binding:
+        return _qt_cache[1]
+    resolved = _resolve_qt()
+    _qt_cache = (binding, resolved)
+    return resolved
+
+
+def _resolve_qt() -> tuple[Any, Any, Any]:
     try:
         from PySide import QtCore, QtGui, QtWidgets
 
