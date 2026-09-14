@@ -639,3 +639,87 @@ def test_constrain_midpoint_no_selection_aborts(tools, env):
 
     assert result["status"] == "no-selection"
     assert env.app.ActiveDocument.transactions == []
+
+
+# ---------------------------------------------------------------------------
+# Refusing rather than half-finishing
+# ---------------------------------------------------------------------------
+
+
+def test_boundary_open_ends_only_counts_endpoints_on_the_mirror_line(tools):
+    """Mirroring an open chain away from the axis is ordinary and allowed.
+
+    Only joins sitting on the mirror line are this command's responsibility, so
+    counting every loose endpoint would refuse work that is perfectly valid.
+    """
+    sketch = FakeSketch("Sketch")
+    sketch.addGeometry(FakeLineSegment((-30.0, 5.0), (-10.0, 5.0)))  # both ends off-axis
+    sketch.addGeometry(FakeLineSegment((0.0, 20.0), (-15.0, 20.0)))  # starts on the axis
+
+    on_axis = tools.boundary_open_ends(sketch, *V_AXIS)
+
+    assert [point for point, _owners in on_axis] == [(0.0, 20.0)]
+    assert len(tools.open_endpoints(sketch)) == 4
+
+
+def test_a_meeting_point_on_the_axis_is_not_an_open_end(tools):
+    """Once both halves are present the join is made and nothing is reported."""
+    sketch = FakeSketch("Sketch")
+    sketch.addGeometry(FakeLineSegment((-15.0, 20.0), (0.0, 20.0)))
+    sketch.addGeometry(FakeLineSegment((0.0, 20.0), (15.0, 20.0)))
+
+    assert tools.boundary_open_ends(sketch, *V_AXIS) == []
+
+
+def test_construction_geometry_is_not_part_of_the_profile(tools):
+    """A construction line crossing the axis does not bound a face."""
+    sketch = FakeSketch("Sketch")
+    geoid = sketch.addGeometry(FakeLineSegment((0.0, 0.0), (0.0, 40.0)))
+    sketch.setConstruction(geoid, True)
+
+    assert tools.boundary_open_ends(sketch, *V_AXIS) == []
+
+
+def test_a_mirror_that_would_open_the_profile_changes_nothing(tools, env, monkeypatch):
+    """The complaint this replaces: a half-finished mirror reporting success.
+
+    When the joins that hold the two halves together cannot be carried across,
+    the result is a profile that will not become a face -- and a pad that fails
+    later, far from the command that caused it. Refusing keeps the sketch as it
+    was and says which joins were the problem.
+    """
+    sketch, _dividers = _card_box([10.0])
+    env.begin_sketch_edit(sketch)
+    env.select_subelements(sketch, ["Edge3", "V_Axis"])
+    geometry_before = list(sketch.Geometry)
+    constraints_before = list(sketch.Constraints)
+
+    # Stand in for the real case: a tangency on the mirror line that the tool
+    # reports as unsupported, leaving the halves unjoined.
+    def _leaves_a_gap(sketch_, *args, **kwargs):
+        sketch_.addGeometry(FakeLineSegment((0.0, 12.0), (25.0, 12.0)))
+        return {
+            "mirrored": 1,
+            "linked_pairs": 0,
+            "attached_pairs": 0,
+            "link_dropped": 0,
+            "copied": 0,
+            "removed": 0,
+            "unmatched": [],
+            "skipped": [
+                (14, "Tangent", "Tangent constraint across the mirror boundary is unsupported")
+            ],
+        }
+
+    monkeypatch.setattr(tools, "mirror_sketch_geometry", _leaves_a_gap)
+    result = tools.mirror_with_constraints()
+
+    assert result["status"] == "unclosed"
+    assert result["open_ends"] >= 1
+    assert any("Tangent" in str(entry) for entry in result["blockers"])
+    assert sketch.Geometry == geometry_before, "the sketch must be left untouched"
+    assert sketch.Constraints == constraints_before
+    assert env.app.ActiveDocument.transactions == [
+        ("open", "Mirror with Constraints"),
+        ("abort", "Mirror with Constraints"),
+    ]

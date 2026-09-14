@@ -708,11 +708,34 @@ def test_the_ribbon_tools_panel_preference_is_managed(bootstrap):
     assert ("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon", "UseToolsPanel") in managed
 
 
-def test_every_workbench_ends_with_its_utilities_section(layout):
+def test_every_workbench_carries_a_utilities_section(layout):
     """The commands the global Tools panel held now live in the layout."""
     for workbench, panels in layout["workbenches"].items():
-        last = panels[-1]
-        assert last["title"] == "UTILITIES", workbench
-        commands = {entry[0] for entry in last["commands"] + last["overflow"]}
+        utilities = [panel for panel in panels if panel["title"] == "UTILITIES"]
+        assert len(utilities) == 1, workbench
+        commands = {entry[0] for entry in utilities[0]["commands"] + utilities[0]["overflow"]}
         assert "Std_UnitsCalculator" in commands
         assert "Std_Measure" not in commands, "already in INSPECT; do not duplicate"
+
+
+def test_export_ends_the_tab_wherever_it_appears(layout):
+    """Export is the right-hand bookend, as Create Sketch is the left-hand one.
+
+    A ribbon tab is read from its edges, so the command that finishes a part
+    belongs at the end of it rather than buried before the utilities.
+    """
+    for workbench, panels in layout["workbenches"].items():
+        output = [panel for panel in panels if panel["title"] == "OUTPUT"]
+        if not output:
+            continue
+        assert panels[-1] is output[0], workbench
+        first = output[0]["commands"][0]
+        assert first[0] == "FusionMyFreeCAD_Export"
+        assert first[2] == "large", "the export button has to read as prominent"
+
+
+def test_create_sketch_still_opens_the_part_design_tab(layout):
+    """README promises it; the export bookend must not have displaced it."""
+    first = layout["workbenches"]["PartDesignWorkbench"][0]
+    assert first["commands"][0][0] == "FusionMyFreeCAD_CreateSketch"
+    assert first["commands"][0][2] == "large"

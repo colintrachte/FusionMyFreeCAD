@@ -28,6 +28,13 @@ MAX_COLUMNS = 24
 #: Space a section needs beyond its columns, for margins and the divider.
 COLUMN_PADDING = 12
 
+#: How a stored width was arrived at. A width recorded under an older model was
+#: measured against something this one no longer means -- columns rather than
+#: pixels, or the widest button rather than the median column -- so it is
+#: retired rather than honoured, and the section returns to sizing itself.
+#: Bump this whenever the measurement changes.
+WIDTH_MODEL = 2
+
 
 def panel_column_widths(panel) -> list:
     """The width of each laid-out column of buttons in `panel`.
@@ -125,6 +132,11 @@ def stored_panel_width(bar, workbench_name, panel_name):
     """
     toolbar = _toolbar_of(bar, workbench_name, panel_name)
     if toolbar is None or toolbar.get("minWidth") is None:
+        return None
+    if toolbar.get("widthModel") != WIDTH_MODEL:
+        # Recorded by a build that measured differently. Honouring it pinned
+        # sections to widths that no longer correspond to their contents -- the
+        # export button arrived squeezed into 131px because of one.
         return None
     try:
         value = int(toolbar["minWidth"])
