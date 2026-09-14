@@ -15,7 +15,8 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
 - **UTILITIES** replaces the Ribbon add-on's global Tools panel. It holds the
   same standard commands but belongs to the layout, so it can be ordered,
   resized and reset like every other section.
-- **Export** is now the right-hand bookend of Part Design, Part and Surface, as
+- The **EXPORT** section is now the right-hand bookend of Part Design, Part and
+  Surface, as
   Create Sketch is the left-hand one. It reads the selection and opens the save
   dialog already set to the format that suits it: STEP for solids and bodies,
   STL for meshes, PDF for drawing pages, DXF for sketches.
