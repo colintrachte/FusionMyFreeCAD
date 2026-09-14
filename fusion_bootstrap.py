@@ -67,6 +67,7 @@ PREFERENCE_KEYS = (
     ("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon", "RibbonStructure", "String"),
     ("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon", "BackupFolder", "String"),
     ("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon", "Preferred_view", "Int"),
+    ("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon", "UseToolsPanel", "Bool"),
     ("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon", "Link_IconSizes", "Bool"),
     ("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon", "IconSize_Small", "Int"),
     ("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon", "IconSize_Medium", "Int"),
@@ -377,6 +378,12 @@ def _merge_layout(apply_customization=True):
         toolbars["order"] = order
         all_new_panels[workbench] = new_panels
         all_workbenches[workbench] = {"toolbars": toolbars}
+    # FreeCAD-Ribbon adds a global "Tools" panel of Std_ commands to every
+    # workbench. The UTILITIES section carries the same commands as part of the
+    # layout, so it can be ordered, resized and reset; the global one belongs to
+    # no workbench, so a divider drag on it had nothing to write to and said so.
+    # The preference that recreates it is managed off in runtime.py.
+    all_new_panels.get("Global", {}).pop("Tools_newPanel", None)
     if apply_customization:
         _apply_customization(ribbon, spec)
     return ribbon, spec["layoutVersion"]

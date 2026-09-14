@@ -688,3 +688,31 @@ def test_the_source_icon_list_has_no_stale_entries(layout, manifest):
 def test_the_probe_records_which_freecad_it_checked():
     verified = json.loads((RESOURCES / "verified-icons.json").read_text("utf-8"))
     assert verified["freeCADVersion"].startswith("1.1"), verified["freeCADVersion"]
+
+
+def test_the_ribbon_global_tools_panel_is_not_carried_into_the_layout(bootstrap):
+    """UTILITIES replaces it, and a global panel belongs to no workbench.
+
+    FreeCAD-Ribbon adds a "Tools" panel of Std_ commands to every workbench
+    from newPanels/Global. Because it is not part of any workbench's toolbars,
+    a divider drag on it had nothing to write to and reported "no toolbar named
+    that in the ribbon structure".
+    """
+    ribbon, _version = bootstrap._merge_layout()
+    assert "Tools_newPanel" not in ribbon.get("newPanels", {}).get("Global", {})
+
+
+def test_the_ribbon_tools_panel_preference_is_managed(bootstrap):
+    """Otherwise the add-on recreates the panel on the next start."""
+    managed = {(group, key) for group, key, _kind in bootstrap.PREFERENCE_KEYS}
+    assert ("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon", "UseToolsPanel") in managed
+
+
+def test_every_workbench_ends_with_its_utilities_section(layout):
+    """The commands the global Tools panel held now live in the layout."""
+    for workbench, panels in layout["workbenches"].items():
+        last = panels[-1]
+        assert last["title"] == "UTILITIES", workbench
+        commands = {entry[0] for entry in last["commands"] + last["overflow"]}
+        assert "Std_UnitsCalculator" in commands
+        assert "Std_Measure" not in commands, "already in INSPECT; do not duplicate"
