@@ -180,6 +180,12 @@ def _apply_defaults():
     # The bundled Ribbon once persisted the small icon size as its large-icon
     # default. Set all three tiers explicitly so layout "large" and "small" choices
     # remain visually meaningful on existing as well as clean profiles.
+    # The Ribbon add-on injects its own global "Tools" panel of Std_ commands
+    # into every workbench. FusionMyFreeCAD carries the same commands in its
+    # UTILITIES section, which belongs to the layout and so can be ordered,
+    # resized and reset; leaving both on gave every tab a duplicate panel that
+    # sat outside the layout and could not be resized.
+    ribbon.SetBool("UseToolsPanel", False)
     ribbon.SetBool("Link_IconSizes", True)
     ribbon.SetInt("IconSize_Small", 24)
     ribbon.SetInt("IconSize_Medium", 36)
