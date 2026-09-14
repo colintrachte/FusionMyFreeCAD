@@ -1,5 +1,5 @@
 {
-  "layoutVersion": "1.5.0",
+  "layoutVersion": "1.6.0",
   "targetFreeCAD": "1.1.x",
   "dropdownButtons": {
     "Fusion_MoreCreate_ddb": [
@@ -1551,6 +1551,41 @@
         }
       },
       {
+        "name": "Fusion Sketch Frequent_newPanel",
+        "title": "FREQUENT",
+        "commands": [
+          [
+            "Sketcher_ConstrainHorVer",
+            "SketcherWorkbench",
+            "large",
+            "Horizontal / Vertical",
+            "Constraint_HorVer"
+          ],
+          [
+            "Sketcher_ConstrainCoincident",
+            "SketcherWorkbench",
+            "large",
+            "Coincident",
+            "Constraint_PointOnPoint"
+          ],
+          [
+            "Sketcher_ConstrainEqual",
+            "SketcherWorkbench",
+            "small",
+            "Equal",
+            "Constraint_EqualLength"
+          ],
+          [
+            "Sketcher_CompExternal",
+            "SketcherWorkbench",
+            "small",
+            "Project / Include",
+            "Sketcher_Projection"
+          ]
+        ],
+        "overflow": []
+      },
+      {
         "name": "Fusion Sketch Inspect_newPanel",
         "title": "INSPECT",
         "commands": [
@@ -1824,7 +1859,7 @@
           [
             "Surface_ExtendFace",
             "SurfaceWorkbench",
-            "large",
+            "small",
             "Extend Face",
             "Surface_ExtendFace"
           ],

@@ -301,3 +301,105 @@ def test_an_unusable_stored_width_reads_as_unset(math_module, stored):
 def test_an_unknown_section_reads_as_unset_rather_than_raising(math_module):
     assert math_module.stored_panel_width(_bar({}), "PartDesignWorkbench", "Nope") is None
     assert math_module.stored_panel_width(types.SimpleNamespace(), "X", "Y") is None
+
+
+# ---------------------------------------------------------------------------
+# Measuring a button
+# ---------------------------------------------------------------------------
+
+
+def _sized(hint, laid_out):
+    """A button that asks for `hint` pixels and was handed `laid_out`."""
+    return types.SimpleNamespace(
+        sizeHint=lambda: types.SimpleNamespace(width=lambda: hint),
+        width=lambda: laid_out,
+        objectName=lambda: "button",
+    )
+
+
+def test_a_button_is_measured_by_what_it_asks_for_not_what_it_was_given(math_module):
+    """A pinned section hands its buttons more room than they want.
+
+    Reading that back as the size of a column would make the empty space argue
+    for more empty space, so what is measured is the button's own request.
+    """
+    assert math_module.natural_width(_sized(40, 120)) == 40
+
+
+def test_a_button_that_has_not_been_laid_out_yet_falls_back_to_its_width(math_module):
+    assert math_module.natural_width(_sized(0, 50)) == 50
+
+
+def test_a_button_that_can_report_neither_measures_zero(math_module):
+    assert math_module.natural_width(types.SimpleNamespace()) == 0
+
+
+# ---------------------------------------------------------------------------
+# Choosing how much to show
+# ---------------------------------------------------------------------------
+
+
+def _ruler(widths):
+    """A section whose budget `n` needs `widths[n - 1]` pixels, and a call log."""
+    seen = []
+
+    def measure(budget):
+        seen.append(budget)
+        return widths[budget - 1]
+
+    return measure, seen
+
+
+def test_the_fullest_budget_that_fits_is_chosen(math_module):
+    measure, _seen = _ruler([80, 150, 300, 480])
+    assert math_module.choose_column_budget(320, 4, measure) == 3
+
+
+def test_a_budget_is_chosen_by_measuring_rather_than_by_multiplying(math_module):
+    """Columns are not interchangeable, so no single column width describes one.
+
+    Three small commands share a column, a half-filled stack takes a column
+    without being counted, and a large button's column is nothing like a small
+    one's. Here the fourth budget costs almost nothing and the third costs a
+    great deal; arithmetic on an average column would get both wrong.
+    """
+    measure, _seen = _ruler([60, 110, 400, 410])
+    assert math_module.choose_column_budget(420, 4, measure) == 4
+    measure, _seen = _ruler([60, 110, 400, 410])
+    assert math_module.choose_column_budget(399, 4, measure) == 2
+
+
+def test_everything_fitting_means_everything_is_shown(math_module):
+    measure, _seen = _ruler([80, 150, 300, 480])
+    assert math_module.choose_column_budget(10000, 4, measure) == 4
+
+
+def test_a_section_too_narrow_for_even_one_column_still_shows_one(math_module):
+    measure, _seen = _ruler([80, 150])
+    assert math_module.choose_column_budget(10, 2, measure) == 1
+
+
+def test_the_search_does_not_build_every_candidate(math_module):
+    """Each candidate is a real panel build, so the count is the cost."""
+    measure, seen = _ruler(list(range(50, 50 + 16 * 40, 40)))
+    math_module.choose_column_budget(600, 16, measure)
+    assert len(seen) <= 5, seen
+
+
+def test_a_budget_is_never_wider_than_the_ribbon_allows(math_module):
+    measure, _seen = _ruler([10] * 100)
+    got = math_module.choose_column_budget(10000, 100, measure)
+    assert got == math_module.MAX_COLUMNS
+
+
+def test_a_candidate_that_will_not_build_falls_back_to_the_floor(math_module):
+    """A build that fails says nothing about any other budget.
+
+    Guessing a wider one from the ones that did build would pin a section to a
+    width its contents were never measured against.
+    """
+
+    def measure(budget):
+        return 100 if budget <= 2 else None
+
+    assert math_module.choose_column_budget(500, 6, measure) == math_module.MIN_COLUMNS

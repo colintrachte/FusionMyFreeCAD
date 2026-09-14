@@ -11,8 +11,9 @@ from PySide.QtCore import Qt, QPoint, Signal
 from PySide.QtWidgets import QRubberBand
 
 from .fmf_layout_math import (
+    MAX_COLUMNS,
     WIDTH_MODEL,
-    columns_for_width,
+    choose_column_budget,
     panel_column_width,
     plan_width_resize,
     stored_panel_width,
@@ -257,13 +258,78 @@ def apply_panel_width(bar, panel) -> None:
         _report("could not size the panel: {}: {}".format(type(error).__name__, error))
 
 
-def resize_panel(bar, panel, targetWidth: int):
-    """Hold this section at `targetWidth` pixels and refit its contents.
+def _build_panel(bar, workbenchName, panelName):
+    """One rebuild of a section from the current ribbon structure."""
+    panel = bar.CreatePanel(
+        workbenchName,
+        panelName,
+        addPanel=False,
+        Dict=bar.workBenchDict,
+        ignoreColumnLimit=False,
+        showEnableControl=False,
+        enableSeparator=False,
+        # Not an arranging operation: leaving every button force-enabled
+        # would make unavailable commands look usable.
+        ActivateButtons=False,
+    )
+    if panel is not None:
+        try:
+            # Built unparented, so it would not inherit the ribbon's stylesheet
+            # and would measure against the wrong font and padding. Adopting it
+            # into the category first costs nothing -- it stays hidden until
+            # replacePanel puts it in the layout -- and makes the width it
+            # reports the width it will have.
+            panel.setParent(bar.currentCategory())
+        except Exception:
+            pass
+    return panel
 
-    The width is what the user dragged, so the width is what is stored. The
-    column budget is then derived from it, so the commands that no longer fit
-    in that space drop into the section's drawer rather than the two numbers
-    being set independently and disagreeing.
+
+def _fit_to_width(bar, workbenchName, panelName, toolbar, targetWidth: int):
+    """Build the fullest version of a section that fits in `targetWidth`.
+
+    Returns (panel, budget). The budget is found by building candidates and
+    asking each what width it wants, rather than by multiplying a column width
+    by a count: a budget of N does not mean N columns of buttons on screen --
+    three small commands share a column, a half-filled stack occupies one
+    without being counted, and a large button's column is nothing like a small
+    one's. Every earlier attempt to compute this arithmetically left the
+    section demanding far more room than its icons needed.
+    """
+    built = {}
+
+    def measure(budget):
+        toolbar["maxColumns"] = int(budget)
+        candidate = _build_panel(bar, workbenchName, panelName)
+        built[int(budget)] = candidate
+        if candidate is None:
+            return None
+        return candidate.sizeHint().width()
+
+    ceiling = len(toolbar.get("order", [])) or MAX_COLUMNS
+    budget = choose_column_budget(targetWidth, ceiling, measure)
+    chosen = built.get(budget)
+    if chosen is None:
+        toolbar["maxColumns"] = budget
+        chosen = _build_panel(bar, workbenchName, panelName)
+    for candidate in built.values():
+        if candidate is not None and candidate is not chosen:
+            candidate.close()
+            candidate.deleteLater()
+    toolbar["maxColumns"] = budget
+    return chosen, budget
+
+
+def resize_panel(bar, panel, targetWidth: int):
+    """Refit this section to the width the user dragged it to.
+
+    The drag sets a ceiling, not a target. Inside it the fullest set of
+    commands that fits is shown, and the section is then held at the width
+    *that* set needs. Dragging past the point where everything already fits
+    therefore does nothing rather than opening a dead zone on the right, which
+    is the whole complaint about the previous behaviour: a section could be
+    left demanding a great deal of empty space with commands still in its
+    drawer.
     """
     try:
         if not targetWidth or targetWidth <= 0:
@@ -274,7 +340,6 @@ def resize_panel(bar, panel, targetWidth: int):
             return
         label = panel.title() if hasattr(panel, "title") else panelName
         was = panel.width()
-        columns = columns_for_width(targetWidth, panel_column_width(panel))
 
         bar._ensureDirectDragState()
         toolbars = (
@@ -287,32 +352,29 @@ def resize_panel(bar, panel, targetWidth: int):
             _report("{}: no toolbar named that in the ribbon structure.".format(label))
             return
         toolbar["minWidth"] = int(targetWidth)
-        toolbar["maxColumns"] = columns
         toolbar["widthModel"] = WIDTH_MODEL
-        bar._saveDirectDragState()
 
-        replacement = bar.CreatePanel(
-            workbenchName,
-            panelName,
-            addPanel=False,
-            Dict=bar.workBenchDict,
-            ignoreColumnLimit=False,
-            showEnableControl=False,
-            enableSeparator=False,
-            # Not an arranging operation: leaving every button force-enabled
-            # would make unavailable commands look usable.
-            ActivateButtons=False,
+        replacement, columns = _fit_to_width(
+            bar, workbenchName, panelName, toolbar, int(targetWidth)
         )
         if replacement is None:
             _report("{}: the rebuild produced no panel.".format(label))
             return
+        # What the chosen set of commands actually occupies, which is at most
+        # the dragged width and usually a little less. Storing the drag instead
+        # is what let a section keep space it had no use for.
+        finalWidth = max(1, int(replacement.sizeHint().width()))
+        toolbar["minWidth"] = finalWidth
+        bar._saveDirectDragState()
         bar.currentCategory().replacePanel(panel, replacement)
         bar.setPanelProperties(replacement)
         apply_panel_width(bar, replacement)
         bar.currentCategory()._panels[replacement.objectName()] = replacement
         panel.close()
         _report(
-            "{}: {}px -> {}px ({} column(s)).".format(label, was, targetWidth, columns),
+            "{}: {}px -> {}px within a {}px drag ({} column(s)).".format(
+                label, was, finalWidth, targetWidth, columns
+            ),
             quiet=True,
         )
     except Exception as error:

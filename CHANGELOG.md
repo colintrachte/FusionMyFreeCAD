@@ -2,6 +2,45 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
+## 1.6.0 — 2026-09-13
+
+### A section stops at the width its icons need
+
+- Dragging a divider sets a ceiling rather than a target. Inside it the fullest
+  set of commands that fits is shown, and the section is then held at the width
+  *that* set needs -- so dragging past the point where everything already fits
+  does nothing, instead of leaving a stretch of empty space with commands still
+  in the drawer.
+- How much fits is now settled by building the section and asking it how wide it
+  wants to be, rather than by multiplying a representative column width by a
+  count. A column budget was never a number of columns on screen: three small
+  commands share one, a half-filled stack takes one without being counted, and a
+  large button's column is nothing like a small one's. MODIFY, which mixes the
+  two, was the section that showed it worst.
+- A width recorded by an earlier build is retired rather than honoured, so
+  sections measured the old way size themselves again on first use.
+
+### FREQUENT, in every workbench, populated however you like
+
+- **Sketcher now has a FREQUENT section**, so every workbench has one.
+- **Anything you use can rise into it.** The candidate pool was a dozen or so
+  hand-picked commands per workbench, which meant almost everything you actually
+  clicked was invisible to the ranking and the section never changed. The pool
+  is now every command that workbench's ribbon offers.
+- **Anything you drag into it stays.** The section rewrites itself from what gets
+  used, so a command dropped in was swept away at the next workbench switch.
+  What you put there is now remembered and kept ahead of anything the counters
+  suggest -- and a command you drag back out stays out. A command dragged in
+  from another workbench keeps the label and icon it arrived with.
+- A FREQUENT section keeps a fixed shape -- two large slots, then small ones --
+  so buttons do not move out from under the hand that learned where they were.
+
+### Notes
+
+- A FREQUENT section is rewritten when you switch to its workbench, so a
+  promotion from usage appears the next time you come back to that tab.
+  Something you drag in appears immediately.
+
 ## 1.5.0 — 2026-09-13
 
 ### The ribbon sections are yours to arrange
