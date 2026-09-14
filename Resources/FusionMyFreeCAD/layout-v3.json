@@ -455,49 +455,6 @@
         "overflow": []
       },
       {
-        "name": "Fusion Output_newPanel",
-        "title": "OUTPUT",
-        "commands": [
-          [
-            "FusionMyFreeCAD_Export",
-            "General",
-            "large",
-            "Export",
-            "FusionMyFreeCAD_Export"
-          ]
-        ],
-        "overflow": [
-          [
-            "FusionMyFreeCAD_ExportSTEP",
-            "General",
-            "small",
-            "Export as STEP",
-            "FusionMyFreeCAD_Export"
-          ],
-          [
-            "FusionMyFreeCAD_ExportSTL",
-            "General",
-            "small",
-            "Export as STL",
-            "FusionMyFreeCAD_Export"
-          ],
-          [
-            "FusionMyFreeCAD_Export3MF",
-            "General",
-            "small",
-            "Export as 3MF",
-            "FusionMyFreeCAD_Export"
-          ],
-          [
-            "FusionMyFreeCAD_ExportDXF",
-            "General",
-            "small",
-            "Export as DXF",
-            "FusionMyFreeCAD_Export"
-          ]
-        ]
-      },
-      {
         "name": "Fusion Utilities_newPanel",
         "title": "UTILITIES",
         "commands": [
@@ -537,6 +494,49 @@
             "small",
             "What's This?",
             "WhatsThis"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Output_newPanel",
+        "title": "OUTPUT",
+        "commands": [
+          [
+            "FusionMyFreeCAD_Export",
+            "General",
+            "large",
+            "Export",
+            "FusionMyFreeCAD_Export"
+          ]
+        ],
+        "overflow": [
+          [
+            "FusionMyFreeCAD_ExportSTEP",
+            "General",
+            "small",
+            "Export as STEP",
+            "FusionMyFreeCAD_Export"
+          ],
+          [
+            "FusionMyFreeCAD_ExportSTL",
+            "General",
+            "small",
+            "Export as STL",
+            "FusionMyFreeCAD_Export"
+          ],
+          [
+            "FusionMyFreeCAD_Export3MF",
+            "General",
+            "small",
+            "Export as 3MF",
+            "FusionMyFreeCAD_Export"
+          ],
+          [
+            "FusionMyFreeCAD_ExportDXF",
+            "General",
+            "small",
+            "Export as DXF",
+            "FusionMyFreeCAD_Export"
           ]
         ]
       }
@@ -974,49 +974,6 @@
         "overflow": []
       },
       {
-        "name": "Fusion Part Output_newPanel",
-        "title": "OUTPUT",
-        "commands": [
-          [
-            "FusionMyFreeCAD_Export",
-            "General",
-            "large",
-            "Export",
-            "FusionMyFreeCAD_Export"
-          ]
-        ],
-        "overflow": [
-          [
-            "FusionMyFreeCAD_ExportSTEP",
-            "General",
-            "small",
-            "Export as STEP",
-            "FusionMyFreeCAD_Export"
-          ],
-          [
-            "FusionMyFreeCAD_ExportSTL",
-            "General",
-            "small",
-            "Export as STL",
-            "FusionMyFreeCAD_Export"
-          ],
-          [
-            "FusionMyFreeCAD_Export3MF",
-            "General",
-            "small",
-            "Export as 3MF",
-            "FusionMyFreeCAD_Export"
-          ],
-          [
-            "FusionMyFreeCAD_ExportDXF",
-            "General",
-            "small",
-            "Export as DXF",
-            "FusionMyFreeCAD_Export"
-          ]
-        ]
-      },
-      {
         "name": "Fusion Part Utilities_newPanel",
         "title": "UTILITIES",
         "commands": [
@@ -1056,6 +1013,49 @@
             "small",
             "What's This?",
             "WhatsThis"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Part Output_newPanel",
+        "title": "OUTPUT",
+        "commands": [
+          [
+            "FusionMyFreeCAD_Export",
+            "General",
+            "large",
+            "Export",
+            "FusionMyFreeCAD_Export"
+          ]
+        ],
+        "overflow": [
+          [
+            "FusionMyFreeCAD_ExportSTEP",
+            "General",
+            "small",
+            "Export as STEP",
+            "FusionMyFreeCAD_Export"
+          ],
+          [
+            "FusionMyFreeCAD_ExportSTL",
+            "General",
+            "small",
+            "Export as STL",
+            "FusionMyFreeCAD_Export"
+          ],
+          [
+            "FusionMyFreeCAD_Export3MF",
+            "General",
+            "small",
+            "Export as 3MF",
+            "FusionMyFreeCAD_Export"
+          ],
+          [
+            "FusionMyFreeCAD_ExportDXF",
+            "General",
+            "small",
+            "Export as DXF",
+            "FusionMyFreeCAD_Export"
           ]
         ]
       }
@@ -1881,49 +1881,6 @@
         "overflow": []
       },
       {
-        "name": "Fusion Surface Output_newPanel",
-        "title": "OUTPUT",
-        "commands": [
-          [
-            "FusionMyFreeCAD_Export",
-            "General",
-            "large",
-            "Export",
-            "FusionMyFreeCAD_Export"
-          ]
-        ],
-        "overflow": [
-          [
-            "FusionMyFreeCAD_ExportSTEP",
-            "General",
-            "small",
-            "Export as STEP",
-            "FusionMyFreeCAD_Export"
-          ],
-          [
-            "FusionMyFreeCAD_ExportSTL",
-            "General",
-            "small",
-            "Export as STL",
-            "FusionMyFreeCAD_Export"
-          ],
-          [
-            "FusionMyFreeCAD_Export3MF",
-            "General",
-            "small",
-            "Export as 3MF",
-            "FusionMyFreeCAD_Export"
-          ],
-          [
-            "FusionMyFreeCAD_ExportDXF",
-            "General",
-            "small",
-            "Export as DXF",
-            "FusionMyFreeCAD_Export"
-          ]
-        ]
-      },
-      {
         "name": "Fusion Surface Utilities_newPanel",
         "title": "UTILITIES",
         "commands": [
@@ -1963,6 +1920,49 @@
             "small",
             "What's This?",
             "WhatsThis"
+          ]
+        ]
+      },
+      {
+        "name": "Fusion Surface Output_newPanel",
+        "title": "OUTPUT",
+        "commands": [
+          [
+            "FusionMyFreeCAD_Export",
+            "General",
+            "large",
+            "Export",
+            "FusionMyFreeCAD_Export"
+          ]
+        ],
+        "overflow": [
+          [
+            "FusionMyFreeCAD_ExportSTEP",
+            "General",
+            "small",
+            "Export as STEP",
+            "FusionMyFreeCAD_Export"
+          ],
+          [
+            "FusionMyFreeCAD_ExportSTL",
+            "General",
+            "small",
+            "Export as STL",
+            "FusionMyFreeCAD_Export"
+          ],
+          [
+            "FusionMyFreeCAD_Export3MF",
+            "General",
+            "small",
+            "Export as 3MF",
+            "FusionMyFreeCAD_Export"
+          ],
+          [
+            "FusionMyFreeCAD_ExportDXF",
+            "General",
+            "small",
+            "Export as DXF",
+            "FusionMyFreeCAD_Export"
           ]
         ]
       }

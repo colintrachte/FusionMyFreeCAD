@@ -11,6 +11,7 @@ from PySide.QtCore import Qt, QPoint, Signal
 from PySide.QtWidgets import QRubberBand
 
 from .fmf_layout_math import (
+    WIDTH_MODEL,
     columns_for_width,
     panel_column_width,
     plan_width_resize,
@@ -287,6 +288,7 @@ def resize_panel(bar, panel, targetWidth: int):
             return
         toolbar["minWidth"] = int(targetWidth)
         toolbar["maxColumns"] = columns
+        toolbar["widthModel"] = WIDTH_MODEL
         bar._saveDirectDragState()
 
         replacement = bar.CreatePanel(

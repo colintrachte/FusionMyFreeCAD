@@ -186,6 +186,77 @@ def geometry_endpoints(geo):
     return points
 
 
+def point_on_axis(point, axis_a, axis_b, tolerance=TOLERANCE):
+    """Whether `point` lies on the infinite mirror line."""
+    return distance_point_to_line(point, axis_a, axis_b) <= tolerance
+
+
+def boundary_open_ends(sketch, axis_a, axis_b, tolerance=TOLERANCE):
+    """Profile endpoints sitting on the mirror line that nothing joins to.
+
+    These are the joins a mirror is answerable for. An endpoint on the axis is
+    where the original meets its reflection, so after mirroring it must be met
+    by two edges. Anything still alone there is a gap the mirror opened, and the
+    profile will not close.
+
+    Endpoints away from the axis are deliberately ignored: mirroring an open
+    chain and closing it afterwards is an ordinary thing to do, and refusing
+    that would make the command useless.
+    """
+    return [
+        (point, owners)
+        for point, owners in _endpoint_owners(sketch, tolerance)
+        if len(owners) < 2 and point_on_axis(point, axis_a, axis_b, tolerance)
+    ]
+
+
+def _endpoint_owners(sketch, tolerance=TOLERANCE):
+    """Every profile endpoint with the edges meeting it."""
+    counts = []
+    for geoid, geo in enumerate(_geometry_list(sketch)):
+        if is_construction(sketch, geoid, geo):
+            continue
+        points = geometry_endpoints(geo)
+        start, end = points.get(_POS_START), points.get(_POS_END)
+        if start is None or end is None:
+            # A circle bounds itself and needs no partner.
+            continue
+        for point in (start, end):
+            for existing in counts:
+                if points_equal(existing[0], point, tolerance):
+                    existing[1].append(geoid)
+                    break
+            else:
+                counts.append((point, [geoid]))
+    return [(point, sorted(set(owners))) for point, owners in counts]
+
+
+def is_construction(sketch, geoid, geo=None):
+    """Whether `geoid` is construction geometry, however this build spells it."""
+    getter = getattr(sketch, "getConstruction", None)
+    if callable(getter):
+        try:
+            return bool(getter(geoid))
+        except Exception:
+            pass
+    if geo is None:
+        geometry = _geometry_list(sketch)
+        geo = geometry[geoid] if 0 <= geoid < len(geometry) else None
+    return bool(getattr(geo, "Construction", False))
+
+
+def open_endpoints(sketch, tolerance=TOLERANCE):
+    """Endpoints of the profile that are not shared by exactly two edges.
+
+    This is what decides whether a sketch can become a face. An endpoint met by
+    one edge is a gap; by three or more, a branch. Either makes OpenCASCADE
+    report "failed to close some wire" and the pad refuse.
+    """
+    return [
+        (point, owners) for point, owners in _endpoint_owners(sketch, tolerance) if len(owners) != 2
+    ]
+
+
 def constraint_record(constraint, index):
     """Flatten a Sketcher constraint into a plain dict.
 
@@ -1056,6 +1127,50 @@ def mirror_sketch_geometry(sketch, source_indices, reference_geoid, reference_po
     }
 
 
+def _report_unclosed(result, gaps_after, gaps_before):
+    """Explain a refusal, naming what could not be carried across the mirror."""
+    blockers = [entry for entry in result.get("skipped", []) if _blocks_closure(entry)]
+    _notify(
+        "did not mirror: the result would leave {} open end(s) in the profile, "
+        "so nothing was changed.".format(len(gaps_after) - gaps_before),
+        error=True,
+    )
+    if blockers:
+        App.Console.PrintMessage("  joins that could not be carried across the mirror line:\n")
+        for entry in blockers:
+            App.Console.PrintMessage("    {}\n".format(_describe_skip(entry)))
+        App.Console.PrintMessage(
+            "  Mirror with FreeCAD's own Mirror and add those by hand, or move the\n"
+            "  geometry so the join does not sit on the mirror line.\n"
+        )
+    for point, owners in gaps_after[:6]:
+        App.Console.PrintMessage(
+            "  open end near ({:.3f}, {:.3f}), edge(s) {}\n".format(
+                point[0], point[1], ", ".join(str(owner) for owner in owners)
+            )
+        )
+    return {
+        "status": "unclosed",
+        "open_ends": len(gaps_after),
+        "open_ends_before": gaps_before,
+        "blockers": blockers,
+        **result,
+    }
+
+
+def _blocks_closure(entry):
+    """Whether a skipped constraint is one that held the profile together."""
+    ctype = entry[1] if len(entry) > 1 else ""
+    return str(ctype) in {"Tangent", "Coincident", "PointOnObject", "Symmetric"}
+
+
+def _describe_skip(entry):
+    index = entry[0] if entry else "?"
+    ctype = entry[1] if len(entry) > 1 else "?"
+    reason = entry[2] if len(entry) > 2 else ""
+    return "{} #{}: {}".format(ctype, index, reason)
+
+
 def mirror_with_constraints():
     """Mirror synchronously, then copy constraints left on the boundary.
 
@@ -1073,11 +1188,24 @@ def mirror_with_constraints():
         _notify(selection_error + ".", error=True)
         return {"status": "no-selection"}
     document = getattr(App, "ActiveDocument", None)
+    # Only joins on the mirror line count against this command: those are the
+    # ones it is answerable for. Gaps the sketch already had, and open chains
+    # away from the axis, are not its doing.
+    axis_a, axis_b = axis
+    gaps_before = len(boundary_open_ends(sketch, axis_a, axis_b))
     _open_transaction(document, "Mirror with Constraints")
     try:
         result = mirror_sketch_geometry(
             sketch, source_indices, reference_geoid, reference_pos, axis
         )
+        gaps_after = boundary_open_ends(sketch, axis_a, axis_b)
+        if len(gaps_after) > gaps_before:
+            # Refuse rather than half-finish. A mirror that drops the joins
+            # holding the two halves together leaves a profile that cannot
+            # become a face, and reporting success on that sends the user off
+            # to debug a pad that was never going to work.
+            _abort_transaction(document)
+            return _report_unclosed(result, gaps_after, gaps_before)
         _commit_transaction(document)
     except Exception as error:
         _abort_transaction(document)

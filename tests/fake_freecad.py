@@ -169,6 +169,7 @@ class FakeDocument:
         self.Objects = []
         self.recomputes = 0
         self.transactions = []
+        self._transaction_snapshot = []
         self.open_transaction = None
 
     def addObject(self, type_name, name):
@@ -197,14 +198,27 @@ class FakeDocument:
     def openTransaction(self, label):
         self.open_transaction = label
         self.transactions.append(("open", label))
+        # Snapshot what an abort has to be able to put back. FreeCAD rolls the
+        # document back on abort; without modelling that, a test cannot tell a
+        # command that refused cleanly from one that refused after editing.
+        self._transaction_snapshot = [
+            (obj, list(obj.Geometry), list(obj.Constraints))
+            for obj in self.Objects
+            if hasattr(obj, "Geometry") and hasattr(obj, "Constraints")
+        ]
 
     def commitTransaction(self):
         self.transactions.append(("commit", self.open_transaction))
         self.open_transaction = None
+        self._transaction_snapshot = []
 
     def abortTransaction(self):
         self.transactions.append(("abort", self.open_transaction))
         self.open_transaction = None
+        for obj, geometry, constraints in self._transaction_snapshot:
+            obj.Geometry = geometry
+            obj.Constraints = constraints
+        self._transaction_snapshot = []
 
     def removeObject(self, obj_or_name):
         name = obj_or_name if isinstance(obj_or_name, str) else getattr(obj_or_name, "Name", None)

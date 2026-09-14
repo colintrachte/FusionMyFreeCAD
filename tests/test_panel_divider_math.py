@@ -243,10 +243,12 @@ def test_the_preview_and_the_commit_agree(math_module):
 # ---------------------------------------------------------------------------
 
 
-def _width_bar(stored=None):
+def _width_bar(stored=None, model="current"):
     toolbar = {"order": ["a", "b"]}
     if stored is not None:
         toolbar["minWidth"] = stored
+        if model is not None:
+            toolbar["widthModel"] = model
     return _bar({"Fusion Create_newPanel": toolbar})
 
 
@@ -259,10 +261,23 @@ def test_a_section_never_dragged_has_no_stored_width(math_module):
 
 
 def test_a_dragged_section_remembers_its_width(math_module):
-    got = math_module.stored_panel_width(
-        _width_bar(412), "PartDesignWorkbench", "Fusion Create_newPanel"
+    bar = _width_bar(412, model=math_module.WIDTH_MODEL)
+    assert (
+        math_module.stored_panel_width(bar, "PartDesignWorkbench", "Fusion Create_newPanel") == 412
     )
-    assert got == 412
+
+
+def test_a_width_from_an_earlier_measurement_is_retired(math_module):
+    """A width recorded under an older model measured something else.
+
+    Honouring one pinned the export section to 131px, because that number came
+    from counting columns rather than pixels. Retiring it returns the section to
+    sizing itself until the user drags it again.
+    """
+    for stale in (None, 1, "v1"):
+        bar = _width_bar(412, model=stale)
+        got = math_module.stored_panel_width(bar, "PartDesignWorkbench", "Fusion Create_newPanel")
+        assert got is None, stale
 
 
 def test_a_width_is_not_derived_from_the_column_budget(math_module):
