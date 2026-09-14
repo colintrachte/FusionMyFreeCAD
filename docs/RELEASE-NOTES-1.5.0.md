@@ -12,10 +12,11 @@ that section's drawer. Click a section title to open that drawer.
 **UTILITIES** replaces the Ribbon add-on's global Tools panel: the same standard
 commands, but part of the layout, so it can be ordered, resized and reset.
 
-**Export** now ends the Part Design, Part and Surface tabs, as Create Sketch
-begins them. It reads the selection and opens the save dialog already set to a
+The **EXPORT** section now ends the Part Design, Part and Surface tabs, as
+Create Sketch begins them. It reads the selection and opens the save dialog already set to a
 sensible format -- STEP for solids and bodies, STL for meshes, PDF for drawing
-pages, DXF for sketches -- and its dropdown holds the explicit choices.
+pages, DXF for sketches -- and the STEP, STL, 3MF and DXF buttons beside it each carry their own mark and
+caption, so the one you want is picked out at a glance.
 
 ## A faster sketcher
 

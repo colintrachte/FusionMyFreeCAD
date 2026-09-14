@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Sheet -->
+  <path d="M14 6 h24 l12 12 v28 a4 4 0 0 1 -4 4 h-32 a4 4 0 0 1 -4 -4 v-36 a4 4 0 0 1 4 -4 z"
+        fill="#ffffff" stroke="#204a87" stroke-width="2.5" stroke-linejoin="round" />
+  <path d="M38 6 v12 h12" fill="none" stroke="#204a87" stroke-width="2.5" stroke-linejoin="round" />
+
+  <!-- Format wordmark. Colour carries the distinction where the text does not
+       render, so the four icons stay apart either way. -->
+  <rect x="6" y="36" width="52" height="20" rx="4" fill="#3465a4" />
+  <text x="32" y="51" text-anchor="middle" font-family="DejaVu Sans, Verdana, sans-serif"
+        font-size="15" font-weight="bold" fill="#ffffff">STEP</text>
+
+  <!-- Leaving the document -->
+  <line x1="30" y1="30" x2="52" y2="30" stroke="#204a87" stroke-width="3" stroke-linecap="round" />
+  <polygon points="50,24 58,30 50,36" fill="#204a87" />
+</svg>

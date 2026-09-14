@@ -725,13 +725,32 @@ def test_export_ends_the_tab_wherever_it_appears(layout):
     belongs at the end of it rather than buried before the utilities.
     """
     for workbench, panels in layout["workbenches"].items():
-        output = [panel for panel in panels if panel["title"] == "OUTPUT"]
+        output = [panel for panel in panels if panel["title"] == "EXPORT"]
         if not output:
             continue
         assert panels[-1] is output[0], workbench
         first = output[0]["commands"][0]
         assert first[0] == "FusionMyFreeCAD_Export"
         assert first[2] == "large", "the export button has to read as prominent"
+
+
+def test_every_export_format_is_told_apart_by_its_own_icon(layout):
+    """One shared icon four times over tells the user nothing.
+
+    The format buttons sit side by side once the section is widened, so each
+    needs its own mark and its own caption to be picked out at a glance.
+    """
+    for workbench, panels in layout["workbenches"].items():
+        export = [panel for panel in panels if panel["title"] == "EXPORT"]
+        if not export:
+            continue
+        entries = export[0]["commands"] + export[0]["overflow"]
+        icons = [entry[4] for entry in entries]
+        captions = [entry[3] for entry in entries]
+        assert len(set(icons)) == len(icons), "{}: duplicate icon".format(workbench)
+        assert len(set(captions)) == len(captions), "{}: duplicate caption".format(workbench)
+        for entry in entries[1:]:
+            assert entry[3] in {"STEP", "STL", "3MF", "DXF"}, entry
 
 
 def test_create_sketch_still_opens_the_part_design_tab(layout):
