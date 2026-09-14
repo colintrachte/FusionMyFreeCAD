@@ -538,16 +538,116 @@ def record_usage(command):
 
 
 def adaptive_groups(workbench):
-    config = load_manifest().get("adaptivePins", {}).get(workbench)
-    if not config:
+    """The adaptive sections of a workbench, as (panel name, group) pairs."""
+    config = load_manifest().get("adaptivePins", {}).get(workbench) or {}
+    return list(config.get("panels", {}).items())
+
+
+def group_is_whole(group):
+    """Whether this group owns its whole section or only permutes its slots.
+
+    A whole-panel group -- FREQUENT -- replaces the section's contents with
+    whatever has risen to the top. A slot group leaves the section's command
+    list alone and only decides which of two alternatives gets the prominent
+    slot. A workbench can have both: Sketcher promotes within CREATE and
+    MODIFY and keeps a FREQUENT section as well.
+    """
+    return bool(group.get("whole", False))
+
+
+#: A FREQUENT section's shape: the first two slots are large, the rest small.
+#: Taking each slot's size from the command promoted into it made the section
+#: change shape as habits changed, moving buttons out from under the hand that
+#: had learned where they were. It is also meaningless now that the candidates
+#: are the whole ribbon: a command's declared size describes the section it
+#: normally lives in, not this one.
+WHOLE_PANEL_SLOT_SIZES = ("large", "large")
+
+
+def _slot_size(index):
+    if index < len(WHOLE_PANEL_SLOT_SIZES):
+        return WHOLE_PANEL_SLOT_SIZES[index]
+    return "small"
+
+
+def _pin_record(workbench, panel_name):
+    """Where a section remembers what the user put in it, and what we wrote."""
+    return load_usage().setdefault("pins", {}).setdefault(workbench, {}).setdefault(panel_name, {})
+
+
+def pinned_commands(workbench, panel_name):
+    kept = _pin_record(workbench, panel_name).get("kept", [])
+    return list(kept) if isinstance(kept, list) else []
+
+
+def _panel_metadata(ribbon, workbench, panel_name, command):
+    """Everything a slot needs to draw `command`, read from the live ribbon.
+
+    A command dragged in from elsewhere arrives without the icon and label a
+    candidate carries, but the section it was just dropped into knows all of
+    it.
+    """
+    try:
+        entry = ribbon["workbenches"][workbench]["toolbars"][panel_name]["commands"][command]
+        sources = dict(ribbon["newPanels"][workbench][panel_name])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if command not in sources or not isinstance(entry, dict):
+        return None
+    return [
+        sources[command],
+        entry.get("size", "small"),
+        entry.get("text", command),
+        entry.get("icon", ""),
+    ]
+
+
+def reconcile_pins(workbench, panel_name, group, ribbon):
+    """Learn what the user put into this section by hand, and keep it there.
+
+    A FREQUENT section rewrites itself from what gets used, so a command
+    dragged into it would be swept away again at the next workbench switch --
+    which is what makes people conclude the section cannot be populated at
+    all. Comparing what is in the panel now against what was last written
+    identifies the commands the user placed there and the ones they threw out,
+    so a deliberate choice outranks a measured habit.
+    """
+    record = _pin_record(workbench, panel_name)
+    try:
+        current = list(ribbon["workbenches"][workbench]["toolbars"][panel_name]["order"])
+    except (KeyError, TypeError):
         return []
-    if "panels" in config:
-        return list(config["panels"].items())
-    panel = config.get("panel")
-    return [(panel, config)] if panel else []
+    written = record.get("written")
+    if not isinstance(written, list):
+        # Nothing has been written here yet, so what is in the section is what
+        # was shipped rather than anything the user chose.
+        record["written"] = current
+        schedule_usage_write()
+        return pinned_commands(workbench, panel_name)
+
+    # A pinned command that is no longer there was taken out on purpose.
+    kept = [command for command in pinned_commands(workbench, panel_name) if command in current]
+    meta = record.get("meta")
+    meta = dict(meta) if isinstance(meta, dict) else {}
+    for command in current:
+        if command in written or command in kept:
+            continue
+        if command not in group.get("commands", {}):
+            details = _panel_metadata(ribbon, workbench, panel_name, command)
+            if details is None:
+                continue
+            meta[command] = details
+        kept.append(command)
+    # The newest choice wins a contested slot; an older pin drops back to
+    # competing on how much it gets used, like everything else.
+    kept = kept[-int(group.get("capacity", 4)) :]
+    record["kept"] = kept
+    record["meta"] = {command: meta[command] for command in kept if command in meta}
+    schedule_usage_write()
+    return kept
 
 
-def _adaptive_group_selection(workbench, config):
+def _adaptive_group_selection(workbench, config, pinned=()):
     now = _utc_now()
     usage = load_usage().get("workbenches", {}).get(workbench, {})
     defaults = config.get("defaults", [])
@@ -558,78 +658,88 @@ def _adaptive_group_selection(workbench, config):
         baseline = PROMOTION_BASELINE if command in default_rank else 0.0
         return (max(measured, baseline), -default_rank.get(command, len(defaults)))
 
-    commands = list(config.get("commands", {}))
+    capacity = int(config.get("capacity", 4))
+    pinned = list(pinned)[:capacity]
+    commands = [command for command in config.get("commands", {}) if command not in pinned]
     commands.sort(key=rank, reverse=True)
-    return commands[: int(config.get("capacity", 4))]
+    return (pinned + commands)[:capacity]
 
 
 def adaptive_selection(workbench):
-    config = load_manifest().get("adaptivePins", {}).get(workbench)
-    groups = adaptive_groups(workbench)
-    if not config or not groups:
-        return []
-    selected = {panel: _adaptive_group_selection(workbench, group) for panel, group in groups}
-    return selected if "panels" in config else selected[groups[0][0]]
+    """What each adaptive section of `workbench` should hold, keyed by panel."""
+    return {
+        panel: _adaptive_group_selection(
+            workbench,
+            group,
+            pinned_commands(workbench, panel) if group_is_whole(group) else (),
+        )
+        for panel, group in adaptive_groups(workbench)
+    }
 
 
-def _rewrite_panels(ribbon, workbench, config, selected):
+def _rewrite_slots(ribbon, workbench, panel_name, group, promoted):
     """Permute adaptive candidates inside the slots they already occupy."""
+    toolbar = ribbon["workbenches"][workbench]["toolbars"][panel_name]
+    current_order = list(toolbar["order"])
+    candidate_set = set(group.get("commands", {}))
+    candidate_positions = [
+        index for index, command in enumerate(current_order) if command in candidate_set
+    ]
+    reordered = promoted + [
+        command for command in current_order if command in candidate_set and command not in promoted
+    ]
+    if len(reordered) != len(candidate_positions):
+        # Silently truncating here would drop a promoted command from the
+        # panel; report the mismatch and leave this panel untouched instead.
+        _record_problem(
+            "adaptive panel {}/{} has {} candidates for {} slots".format(
+                workbench, panel_name, len(reordered), len(candidate_positions)
+            )
+        )
+        return False
     changed = False
-    for panel_name, group in adaptive_groups(workbench):
-        promoted = selected.get(panel_name, [])
-        toolbar = ribbon["workbenches"][workbench]["toolbars"][panel_name]
-        current_order = list(toolbar["order"])
-        candidate_set = set(group.get("commands", {}))
-        candidate_positions = [
-            index for index, command in enumerate(current_order) if command in candidate_set
-        ]
-        reordered = promoted + [
-            command
-            for command in current_order
-            if command in candidate_set and command not in promoted
-        ]
-        if len(reordered) != len(candidate_positions):
-            # Silently truncating here would drop a promoted command from the
-            # panel; report the mismatch and leave this panel untouched instead.
+    new_order = list(current_order)
+    for index, command in zip(candidate_positions, reordered, strict=True):
+        new_order[index] = command
+    if new_order != current_order:
+        sources = dict(ribbon["newPanels"][workbench][panel_name])
+        missing = [command for command in new_order if command not in sources]
+        if missing:
             _record_problem(
-                "adaptive panel {}/{} has {} candidates for {} slots".format(
-                    workbench, panel_name, len(reordered), len(candidate_positions)
+                "adaptive panel {}/{} is missing source data for {}".format(
+                    workbench, panel_name, missing
                 )
             )
-            continue
-        new_order = list(current_order)
-        for index, command in zip(candidate_positions, reordered, strict=True):
-            new_order[index] = command
-        if new_order != current_order:
-            sources = dict(ribbon["newPanels"][workbench][panel_name])
-            missing = [command for command in new_order if command not in sources]
-            if missing:
-                _record_problem(
-                    "adaptive panel {}/{} is missing source data for {}".format(
-                        workbench, panel_name, missing
-                    )
-                )
-                continue
-            toolbar["order"] = new_order
-            if "panelMenu" in toolbar:
-                toolbar["panelMenu"] = list(new_order)
-            ribbon["newPanels"][workbench][panel_name] = [
-                [command, sources[command]] for command in new_order
-            ]
+            return False
+        toolbar["order"] = new_order
+        if "panelMenu" in toolbar:
+            toolbar["panelMenu"] = list(new_order)
+        ribbon["newPanels"][workbench][panel_name] = [
+            [command, sources[command]] for command in new_order
+        ]
+        changed = True
+    for command in candidate_set.intersection(toolbar["commands"]):
+        wanted_size = "large" if command in promoted else "small"
+        if toolbar["commands"][command].get("size") != wanted_size:
+            toolbar["commands"][command]["size"] = wanted_size
             changed = True
-        for command in candidate_set.intersection(toolbar["commands"]):
-            wanted_size = "large" if command in promoted else "small"
-            if toolbar["commands"][command].get("size") != wanted_size:
-                toolbar["commands"][command]["size"] = wanted_size
-                changed = True
     return changed
 
 
-def _rewrite_single_panel(ribbon, workbench, config, selected):
-    panel_name = config["panel"]
+def _rewrite_whole_panel(ribbon, workbench, panel_name, group, selected):
+    """Replace a FREQUENT section's contents with the current selection."""
     toolbar = ribbon["workbenches"][workbench]["toolbars"][panel_name]
-    metadata = config["commands"]
-    if toolbar.get("order") == selected:
+    metadata = dict(group.get("commands", {}))
+    metadata.update(_pin_record(workbench, panel_name).get("meta", {}))
+    selected = [command for command in selected if command in metadata]
+    if not selected:
+        return False
+    sizes = [_slot_size(index) for index in range(len(selected))]
+    already_shaped = all(
+        toolbar.get("commands", {}).get(command, {}).get("size") == size
+        for command, size in zip(selected, sizes, strict=True)
+    )
+    if toolbar.get("order") == selected and already_shaped:
         return False
     toolbar["order"] = list(selected)
     toolbar["panelMenu"] = list(selected)
@@ -637,31 +747,44 @@ def _rewrite_single_panel(ribbon, workbench, config, selected):
     toolbar["pinCount"] = len(selected)
     toolbar["commands"] = {
         command: {
-            "size": metadata[command][1],
+            "size": size,
             "text": metadata[command][2],
             "icon": metadata[command][3],
             "IsExtra": True,
         }
-        for command in selected
+        for command, size in zip(selected, sizes, strict=True)
     }
     ribbon["newPanels"][workbench][panel_name] = [
         [command, metadata[command][0]] for command in selected
     ]
+    _pin_record(workbench, panel_name)["written"] = list(selected)
+    schedule_usage_write()
     return True
 
 
 def refresh_adaptive_panel(workbench):
-    config = load_manifest().get("adaptivePins", {}).get(workbench)
-    selected = adaptive_selection(workbench)
-    if not config or not selected or not os.path.isfile(RIBBON_PATH):
+    groups = adaptive_groups(workbench)
+    if not groups or not os.path.isfile(RIBBON_PATH):
         return False
     try:
         with open(RIBBON_PATH, encoding="utf-8") as stream:
             ribbon = json.load(stream)
-        if "panels" in config:
-            changed = _rewrite_panels(ribbon, workbench, config, selected)
-        else:
-            changed = _rewrite_single_panel(ribbon, workbench, config, selected)
+        changed = False
+        for panel_name, group in groups:
+            whole = group_is_whole(group)
+            pinned = ()
+            if whole:
+                # Reconcile first: a command the user dragged in is a stronger
+                # statement than anything the counters have to say.
+                pinned = reconcile_pins(workbench, panel_name, group, ribbon)
+            promoted = _adaptive_group_selection(workbench, group, pinned)
+            if not promoted:
+                continue
+            if whole:
+                rewritten = _rewrite_whole_panel(ribbon, workbench, panel_name, group, promoted)
+            else:
+                rewritten = _rewrite_slots(ribbon, workbench, panel_name, group, promoted)
+            changed = rewritten or changed
         if not changed:
             return False
         temporary = RIBBON_PATH + ".tmp"

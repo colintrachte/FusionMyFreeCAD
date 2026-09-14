@@ -88,48 +88,100 @@ def test_manifest_panel_order_matches_the_layout(layout, manifest):
     assert manifest["workbenchPanelOrder"] == expected
 
 
+def _adaptive_groups(config):
+    """(panel name, group, whether it owns the whole section) for one workbench."""
+    return [
+        (name, group, bool(group.get("whole", False))) for name, group in config["panels"].items()
+    ]
+
+
 def test_adaptive_pins_target_panels_that_exist(layout, manifest):
     for workbench, config in manifest["adaptivePins"].items():
-        groups = config["panels"].items() if "panels" in config else [(config["panel"], config)]
         panels = {panel["name"]: panel for panel in layout["workbenches"][workbench]}
-        for panel_name, _group in groups:
+        for panel_name, _group, _whole in _adaptive_groups(config):
             assert panel_name in panels, "{}/{} is not in the layout".format(workbench, panel_name)
 
 
 def test_adaptive_defaults_come_from_the_candidate_pool(manifest):
     for workbench, config in manifest["adaptivePins"].items():
-        groups = config["panels"].items() if "panels" in config else [(config["panel"], config)]
-        for panel_name, group in groups:
+        for panel_name, group, _whole in _adaptive_groups(config):
             missing = set(group.get("defaults", [])) - set(group["commands"])
             assert missing == set(), "{}/{}: {}".format(workbench, panel_name, missing)
 
 
 def test_a_whole_panel_pin_ships_its_defaults_as_the_starting_layout(layout, manifest):
-    """A `panel` pin replaces the whole panel, so the layout must start at its defaults."""
+    """A whole-panel pin replaces the section, so the layout must start at its defaults."""
     for workbench, config in manifest["adaptivePins"].items():
-        if "panels" in config:
-            continue
         panels = {panel["name"]: panel for panel in layout["workbenches"][workbench]}
-        shipped = [entry[0] for entry in panels[config["panel"]]["commands"]]
-        assert shipped == config["defaults"], "{}/{}".format(workbench, config["panel"])
+        for panel_name, group, whole in _adaptive_groups(config):
+            if not whole:
+                continue
+            shipped = [entry[0] for entry in panels[panel_name]["commands"]]
+            assert shipped == group["defaults"], "{}/{}".format(workbench, panel_name)
+
+
+def test_a_frequent_section_ships_the_shape_the_runtime_rewrites_it_to(layout, manifest):
+    """Two large slots then small ones.
+
+    The runtime fixes the shape so the section does not rearrange itself as
+    habits change; if the shipped layout disagreed, every FREQUENT section
+    would be rewritten once on first use for no visible reason.
+    """
+    for workbench, config in manifest["adaptivePins"].items():
+        panels = {panel["name"]: panel for panel in layout["workbenches"][workbench]}
+        for panel_name, _group, whole in _adaptive_groups(config):
+            if not whole:
+                continue
+            sizes = [entry[2] for entry in panels[panel_name]["commands"]]
+            expected = ["large" if index < 2 else "small" for index in range(len(sizes))]
+            assert sizes == expected, "{}/{}".format(workbench, panel_name)
 
 
 def test_a_slot_swap_pin_only_names_commands_already_in_the_panel(layout, manifest):
-    """A `panels` pin permutes existing slots, so every candidate must be present."""
+    """A slot-swap pin permutes existing slots, so every candidate must be present."""
     for workbench, config in manifest["adaptivePins"].items():
-        if "panels" not in config:
-            continue
         panels = {panel["name"]: panel for panel in layout["workbenches"][workbench]}
-        for panel_name, group in config["panels"].items():
+        for panel_name, group, whole in _adaptive_groups(config):
+            if whole:
+                continue
             declared = {entry[0] for entry in panels[panel_name]["commands"]}
             missing = set(group["commands"]) - declared
             assert missing == set(), "{}/{}: {}".format(workbench, panel_name, missing)
 
 
+def test_every_command_a_workbench_offers_can_reach_its_frequent_section(layout, manifest):
+    """The candidate pool is the whole ribbon, not a hand-picked shortlist.
+
+    A section that promotes what gets used can only promote what it is allowed
+    to consider. The pool used to be a dozen commands per workbench, so almost
+    everything a user actually clicked was invisible to the ranking and the
+    section never changed -- which reads, from outside, as a feature that does
+    not work. `tools/generate_frequent_pools.py` regenerates these.
+    """
+    for workbench, config in manifest["adaptivePins"].items():
+        offered = {
+            entry[0]
+            for panel in layout["workbenches"][workbench]
+            for entry in list(panel.get("commands", [])) + list(panel.get("overflow", []))
+            if not entry[0].endswith("_ddb")
+        }
+        for panel_name, group, whole in _adaptive_groups(config):
+            if not whole:
+                continue
+            missing = offered - set(group["commands"])
+            assert missing == set(), "{}/{}: {}".format(workbench, panel_name, sorted(missing))
+
+
+def test_every_workbench_has_a_frequent_section(layout):
+    """Somewhere to collect what you reach for, whichever workbench you are in."""
+    for workbench, panels in layout["workbenches"].items():
+        titles = [panel["title"] for panel in panels]
+        assert "FREQUENT" in titles, workbench
+
+
 def test_adaptive_capacity_fits_the_panel(manifest):
     for _workbench, config in manifest["adaptivePins"].items():
-        groups = config["panels"].values() if "panels" in config else [config]
-        for group in groups:
+        for _panel_name, group, _whole in _adaptive_groups(config):
             assert int(group.get("capacity", 4)) <= len(group["commands"])
             assert len(group.get("defaults", [])) <= int(group.get("capacity", 4))
 

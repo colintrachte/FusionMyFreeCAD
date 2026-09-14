@@ -30,10 +30,36 @@ COLUMN_PADDING = 12
 
 #: How a stored width was arrived at. A width recorded under an older model was
 #: measured against something this one no longer means -- columns rather than
-#: pixels, or the widest button rather than the median column -- so it is
-#: retired rather than honoured, and the section returns to sizing itself.
+#: pixels, the widest button rather than the median column, or a button's
+#: laid-out width rather than the width it asks for -- so it is retired rather
+#: than honoured, and the section returns to sizing itself.
 #: Bump this whenever the measurement changes.
-WIDTH_MODEL = 2
+WIDTH_MODEL = 3
+
+
+def natural_width(widget) -> int:
+    """What a button wants to be, not what the layout handed it.
+
+    The item widgets in a panel have an Expanding size policy, so once a
+    section is pinned wider than its contents every one of them grows to
+    swallow a share of the slack. Measuring `width()` therefore fed the empty
+    space back in as the size of a column: each extra pixel of emptiness
+    demanded more emptiness before the next command could come out of the
+    drawer, which is exactly how a section ended up having to be dragged far
+    past its icons. `sizeHint()` describes the contents and nothing else.
+    """
+    hint = getattr(widget, "sizeHint", None)
+    if callable(hint):
+        try:
+            wanted = int(hint().width())
+        except Exception:
+            wanted = 0
+        if wanted > 0:
+            return wanted
+    try:
+        return int(widget.width())
+    except Exception:
+        return 0
 
 
 def panel_column_widths(panel) -> list:
@@ -49,7 +75,10 @@ def panel_column_widths(panel) -> list:
         for index in range(layout.count()):
             item = layout.itemAt(index)
             widget = item.widget() if item is not None else None
-            if widget is None or widget.width() <= 0:
+            if widget is None:
+                continue
+            wanted = natural_width(widget)
+            if wanted <= 0:
                 continue
             name = ""
             getter = getattr(widget, "objectName", None)
@@ -60,7 +89,7 @@ def panel_column_widths(panel) -> list:
                 continue
             _row, column, _rowSpan, _columnSpan = layout.getItemPosition(index)
             column = int(column)
-            by_column[column] = max(by_column.get(column, 0), int(widget.width()))
+            by_column[column] = max(by_column.get(column, 0), wanted)
         return [width for _column, width in sorted(by_column.items())]
     except Exception:
         return []
@@ -164,3 +193,38 @@ def plan_width_resize(current_px, delta_px, column_width) -> dict:
         "widening": int(delta_px) > 0,
         "columns": columns_for_width(target, column_width),
     }
+
+
+def choose_column_budget(available_px, max_budget, measure) -> int:
+    """The largest column budget whose panel fits in `available_px` pixels.
+
+    `measure(budget)` returns the width a panel built with that budget asks
+    for, or None if it could not be built. Asking the toolkit instead of doing
+    arithmetic is the whole point of this function: a budget counts three small
+    buttons as one column and does not count a half-filled stack at all, so
+    multiplying a representative column width by a budget cannot say what a
+    section will actually occupy. Under that arithmetic one more notional
+    column could cost far more room than the icon it would reveal, which is how
+    a section came to sit full of empty space with its last commands still in
+    the drawer.
+
+    The width a panel asks for only grows as the budget does, so a binary
+    search settles this in about four builds.
+    """
+    ceiling = max(MIN_COLUMNS, min(int(max_budget), MAX_COLUMNS))
+    available = int(available_px)
+    best = MIN_COLUMNS
+    low, high = MIN_COLUMNS, ceiling
+    while low <= high:
+        middle = (low + high) // 2
+        width = measure(middle)
+        if width is None:
+            # Nothing was built, so nothing is known about wider budgets
+            # either. Keep the best that did fit rather than guessing.
+            break
+        if int(width) <= available:
+            best = middle
+            low = middle + 1
+        else:
+            high = middle - 1
+    return best

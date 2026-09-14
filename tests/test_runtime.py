@@ -305,21 +305,32 @@ def test_status_writes_are_coalesced(env, bootstrap, runtime):
 # ---------------------------------------------------------------------------
 
 
+PART_DESIGN_FREQUENT = "Fusion Frequent_newPanel"
+
+
+def _frequent(runtime, workbench=PART_DESIGN_FREQUENT):
+    """What the FREQUENT section of PartDesign would hold right now.
+
+    A workbench can have several adaptive sections, so the selection is keyed
+    by panel; asking a dict whether a command is "in" it would answer about
+    panel names and quietly pass whatever the ranking did.
+    """
+    return runtime.adaptive_selection("PartDesignWorkbench")[workbench]
+
+
 def test_a_single_click_does_not_displace_a_default(env, runtime):
     """One stray use used to reorder the panel for a month."""
     runtime.load_usage()["workbenches"]["PartDesignWorkbench"] = {
         "PartDesign_Draft": {"score": 1.0, "lastUsed": runtime._utc_now().isoformat()}
     }
-    selection = runtime.adaptive_selection("PartDesignWorkbench")
-    assert "PartDesign_Draft" not in selection
+    assert "PartDesign_Draft" not in _frequent(runtime)
 
 
 def test_sustained_use_does_displace_a_default(env, runtime):
     runtime.load_usage()["workbenches"]["PartDesignWorkbench"] = {
         "PartDesign_Draft": {"score": 3.0, "lastUsed": runtime._utc_now().isoformat()}
     }
-    selection = runtime.adaptive_selection("PartDesignWorkbench")
-    assert selection[0] == "PartDesign_Draft"
+    assert _frequent(runtime)[0] == "PartDesign_Draft"
 
 
 def test_usage_decays_so_an_old_habit_yields_to_the_default(env, runtime):
@@ -327,7 +338,7 @@ def test_usage_decays_so_an_old_habit_yields_to_the_default(env, runtime):
     runtime.load_usage()["workbenches"]["PartDesignWorkbench"] = {
         "PartDesign_Draft": {"score": 3.0, "lastUsed": stale.isoformat()}
     }
-    assert "PartDesign_Draft" not in runtime.adaptive_selection("PartDesignWorkbench")
+    assert "PartDesign_Draft" not in _frequent(runtime)
 
 
 def test_recorded_usage_is_persisted(env, bootstrap, runtime):
@@ -389,6 +400,128 @@ def test_sketcher_slot_swap_keeps_non_candidates_in_place(env, bootstrap, runtim
     assert toolbar["commands"]["Sketcher_CreatePolyline"]["size"] == "small"
 
 
+# ---------------------------------------------------------------------------
+# Putting something in FREQUENT by hand
+# ---------------------------------------------------------------------------
+
+
+FREQUENT = "Fusion Frequent_newPanel"
+
+
+def _frequent_panel(bootstrap, workbench="PartDesignWorkbench", panel=FREQUENT):
+    ribbon = json.loads(Path(bootstrap.RIBBON_PATH).read_text("utf-8"))
+    return ribbon["workbenches"][workbench]["toolbars"][panel]
+
+
+def _drag_into_frequent(bootstrap, command, source="PartDesignWorkbench", **entry):
+    """Stand in for dropping a button into FREQUENT, as the ribbon records it."""
+    path = Path(bootstrap.RIBBON_PATH)
+    ribbon = json.loads(path.read_text("utf-8"))
+    toolbar = ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"][FREQUENT]
+    toolbar["order"] = [*toolbar["order"], command]
+    toolbar["commands"][command] = dict(
+        {"size": "small", "text": command, "icon": command, "IsExtra": True}, **entry
+    )
+    ribbon["newPanels"]["PartDesignWorkbench"][FREQUENT].append([command, source])
+    path.write_text(json.dumps(ribbon), encoding="utf-8")
+
+
+def test_the_shipped_contents_are_not_mistaken_for_the_users_choices(env, bootstrap, runtime):
+    """Otherwise every default would pin itself and nothing could ever change."""
+    bootstrap.prepare()
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+    assert runtime.pinned_commands("PartDesignWorkbench", FREQUENT) == []
+
+
+def test_a_command_dragged_into_frequent_stays_there(env, bootstrap, runtime):
+    """The section rewrites itself, so without this a drop lasts one switch."""
+    bootstrap.prepare()
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+    _drag_into_frequent(bootstrap, "PartDesign_Pocket")
+
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+    assert "PartDesign_Pocket" in _frequent_panel(bootstrap)["order"]
+
+    # And again, because the earlier bug only showed on the second pass.
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+    assert "PartDesign_Pocket" in _frequent_panel(bootstrap)["order"]
+
+
+def test_a_dragged_command_outranks_a_measured_habit(env, bootstrap, runtime):
+    bootstrap.prepare()
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+    _drag_into_frequent(bootstrap, "PartDesign_Pocket")
+    runtime.load_usage()["workbenches"]["PartDesignWorkbench"] = {
+        "PartDesign_Draft": {"score": 50.0, "lastUsed": runtime._utc_now().isoformat()}
+    }
+
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+    assert _frequent_panel(bootstrap)["order"][0] == "PartDesign_Pocket"
+
+
+def test_a_command_taken_out_of_frequent_does_not_come_back(env, bootstrap, runtime):
+    bootstrap.prepare()
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+    _drag_into_frequent(bootstrap, "PartDesign_Pocket")
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+
+    path = Path(bootstrap.RIBBON_PATH)
+    ribbon = json.loads(path.read_text("utf-8"))
+    toolbar = ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"][FREQUENT]
+    toolbar["order"] = [c for c in toolbar["order"] if c != "PartDesign_Pocket"]
+    path.write_text(json.dumps(ribbon), encoding="utf-8")
+
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+    assert "PartDesign_Pocket" not in _frequent_panel(bootstrap)["order"]
+    assert runtime.pinned_commands("PartDesignWorkbench", FREQUENT) == []
+
+
+def test_a_dragged_command_keeps_the_label_and_icon_it_arrived_with(env, bootstrap, runtime):
+    """A command from outside the pool has no candidate entry to draw from."""
+    bootstrap.prepare()
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+    _drag_into_frequent(
+        bootstrap,
+        "Spreadsheet_CreateSheet",
+        source="SpreadsheetWorkbench",
+        text="Spreadsheet",
+        icon="Spreadsheet",
+    )
+
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+    toolbar = _frequent_panel(bootstrap)
+    assert toolbar["commands"]["Spreadsheet_CreateSheet"]["text"] == "Spreadsheet"
+    assert toolbar["commands"]["Spreadsheet_CreateSheet"]["icon"] == "Spreadsheet"
+
+
+def test_a_frequent_section_keeps_its_shape_whatever_is_promoted(env, bootstrap, runtime):
+    """Two large slots then small ones, so buttons stay where the hand left them."""
+    bootstrap.prepare()
+    runtime.load_usage()["workbenches"]["PartDesignWorkbench"] = {
+        "PartDesign_Draft": {"score": 9.0, "lastUsed": runtime._utc_now().isoformat()}
+    }
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+
+    toolbar = _frequent_panel(bootstrap)
+    sizes = [toolbar["commands"][command]["size"] for command in toolbar["order"]]
+    assert sizes == ["large", "large", "small", "small"]
+
+
+def test_sketcher_has_a_frequent_section_alongside_its_slot_swaps(env, bootstrap, runtime):
+    """A workbench may carry both kinds of adaptive section."""
+    bootstrap.prepare()
+    runtime.load_usage()["workbenches"]["SketcherWorkbench"] = {
+        "Sketcher_CreateBSpline": {"score": 9.0, "lastUsed": runtime._utc_now().isoformat()},
+        "Sketcher_ConstrainTangent": {"score": 9.0, "lastUsed": runtime._utc_now().isoformat()},
+    }
+    assert runtime.refresh_adaptive_panel("SketcherWorkbench") is True
+
+    create = _frequent_panel(bootstrap, "SketcherWorkbench", "Fusion Sketch Create_newPanel")
+    assert create["commands"]["Sketcher_CreateBSpline"]["size"] == "large"
+    frequent = _frequent_panel(bootstrap, "SketcherWorkbench", "Fusion Sketch Frequent_newPanel")
+    assert frequent["order"][0] == "Sketcher_ConstrainTangent"
+
+
 def test_a_ribbon_missing_source_data_is_reported_not_crashed(env, bootstrap, runtime):
     bootstrap.prepare()
     path = Path(bootstrap.RIBBON_PATH)
@@ -418,7 +551,7 @@ def test_malformed_usage_entries_do_not_break_adaptive_selection(env, runtime):
         "PartDesign_Draft": {"score": "not-a-number", "lastUsed": "2026-01-01T00:00:00"},
         "PartDesign_Boolean": "not-an-entry",
     }
-    selection = runtime.adaptive_selection("PartDesignWorkbench")
+    selection = _frequent(runtime)
     assert "PartDesign_Draft" not in selection
     assert "PartDesign_Boolean" not in selection
 
