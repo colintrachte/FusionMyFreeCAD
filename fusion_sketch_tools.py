@@ -919,7 +919,48 @@ def _geometry_kind(geo):
     return "other"
 
 
-def repair_sketch_internal_faces(sketch):
+#: Sketches whose internal faces have already been rebuilt, keyed by name, with
+#: the shape signature they were built from. Recomputing the decomposition when
+#: nothing about the shape changed was the single most expensive thing this
+#: add-on did: the observer below fires on every solve, and a solve happens on
+#: every frame of a drag.
+_internal_face_signatures = {}
+
+#: Set False to stop rebuilding internal faces altogether. The feature exists so
+#: multi-region sketches are selectable and padable; it is not worth paying for
+#: on a sketch that has no interior edges.
+REPAIR_INTERNAL_FACES = True
+
+
+def _shape_signature(shape):
+    """A cheap value that changes whenever the decomposition would.
+
+    Edge and wire counts plus the bounding box catch every edit that can alter
+    which regions exist, without touching OpenCASCADE booleans to find out.
+    """
+    try:
+        box = shape.BoundBox
+        return (
+            len(shape.Edges),
+            len(shape.Wires),
+            round(box.XMin, 6),
+            round(box.YMin, 6),
+            round(box.XMax, 6),
+            round(box.YMax, 6),
+        )
+    except Exception:
+        return None
+
+
+def clear_internal_face_cache(sketch=None):
+    """Forget what was last built, for one sketch or all of them."""
+    if sketch is None:
+        _internal_face_signatures.clear()
+        return
+    _internal_face_signatures.pop(getattr(sketch, "Name", None), None)
+
+
+def repair_sketch_internal_faces(sketch, force=False):
     """Ensure sketch.InternalShape contains all planar faces divided by internal edges.
 
     FreeCAD's native MakeInternals (WireJoiner.cpp) drops interior faces that share
@@ -927,11 +968,48 @@ def repair_sketch_internal_faces(sketch):
     face decomposition using FreeCAD's BOPTools.SplitAPI.slice() and assigns the
     compound of all resulting faces back to sketch.InternalShape so every enclosed
     region is selectable and padable in PartDesign.
+
+    The work is a full OpenCASCADE boolean per closed wire, so it is skipped
+    unless the shape has actually changed since the last rebuild. Pass
+    ``force=True`` to rebuild regardless.
     """
+    if not REPAIR_INTERNAL_FACES and not force:
+        return
+
+    shape = getattr(sketch, "Shape", None)
+    if shape is None or not hasattr(shape, "Wires") or not hasattr(shape, "Edges"):
+        return
+
+    name = getattr(sketch, "Name", None)
+    signature = _shape_signature(shape)
+    if not force and name and signature is not None:
+        if _internal_face_signatures.get(name) == signature:
+            return
+
     try:
         import BOPTools.SplitAPI
         import Part
     except ImportError:
+        return
+
+    closed_wires = [w for w in shape.Wires if hasattr(w, "isClosed") and w.isClosed()]
+    if not closed_wires:
+        if name and signature is not None:
+            _internal_face_signatures[name] = signature
+        return
+
+    # Membership by identity hash rather than a scan: the previous form compared
+    # every edge against every closed-wire edge with isSame(), which is O(n^2)
+    # OpenCASCADE calls on a hot path.
+    closed_wire_edges = {}
+    for w in closed_wires:
+        for edge in getattr(w, "Edges", []):
+            closed_wire_edges[_edge_key(edge)] = edge
+
+    interior_edges = [e for e in shape.Edges if _edge_key(e) not in closed_wire_edges]
+    if not interior_edges:
+        if name and signature is not None:
+            _internal_face_signatures[name] = signature
         return
 
     if getattr(sketch, "MakeInternals", False) is False and hasattr(sketch, "MakeInternals"):
@@ -939,26 +1017,6 @@ def repair_sketch_internal_faces(sketch):
             sketch.MakeInternals = True
         except Exception:
             pass
-
-    shape = getattr(sketch, "Shape", None)
-    if shape is None or not hasattr(shape, "Wires") or not hasattr(shape, "Edges"):
-        return
-
-    closed_wires = [w for w in shape.Wires if hasattr(w, "isClosed") and w.isClosed()]
-    if not closed_wires:
-        return
-
-    closed_wire_edges = []
-    for w in closed_wires:
-        closed_wire_edges.extend(getattr(w, "Edges", []))
-
-    interior_edges = []
-    for e in shape.Edges:
-        if not any(e.isSame(we) for we in closed_wire_edges):
-            interior_edges.append(e)
-
-    if not interior_edges:
-        return
 
     all_sliced_faces = []
     for w in closed_wires:
@@ -974,6 +1032,18 @@ def repair_sketch_internal_faces(sketch):
             sketch.InternalShape = Part.Compound(all_sliced_faces)
         except Exception:
             pass
+    if name and signature is not None:
+        _internal_face_signatures[name] = signature
+
+
+def _edge_key(edge):
+    """Identify an edge by its endpoints, cheaply and without OCC comparisons."""
+    try:
+        vertexes = edge.Vertexes
+        points = sorted((round(v.X, 7), round(v.Y, 7), round(v.Z, 7)) for v in vertexes)
+        return (round(edge.Length, 7), tuple(points))
+    except Exception:
+        return id(edge)
 
 
 def plan_symmetry_links(mapping, before_geometry, reference_geoid):

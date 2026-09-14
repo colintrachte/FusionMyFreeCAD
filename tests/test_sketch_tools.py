@@ -723,3 +723,73 @@ def test_a_mirror_that_would_open_the_profile_changes_nothing(tools, env, monkey
         ("open", "Mirror with Constraints"),
         ("abort", "Mirror with Constraints"),
     ]
+
+
+# ---------------------------------------------------------------------------
+# Keeping the sketcher responsive
+# ---------------------------------------------------------------------------
+
+
+def _shaped_sketch(name, edges, wires, box=(0.0, 0.0, 10.0, 10.0)):
+    """A stand-in sketch carrying just enough Shape for the signature."""
+    bound = types.SimpleNamespace(XMin=box[0], YMin=box[1], XMax=box[2], YMax=box[3])
+    shape = types.SimpleNamespace(Edges=list(edges), Wires=list(wires), BoundBox=bound)
+    return types.SimpleNamespace(Name=name, Shape=shape)
+
+
+def test_the_face_rebuild_is_skipped_when_the_shape_has_not_changed(tools):
+    """It runs an OpenCASCADE boolean per closed wire.
+
+    The observer that calls it fires on every solve, and a solve happens on
+    every frame of a drag, so repeating the work for an unchanged shape was the
+    most expensive thing this add-on did.
+    """
+    tools.clear_internal_face_cache()
+    sketch = _shaped_sketch("Sketch", edges=[1, 2, 3], wires=[1])
+    signature = tools._shape_signature(sketch.Shape)
+    assert signature is not None
+
+    tools._internal_face_signatures[sketch.Name] = signature
+    sentinel = object()
+
+    def _explode(*args, **kwargs):
+        raise AssertionError("the boolean must not run for an unchanged shape")
+
+    sketch.Shape.Wires = sentinel  # touching Wires at all would now raise
+    tools.repair_sketch_internal_faces(sketch)
+
+
+def test_a_changed_shape_invalidates_the_cached_signature(tools):
+    before = tools._shape_signature(_shaped_sketch("S", edges=[1, 2], wires=[1]).Shape)
+    after = tools._shape_signature(_shaped_sketch("S", edges=[1, 2, 3], wires=[1]).Shape)
+    moved = tools._shape_signature(
+        _shaped_sketch("S", edges=[1, 2], wires=[1], box=(0.0, 0.0, 20.0, 10.0)).Shape
+    )
+    assert before != after, "an added edge can change which regions exist"
+    assert before != moved, "so can moving the outline"
+
+
+def test_a_shape_that_cannot_be_measured_has_no_signature(tools):
+    assert tools._shape_signature(types.SimpleNamespace()) is None
+
+
+def test_clearing_the_cache_forgets_one_sketch_or_all_of_them(tools):
+    sketch, _dividers = _card_box([10.0])
+    tools._internal_face_signatures[sketch.Name] = "stale"
+    tools.clear_internal_face_cache(sketch)
+    assert sketch.Name not in tools._internal_face_signatures
+
+    tools._internal_face_signatures["other"] = "stale"
+    tools.clear_internal_face_cache()
+    assert tools._internal_face_signatures == {}
+
+
+def test_the_feature_can_be_turned_off_entirely(tools, monkeypatch):
+    """It exists for multi-region sketches; it should not be compulsory."""
+    sketch, _dividers = _card_box([10.0])
+    tools.clear_internal_face_cache()
+    monkeypatch.setattr(tools, "REPAIR_INTERNAL_FACES", False)
+
+    tools.repair_sketch_internal_faces(sketch)
+
+    assert tools._internal_face_signatures == {}

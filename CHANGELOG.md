@@ -2,6 +2,49 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
+## 1.5.0 — 2026-09-13
+
+### The ribbon sections are yours to arrange
+
+- Dragging the divider between two sections now resizes the section to its left.
+  The drag previews where the edge will land, is measured in pixels against the
+  section's real width, and the commands that no longer fit move into that
+  section's drawer. **Reset this panel** clears a width along with everything else.
+- Clicking a section's title opens its drawer, aligned under the section rather
+  than under the small icon at the end of the title bar.
+- **UTILITIES** replaces the Ribbon add-on's global Tools panel. It holds the
+  same standard commands but belongs to the layout, so it can be ordered,
+  resized and reset like every other section.
+- **Export** is now the right-hand bookend of Part Design, Part and Surface, as
+  Create Sketch is the left-hand one. It reads the selection and opens the save
+  dialog already set to the format that suits it: STEP for solids and bodies,
+  STL for meshes, PDF for drawing pages, DXF for sketches.
+
+### The sketcher stays responsive as a sketch grows
+
+- FusionMyFreeCAD rebuilds a sketch's internal faces so multi-region profiles are
+  selectable and padable. That rebuild runs an OpenCASCADE boolean, and it was
+  running on every solve -- which means every frame of a drag. It is now skipped
+  while a sketch is open for editing, skipped when the shape has not changed
+  since the last rebuild, and runs on leaving the sketch instead.
+
+### Mirror + Constraints refuses rather than half-finishing
+
+- A tangency sitting on the mirror line cannot be carried across. The command
+  used to skip it, report success, and leave a profile that would not close --
+  so the pad failed later, far from the cause. It now leaves the sketch
+  untouched and names the joins it could not make.
+
+### Fixes
+
+- Icons could not be dragged to reorder them. Qt 6 removed `QDrag.exec_()`, which
+  every icon drag used, and the error went to a stream FreeCAD does not display.
+- A ribbon rebuild no longer enables every button in the window, which made
+  unavailable commands look usable after resizing a section.
+- A layout change now reaches an existing installation. A saved panel order was
+  replayed over the shipped one, and because the result matched what was already
+  on disk, nothing was regenerated.
+
 ## 1.4.0 — 2026-09-07
 
 ### Added

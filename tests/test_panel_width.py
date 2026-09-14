@@ -118,3 +118,46 @@ def test_resetting_one_panel_clears_its_width(installed):
     installed.reset_panel_customization(workbench, panel)
 
     assert "minWidth" not in _toolbar(installed, workbench, panel)
+
+
+def test_a_saved_panel_order_from_an_older_layout_is_not_replayed(installed):
+    """A release that changes the sections has to be able to reach an install.
+
+    Replaying an order recorded against the previous layout silently overrode
+    the new one, and because the result then matched what was already on disk,
+    verification passed and nothing was regenerated. Two releases of section
+    changes reached nobody that way.
+    """
+    workbench, _panel = _first_panel(installed)
+    spec = installed._load_json(installed.LAYOUT_SPEC)
+    shipped = [panel["name"] for panel in spec["workbenches"][workbench]]
+
+    stale = {
+        "schemaVersion": 1,
+        "layoutVersion": "0.0.1-old",
+        "workbenches": {workbench: {"panelOrder": list(reversed(shipped)), "panels": {}}},
+    }
+    installed._atomic_json(installed.CUSTOMIZATION_PATH, stale)
+    ribbon, _version = installed._merge_layout()
+    assert ribbon["workbenches"][workbench]["toolbars"]["order"] == shipped
+
+    current = dict(stale, layoutVersion=spec["layoutVersion"])
+    installed._atomic_json(installed.CUSTOMIZATION_PATH, current)
+    ribbon, _version = installed._merge_layout()
+    assert ribbon["workbenches"][workbench]["toolbars"]["order"] == list(reversed(shipped)), (
+        "an order recorded against this layout is still the user's to keep"
+    )
+
+
+def test_per_panel_settings_survive_a_layout_version_change(installed):
+    """Only the order between sections is taken from the new layout."""
+    workbench, panel = _first_panel(installed)
+    stale = {
+        "schemaVersion": 1,
+        "layoutVersion": "0.0.1-old",
+        "workbenches": {
+            workbench: {"panelOrder": [], "panels": {panel: {"minWidth": 321, "widthModel": 2}}}
+        },
+    }
+    installed._atomic_json(installed.CUSTOMIZATION_PATH, stale)
+    assert _toolbar(installed, workbench, panel)["minWidth"] == 321

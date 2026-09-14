@@ -289,13 +289,20 @@ def _reconcile_order(preferred, shipped):
 def _apply_customization(ribbon, spec, customization=None):
     customization = customization if customization is not None else _read_customization()
     customized = customization.get("workbenches", {})
+    # A saved panel order describes the sections of the layout it was recorded
+    # against. When a release changes which sections exist or what order they
+    # ship in, replaying the old order silently overrides the new one -- and
+    # because the result then matches what is already on disk, verification
+    # passes and the whole layout is never regenerated. Two releases of section
+    # changes reached nobody that way. Per-panel settings still carry over;
+    # only the order between sections is taken from the new layout.
+    order_is_current = customization.get("layoutVersion") == spec["layoutVersion"]
     for workbench, panels in spec["workbenches"].items():
         saved_workbench = customized.get(workbench, {})
         toolbar_root = ribbon["workbenches"][workbench]["toolbars"]
         shipped_panel_order = [panel["name"] for panel in panels]
-        toolbar_root["order"] = _reconcile_order(
-            saved_workbench.get("panelOrder", []), shipped_panel_order
-        )
+        saved_order = saved_workbench.get("panelOrder", []) if order_is_current else []
+        toolbar_root["order"] = _reconcile_order(saved_order, shipped_panel_order)
         saved_panels = saved_workbench.get("panels", {})
         for panel in panels:
             name = panel["name"]
@@ -1311,7 +1318,14 @@ class _SketchRepairObserver:
             try:
                 import fusion_sketch_tools
 
-                fusion_sketch_tools.repair_sketch_internal_faces(obj)
+                # Not while the sketch is open for editing. The solver
+                # recomputes on every frame of a drag, and rebuilding the face
+                # decomposition there meant an OpenCASCADE boolean per frame --
+                # which is what made editing slow down as a sketch grew. The
+                # decomposition is only needed once the sketch is used as a
+                # profile, so it is rebuilt on leaving edit instead.
+                if fusion_sketch_tools.active_sketch() is not obj:
+                    fusion_sketch_tools.repair_sketch_internal_faces(obj)
             except Exception:
                 pass
             finally:
