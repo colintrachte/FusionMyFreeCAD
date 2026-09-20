@@ -1,5 +1,5 @@
 {
-  "layoutVersion": "1.7.2",
+  "layoutVersion": "1.8.0",
   "targetFreeCAD": "1.1.x",
   "authoredIcons": [
     "FusionMyFreeCAD_AddMidline",
@@ -16,7 +16,8 @@
     "FusionMyFreeCAD_RepairReferences",
     "FusionMyFreeCAD_SmartOffset",
     "FusionMyFreeCAD_SolverDiagnostics",
-    "FusionMyFreeCAD_StudioViewport"
+    "FusionMyFreeCAD_StudioViewport",
+    "FusionMyFreeCAD_UpdateModel"
   ],
   "primaryCommands": [
     "FusionMyFreeCAD_AddMidline",
@@ -38,6 +39,7 @@
     "FusionMyFreeCAD_SmartOffset",
     "FusionMyFreeCAD_SolverDiagnostics",
     "FusionMyFreeCAD_StudioViewport",
+    "FusionMyFreeCAD_UpdateModel",
     "FusionMyFreeCAD_Verify",
     "PartDesign_AdditiveHelix",
     "PartDesign_AdditiveLoft",
@@ -528,6 +530,12 @@
               "Studio View",
               "FusionMyFreeCAD_StudioViewport"
             ],
+            "FusionMyFreeCAD_UpdateModel": [
+              "General",
+              "small",
+              "Update Model",
+              "FusionMyFreeCAD_UpdateModel"
+            ],
             "FusionMyFreeCAD_RepairReferences": [
               "General",
               "small",
@@ -909,6 +917,12 @@
               "small",
               "Fit All",
               "zoom-all"
+            ],
+            "FusionMyFreeCAD_UpdateModel": [
+              "General",
+              "small",
+              "Update Model",
+              "FusionMyFreeCAD_UpdateModel"
             ],
             "FusionMyFreeCAD_RepairReferences": [
               "General",
@@ -1482,6 +1496,12 @@
               "Cancel Sketch",
               "process-stop"
             ],
+            "FusionMyFreeCAD_UpdateModel": [
+              "General",
+              "small",
+              "Update Model",
+              "FusionMyFreeCAD_UpdateModel"
+            ],
             "FusionMyFreeCAD_RepairReferences": [
               "General",
               "small",
@@ -1599,6 +1619,12 @@
               "small",
               "Restore UI",
               "applications-accessories"
+            ],
+            "FusionMyFreeCAD_UpdateModel": [
+              "General",
+              "small",
+              "Update Model",
+              "FusionMyFreeCAD_UpdateModel"
             ],
             "FusionMyFreeCAD_RepairReferences": [
               "General",

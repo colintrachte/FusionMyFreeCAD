@@ -47,6 +47,7 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
         "FusionMyFreeCAD_SmartOffset",
         "FusionMyFreeCAD_SolverDiagnostics",
         "FusionMyFreeCAD_StudioViewport",
+        "FusionMyFreeCAD_UpdateModel",
         "FusionMyFreeCAD_Verify",
     }
     assert bootstrap.startup_failures() == []

@@ -2,6 +2,29 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
+## 1.8.0 — 2026-09-20
+
+### Update Model
+
+- A new command in **UTILITIES**, in every workbench: rebuild every feature so
+  a change to one carries down to everything that depends on it.
+- The reason it is needed: FreeCAD's own Refresh rebuilds only what is marked
+  as needing it, and accepting a PartDesign feature dialog clears that mark
+  across the whole document -- the Python console shows
+  `App.getDocument(...).purgeTouched()` immediately before its recompute. A pad
+  changes; the pocket cut out of it is told it is already current. Opening that
+  pocket and pressing OK is the usual way back, one feature at a time, down the
+  whole tree.
+- `recompute(force=True)` is not the answer on its own, whatever its name
+  suggests: the flag only bypasses the document's SkipRecompute, and each
+  object is then still asked whether it needs rebuilding and skipped if it says
+  no. Measured against a real document it rebuilt *nothing*. Every object is
+  now marked first, and then the document is recomputed.
+- When something does not come back, the report separates the feature that
+  actually failed from the ones below it that were never reached -- a failed
+  recompute takes its whole downstream out of the queue, so one broken sketch
+  shows up as seven broken features unless someone says which is which.
+
 ## 1.7.2 — 2026-09-20
 
 ### Entering and leaving a sketch
