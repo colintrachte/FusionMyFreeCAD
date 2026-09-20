@@ -1,5 +1,5 @@
 {
-  "layoutVersion": "1.6.0",
+  "layoutVersion": "1.7.0",
   "targetFreeCAD": "1.1.x",
   "dropdownButtons": {
     "Fusion_MoreCreate_ddb": [
@@ -458,6 +458,13 @@
         "name": "Fusion Utilities_newPanel",
         "title": "UTILITIES",
         "commands": [
+          [
+            "FusionMyFreeCAD_RepairReferences",
+            "General",
+            "small",
+            "Repair References",
+            "FusionMyFreeCAD_RepairReferences"
+          ],
           [
             "Std_UnitsCalculator",
             "General",
@@ -977,6 +984,13 @@
         "name": "Fusion Part Utilities_newPanel",
         "title": "UTILITIES",
         "commands": [
+          [
+            "FusionMyFreeCAD_RepairReferences",
+            "General",
+            "small",
+            "Repair References",
+            "FusionMyFreeCAD_RepairReferences"
+          ],
           [
             "Std_UnitsCalculator",
             "General",
@@ -1742,6 +1756,13 @@
         "title": "UTILITIES",
         "commands": [
           [
+            "FusionMyFreeCAD_RepairReferences",
+            "General",
+            "small",
+            "Repair References",
+            "FusionMyFreeCAD_RepairReferences"
+          ],
+          [
             "Std_UnitsCalculator",
             "General",
             "small",
@@ -1919,6 +1940,13 @@
         "name": "Fusion Surface Utilities_newPanel",
         "title": "UTILITIES",
         "commands": [
+          [
+            "FusionMyFreeCAD_RepairReferences",
+            "General",
+            "small",
+            "Repair References",
+            "FusionMyFreeCAD_RepairReferences"
+          ],
           [
             "Std_UnitsCalculator",
             "General",

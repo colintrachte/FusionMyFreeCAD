@@ -28,6 +28,7 @@ RUNTIME_MODULES: tuple[str, ...] = (
     "fusion_dressup_tools.py",
     "fusion_export.py",
     "fusion_parameters_dock.py",
+    "fusion_repair_tools.py",
     "fusion_sketch_tools.py",
     "fusion_viewport.py",
 )

@@ -1,5 +1,5 @@
 {
-  "layoutVersion": "1.6.0",
+  "layoutVersion": "1.7.0",
   "targetFreeCAD": "1.1.x",
   "authoredIcons": [
     "FusionMyFreeCAD_AddMidline",
@@ -13,6 +13,7 @@
     "FusionMyFreeCAD_ExportSTL",
     "FusionMyFreeCAD_MirrorWithConstraints",
     "FusionMyFreeCAD_ParameterDock",
+    "FusionMyFreeCAD_RepairReferences",
     "FusionMyFreeCAD_SmartOffset",
     "FusionMyFreeCAD_SolverDiagnostics",
     "FusionMyFreeCAD_StudioViewport"
@@ -32,6 +33,7 @@
     "FusionMyFreeCAD_ParameterDock",
     "FusionMyFreeCAD_ParameterTable",
     "FusionMyFreeCAD_Reapply",
+    "FusionMyFreeCAD_RepairReferences",
     "FusionMyFreeCAD_Restore",
     "FusionMyFreeCAD_SmartOffset",
     "FusionMyFreeCAD_SolverDiagnostics",
@@ -526,6 +528,12 @@
               "Studio View",
               "FusionMyFreeCAD_StudioViewport"
             ],
+            "FusionMyFreeCAD_RepairReferences": [
+              "General",
+              "small",
+              "Repair References",
+              "FusionMyFreeCAD_RepairReferences"
+            ],
             "Std_UnitsCalculator": [
               "General",
               "small",
@@ -901,6 +909,12 @@
               "small",
               "Fit All",
               "zoom-all"
+            ],
+            "FusionMyFreeCAD_RepairReferences": [
+              "General",
+              "small",
+              "Repair References",
+              "FusionMyFreeCAD_RepairReferences"
             ],
             "Std_UnitsCalculator": [
               "General",
@@ -1468,6 +1482,12 @@
               "Cancel Sketch",
               "process-stop"
             ],
+            "FusionMyFreeCAD_RepairReferences": [
+              "General",
+              "small",
+              "Repair References",
+              "FusionMyFreeCAD_RepairReferences"
+            ],
             "Std_UnitsCalculator": [
               "General",
               "small",
@@ -1579,6 +1599,12 @@
               "small",
               "Restore UI",
               "applications-accessories"
+            ],
+            "FusionMyFreeCAD_RepairReferences": [
+              "General",
+              "small",
+              "Repair References",
+              "FusionMyFreeCAD_RepairReferences"
             ],
             "Std_UnitsCalculator": [
               "General",

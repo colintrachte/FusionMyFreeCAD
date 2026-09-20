@@ -41,6 +41,7 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
         "FusionMyFreeCAD_ParameterDock",
         "FusionMyFreeCAD_ParameterTable",
         "FusionMyFreeCAD_Reapply",
+        "FusionMyFreeCAD_RepairReferences",
         "FusionMyFreeCAD_Restore",
         "FusionMyFreeCAD_RestoreViewport",
         "FusionMyFreeCAD_SmartOffset",

@@ -952,6 +952,52 @@ def _shape_signature(shape):
         return None
 
 
+def _face_centre(face):
+    """Where a region sits, from whichever measure the face can provide."""
+    centre = getattr(face, "CenterOfMass", None)
+    if centre is None:
+        box = getattr(face, "BoundBox", None)
+        centre = getattr(box, "Center", None) if box is not None else None
+    if centre is None:
+        return None
+    try:
+        return float(centre.x), float(centre.y)
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def internal_face_order_key(face):
+    """Where a region belongs in the compound handed to PartDesign.
+
+    A Pad whose Profile names ``InternalFace2`` is naming an index into this
+    list, so the order is what decides whether that reference still means the
+    same region after the sketch is edited. OpenCASCADE returns the slices in
+    whatever order the boolean produced them, which reshuffles on almost any
+    change -- which is how a Pad built on a region came to report "Sub shape
+    not found" after an unrelated trim, taking the chamfer and the sketch
+    attached to its face down with it.
+
+    Ordering by where a region *is* keeps the index attached to the region:
+    moving a dimension shifts a centroid a little and the sequence survives.
+    It cannot survive adding a region that sorts ahead of an existing one --
+    only a real element map could -- but that is a deliberate edit, not the
+    incidental churn that was breaking models.
+
+    Area breaks a tie between concentric regions, largest first, so the outer
+    one keeps the lower index.
+    """
+    centre = _face_centre(face)
+    try:
+        area = float(getattr(face, "Area", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        area = 0.0
+    if centre is None:
+        # Nothing to place it by. Sort these last, together, rather than
+        # letting an unmeasurable face displace the ones that can be placed.
+        return (1, 0.0, 0.0, 0.0)
+    return (0, round(centre[0], 4), round(centre[1], 4), -round(area, 4))
+
+
 def clear_internal_face_cache(sketch=None):
     """Forget what was last built, for one sketch or all of them."""
     if sketch is None:
@@ -968,6 +1014,10 @@ def repair_sketch_internal_faces(sketch, force=False):
     face decomposition using FreeCAD's BOPTools.SplitAPI.slice() and assigns the
     compound of all resulting faces back to sketch.InternalShape so every enclosed
     region is selectable and padable in PartDesign.
+
+    The faces are ordered by position rather than by the order the boolean
+    produced them, because a feature built on one of them refers to it by
+    index. See `internal_face_order_key`.
 
     The work is a full OpenCASCADE boolean per closed wire, so it is skipped
     unless the shape has actually changed since the last rebuild. Pass
@@ -1026,6 +1076,10 @@ def repair_sketch_internal_faces(sketch, force=False):
             all_sliced_faces.extend(getattr(split_result, "Faces", []))
         except Exception:
             pass
+
+    # The index into this list is what a Pad's Profile records, so the order
+    # has to come from the geometry rather than from the boolean.
+    all_sliced_faces.sort(key=internal_face_order_key)
 
     if all_sliced_faces:
         try:

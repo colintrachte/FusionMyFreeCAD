@@ -2,6 +2,41 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
+## 1.7.0 — 2026-09-19
+
+### A region keeps its number
+
+- FusionMyFreeCAD divides a multi-region sketch into faces so each region can be
+  padded, and a Pad that uses one records it by index -- `InternalFace2`. Those
+  faces came out in whatever order OpenCASCADE's boolean produced them, which
+  reshuffles on almost any edit, so a Pad built on a region could start reporting
+  `Sub shape not found` after an unrelated trim. Because everything downstream
+  hangs off the Pad, one unstable reference took the chamfer and the sketch
+  attached to its face with it.
+- The faces are now ordered by where the regions are, so moving a dimension
+  leaves the numbering alone. Adding or removing a region still renumbers from
+  the point it appears -- nothing short of a real element map could prevent that
+  -- but that is a deliberate edit rather than incidental churn.
+- **On upgrade, check any Pad that uses a specific region of a sketch.** The
+  order has changed, so a Pad may need its profile re-picked once. After that it
+  stays put.
+
+### Repair References
+
+- A new command in **UTILITIES**, in every workbench. It scans the document for
+  face and edge references that no longer resolve -- the breakage behind
+  `missing element reference`, `Invalid edge link` and `subshape not found` in
+  the Report view -- and reattaches the ones it can identify.
+- A sketch or datum attached to a face that has been renumbered is reattached to
+  the face it is sitting on. This is a measurement, not a guess: the object's
+  Placement was computed from the missing face, so it still describes the plane
+  that face was on. Where two faces share that plane, the one the object
+  actually covers wins.
+- Everything else is named in the Report view and left alone. Nothing in the
+  document records where `Edge28` used to be, and a chamfer silently moved to
+  the wrong edge is worse than one that admits it is broken.
+- The whole repair is one transaction, so a single Undo puts it back.
+
 ## 1.6.0 — 2026-09-13
 
 ### A section stops at the width its icons need

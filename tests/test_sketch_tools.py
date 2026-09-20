@@ -793,3 +793,82 @@ def test_the_feature_can_be_turned_off_entirely(tools, monkeypatch):
     tools.repair_sketch_internal_faces(sketch)
 
     assert tools._internal_face_signatures == {}
+
+
+# ---------------------------------------------------------------------------
+# Which region is InternalFace1
+# ---------------------------------------------------------------------------
+
+
+def _region(x, y, area=1.0):
+    """A sliced face, described the way OpenCASCADE describes one."""
+    return types.SimpleNamespace(
+        CenterOfMass=types.SimpleNamespace(x=x, y=y, z=0.0),
+        Area=area,
+    )
+
+
+def _order(tools, faces):
+    return [
+        (face.CenterOfMass.x, face.CenterOfMass.y)
+        for face in sorted(faces, key=tools.internal_face_order_key)
+    ]
+
+
+def test_the_same_regions_always_come_out_in_the_same_order(tools):
+    """A Pad's Profile names a region by index, so the index has to be stable.
+
+    OpenCASCADE returns the slices in whatever order the boolean produced
+    them, and that reshuffles on almost any edit -- which is how a Pad built
+    on a region reported "Sub shape not found" after an unrelated trim.
+    """
+    regions = [_region(10, 0), _region(-20, 5), _region(0, 0)]
+    wanted = _order(tools, regions)
+    assert _order(tools, list(reversed(regions))) == wanted
+    assert _order(tools, [regions[1], regions[2], regions[0]]) == wanted
+
+
+def test_moving_a_dimension_does_not_renumber_the_regions(tools):
+    """The ordinary edit that used to break a Pad: a dimension changes.
+
+    Each region shifts a little; none of them changes places, so the one that
+    was InternalFace2 is still InternalFace2.
+    """
+
+    def sequence(regions):
+        tagged = sorted(regions, key=lambda item: tools.internal_face_order_key(item[1]))
+        return [tag for tag, _face in tagged]
+
+    before = [("left", _region(-20, 0)), ("middle", _region(0, 0)), ("right", _region(10, 0))]
+    after = [
+        ("left", _region(-20.4, 0.2)),
+        ("middle", _region(0.3, 0)),
+        ("right", _region(11.7, -0.1)),
+    ]
+    assert sequence(before) == ["left", "middle", "right"]
+    assert sequence(after) == sequence(before)
+
+
+def test_concentric_regions_put_the_larger_one_first(tools):
+    """Nothing separates them by position, so the outer one takes the lower index."""
+    inner, outer = _region(0, 0, area=4.0), _region(0, 0, area=25.0)
+    assert _order(tools, [inner, outer]) == [(0, 0), (0, 0)]
+    assert sorted([inner, outer], key=tools.internal_face_order_key)[0] is outer
+
+
+def test_a_region_that_cannot_be_measured_sorts_last(tools):
+    """It must not displace the regions that can be placed."""
+    unmeasurable = types.SimpleNamespace(Area=1.0)
+    placed = _region(50, 50)
+    assert sorted([unmeasurable, placed], key=tools.internal_face_order_key) == [
+        placed,
+        unmeasurable,
+    ]
+
+
+def test_a_bounding_box_centre_stands_in_for_a_missing_centre_of_mass(tools):
+    face = types.SimpleNamespace(
+        BoundBox=types.SimpleNamespace(Center=types.SimpleNamespace(x=3.0, y=4.0, z=0.0)),
+        Area=1.0,
+    )
+    assert tools.internal_face_order_key(face)[:3] == (0, 3.0, 4.0)
