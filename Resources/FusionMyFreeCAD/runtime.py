@@ -819,8 +819,20 @@ def reconcile_actions(main_window=None):
     main_window = main_window if main_window is not None else Gui.getMainWindow()
     if main_window is None:
         return False
+    # One pass. Asking every action for its shortcut once per shortcut we set
+    # meant thirteen sweeps of a tree with thousands of actions in it, twice
+    # per sketch -- entering an edit activates Sketcher and leaving activates
+    # PartDesign again -- and all of it on the thread that draws the window.
     actions = main_window.findChildren(_qaction_type())
-    by_name = {action.objectName(): action for action in actions if action.objectName()}
+    by_name = {}
+    by_shortcut = {}
+    for action in actions:
+        name = action.objectName()
+        if name:
+            by_name[name] = action
+        held = _portable(action.shortcut().toString())
+        if held:
+            by_shortcut.setdefault(held, []).append(action)
     adaptive_commands = {
         command
         for workbench in load_manifest().get("adaptivePins", {})
@@ -844,8 +856,8 @@ def reconcile_actions(main_window=None):
         if target is None:
             continue
         wanted = _portable(shortcut)
-        for action in actions:
-            if action is target or _portable(action.shortcut().toString()) != wanted:
+        for action in by_shortcut.get(wanted, ()):
+            if action is target:
                 continue
             action.setShortcut(QtGui.QKeySequence())
             entry = {
@@ -930,7 +942,10 @@ def after_workbench_activation(name):
     global _last_workbench
     _last_workbench = name
     _run("adaptive pins", lambda: refresh_adaptive_panel(name))
-    _run("shortcut reconciliation", reconcile_actions)
+    # Deferred, not immediate. Entering and leaving a sketch each activate a
+    # workbench, so anything done here is done on the way in and on the way
+    # out, while the window is frozen waiting for it.
+    _defer("shortcut reconciliation", reconcile_actions)
     _defer("navigation cube", ensure_navigation_cube)
     _defer("model tree", ensure_model_tree)
     schedule_status_write()

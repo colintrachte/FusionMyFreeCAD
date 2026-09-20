@@ -1,5 +1,5 @@
 {
-  "layoutVersion": "1.7.1",
+  "layoutVersion": "1.7.2",
   "targetFreeCAD": "1.1.x",
   "dropdownButtons": {
     "Fusion_MoreCreate_ddb": [

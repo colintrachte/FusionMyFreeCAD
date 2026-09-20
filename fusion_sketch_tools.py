@@ -1104,9 +1104,13 @@ def plan_symmetry_links(mapping, before_geometry, reference_geoid):
     """One ``Symmetric`` constraint per shared named point of each mirrored pair.
 
     This is the live link the user expects from a mirror: drag either element and
-    the other follows, reflected across the same line the mirror used. ``Equal``
-    keeps a mirrored circle or arc the same size as its source. FreeCAD 1.1.3's
-    ``addSymmetric`` creates neither, so the command adds them itself.
+    the other follows, reflected across the same line the mirror used. FreeCAD
+    1.1.3's ``addSymmetric`` creates none of them, so the command adds them.
+
+    Nothing is added that the point links already imply. A mirrored line is
+    fully determined by its two endpoints, and a mirrored arc by its centre and
+    endpoints; only a circle, linked by its centre alone, still needs ``Equal``
+    to carry its radius across.
 
     Each spec carries ``_mirror`` (the mirrored geoid) so the caller can tell
     which pairs ended up coupled.
@@ -1116,7 +1120,8 @@ def plan_symmetry_links(mapping, before_geometry, reference_geoid):
         if not (0 <= source_id < len(before_geometry)):
             continue
         geo = before_geometry[source_id]
-        for pos in sorted(geometry_endpoints(geo)):
+        points = sorted(geometry_endpoints(geo))
+        for pos in points:
             specs.append(
                 {
                     "type": "Symmetric",
@@ -1131,7 +1136,13 @@ def plan_symmetry_links(mapping, before_geometry, reference_geoid):
                     "_mirror": mirror_id,
                 }
             )
-        if _geometry_kind(geo) in ("circle", "arc"):
+        # Only where the point links leave the size free. A circle is linked
+        # by its centre alone, so its radius still is; an arc is linked by its
+        # centre *and* both endpoints, which already fix the radius. Adding
+        # Equal there made every mirrored arc report a redundant constraint,
+        # and the constraint the solver named was rarely the one to delete --
+        # so removing it took a real constraint with it.
+        if _geometry_kind(geo) in ("circle", "arc") and len(points) < 2:
             specs.append(
                 {
                     "type": "Equal",

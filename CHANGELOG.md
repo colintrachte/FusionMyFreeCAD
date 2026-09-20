@@ -2,6 +2,26 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
+## 1.7.2 — 2026-09-20
+
+### Entering and leaving a sketch
+
+- The shortcut sweep ran on the thread that draws the window, every time a
+  workbench was activated -- which is once on the way into a sketch and once on
+  the way out. It asked every action in the main window for its shortcut once
+  per shortcut FusionMyFreeCAD sets, so a tree of several thousand actions was
+  walked thirteen times over, twice per edit. It now reads each action once and
+  runs after the window is up rather than in front of it.
+
+### Mirror stops adding constraints the mirror already implies
+
+- A mirrored arc was given an `Equal` on top of symmetry links for its centre
+  and both endpoints, which already fix its radius. Every mirrored arc
+  therefore reported a redundant constraint, and the one the solver named was
+  rarely the one worth deleting -- so removing it tended to take a real
+  constraint with it. `Equal` is now added only for a circle, which is linked
+  by its centre alone and so has nothing else to say how big it is.
+
 ## 1.7.1 — 2026-09-20
 
 Repair References, corrected against a real document instead of a test double.

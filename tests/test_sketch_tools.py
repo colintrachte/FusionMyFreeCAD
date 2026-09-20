@@ -872,3 +872,40 @@ def test_a_bounding_box_centre_stands_in_for_a_missing_centre_of_mass(tools):
         Area=1.0,
     )
     assert tools.internal_face_order_key(face)[:3] == (0, 3.0, 4.0)
+
+
+# ---------------------------------------------------------------------------
+# What the mirror links, and what it leaves the solver to work out
+# ---------------------------------------------------------------------------
+
+
+def _links(tools, geo):
+    specs = tools.plan_symmetry_links({0: 1}, [geo], reference_geoid=-2)
+    return [spec["type"] for spec in specs]
+
+
+def test_a_mirrored_line_is_linked_by_its_endpoints_alone(tools):
+    line = FakeLineSegment((0.0, 0.0), (10.0, 0.0))
+    assert _links(tools, line) == ["Symmetric", "Symmetric"]
+
+
+def test_a_mirrored_circle_still_needs_its_radius_carried_across(tools):
+    """Only its centre is linked, so nothing else says how big it is."""
+    from fake_freecad import FakeCircle
+
+    assert _links(tools, FakeCircle((5.0, 0.0), 2.0)) == ["Symmetric", "Equal"]
+
+
+def test_a_mirrored_arc_is_not_given_a_radius_it_already_has(tools):
+    """Centre and both endpoints fix the radius; Equal on top is redundant.
+
+    That redundancy is what filled the Report view during a mirror, and the
+    constraint the solver named as redundant was rarely the one worth
+    deleting -- so removing it took a real constraint with it.
+    """
+    from fake_freecad import FakeArcOfCircle, FakeCircle
+
+    arc = FakeArcOfCircle(FakeCircle((5.0, 0.0), 2.0), 0.0, 1.5)
+    types_added = _links(tools, arc)
+    assert "Equal" not in types_added, types_added
+    assert types_added.count("Symmetric") == 3

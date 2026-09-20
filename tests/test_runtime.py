@@ -622,3 +622,25 @@ def test_install_connects_the_signal_only_once(env, bootstrap, runtime):
     runtime.install()
     FakeTimer.pump()
     assert len(env.main_window.workbenchActivated.handlers) == 1
+
+
+def test_every_action_is_asked_for_its_shortcut_once(env, runtime):
+    """This runs twice per sketch, on the thread that draws the window.
+
+    Entering a sketch edit activates Sketcher and leaving activates PartDesign
+    again, so a sweep that asked every action for its shortcut once per
+    shortcut FusionMyFreeCAD sets walked a tree of thousands of actions
+    thirteen times over, each way. The count is the whole point of the test.
+    """
+    reads = {"count": 0}
+
+    class Counting(FakeAction):
+        def shortcut(self):
+            reads["count"] += 1
+            return super().shortcut()
+
+    env.main_window.actions = [Counting("Action{}".format(index), "") for index in range(40)]
+    env.main_window.actions.append(Counting("PartDesign_Pad", ""))
+
+    runtime.reconcile_actions(env.main_window)
+    assert reads["count"] <= len(env.main_window.actions), reads["count"]
