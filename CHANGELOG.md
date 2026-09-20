@@ -2,6 +2,27 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
+## 1.7.1 — 2026-09-20
+
+Repair References, corrected against a real document instead of a test double.
+
+- **A sketch on an origin plane is no longer reported as broken.** It links to
+  the Origin object by the plane's *name*, and an Origin has no shape at all,
+  so asking its shape for a subelement condemned the commonest attachment
+  there is. On the document this was measured against, two of three findings
+  were this false positive.
+- **Sharing a plane is no longer enough to be the face.** The object's origin
+  has to fall within the face as well. Two bosses of the same height share a
+  plane, and so does the surface they stand on.
+- **An attachment whose placement was reset is offered, not applied.** The
+  repair rested on the idea that a broken object still carries the plane of
+  the face it lost. It does not: measured against a real file, a sketch that
+  had been on the side of a pad came back sitting at the origin, unrotated,
+  with nothing left to measure. Where the placement is the untouched default
+  the likely face is named in the Report view and nothing is moved.
+- A "?" marker over a name that can mean exactly one thing again is cleared.
+- FreeCAD's own "?" prefix is read as the answer it is, and not repeated back.
+
 ## 1.7.0 — 2026-09-19
 
 ### A region keeps its number

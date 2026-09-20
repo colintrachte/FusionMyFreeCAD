@@ -129,6 +129,22 @@ def link_entries(value) -> list[tuple[Any, str]]:
     return entries
 
 
+def names_a_child_object(target, sub: str) -> bool:
+    """Whether `sub` names a child object rather than a piece of a shape.
+
+    A sketch on an origin plane links to the Origin object with the plane's
+    name, and an Origin has no Shape at all -- so asking its shape for a
+    subelement said every such sketch was broken, which is the commonest
+    attachment in any document. Its children are the answer.
+    """
+    wanted = sub.rstrip(".")
+    for attribute in ("OriginFeatures", "Group", "OutList"):
+        for child in getattr(target, attribute, None) or []:
+            if getattr(child, "Name", None) == wanted:
+                return True
+    return False
+
+
 def subelement_resolves(target, sub: str) -> bool:
     """Whether `sub` still names something on `target`.
 
@@ -137,6 +153,12 @@ def subelement_resolves(target, sub: str) -> bool:
     """
     if not sub:
         return getattr(target, "Shape", None) is not None
+    if sub.startswith("?"):
+        # FreeCAD rewrites a subelement name it could not resolve with a
+        # leading "?". That is the answer, straight from the source.
+        return False
+    if names_a_child_object(target, sub):
+        return True
     for source in (target, getattr(target, "Shape", None)):
         getter = getattr(source, "getSubObject", None) or getattr(source, "getElement", None)
         if not callable(getter):
@@ -240,9 +262,11 @@ def placement_plane(
 def face_match_rank(wanted, face) -> tuple | None:
     """How good a replacement `face` is for the plane in `wanted`, or None.
 
-    Lower sorts better. A face the point actually lies within beats one that
-    merely shares its plane, which is what separates the top of one boss from
-    the top of another at the same height.
+    Lower sorts better. Sharing a plane is not enough: the object's own origin
+    has to fall within the face. Two bosses of the same height share a plane,
+    and so does the tabletop they stand on, so coplanarity alone would pick
+    whichever came first in the shape. Containment is the test that says
+    *this* face.
     """
     plane = face_plane(face)
     if plane is None:
@@ -254,17 +278,35 @@ def face_match_rank(wanted, face) -> tuple | None:
     offset = abs(_dot(_difference(wanted_point, point), normal))
     if offset > COPLANAR_TOLERANCE:
         return None
-    inside = 1
     contains = getattr(face, "isInside", None)
     if callable(contains):
         try:
-            if contains(App.Vector(*wanted_point), COPLANAR_TOLERANCE, True):
-                inside = 0
+            if not contains(App.Vector(*wanted_point), COPLANAR_TOLERANCE, True):
+                return None
         except Exception:
-            inside = 1
+            pass
     centre = _xyz(getattr(face, "CenterOfMass", None))
     distance = _distance(wanted_point, centre) if centre is not None else float("inf")
-    return (inside, distance)
+    return (distance,)
+
+
+def placement_is_unset(placement) -> bool:
+    """Whether a Placement is the untouched default, and so says nothing.
+
+    When an attachment fails, FreeCAD does not preserve the placement the
+    lost face produced -- a sketch that was on the side of a pad comes back
+    sitting at the origin, unrotated. Measured against a real document that
+    is what `Sketch001` looks like, so an identity placement has to be read
+    as "never placed" rather than as evidence about where the face was.
+    """
+    plane = placement_plane(placement)
+    if plane is None:
+        return True
+    point, normal = plane
+    return (
+        max(abs(component) for component in point) <= COPLANAR_TOLERANCE
+        and abs(normal[2] - 1.0) <= PARALLEL_TOLERANCE
+    )
 
 
 def suggest_attachment_face(obj, target) -> str | None:
@@ -288,18 +330,63 @@ def suggest_attachment_face(obj, target) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+def sketch_regions(target) -> int:
+    """How many regions a sketch currently divides itself into."""
+    return len(getattr(getattr(target, "InternalShape", None), "Faces", None) or [])
+
+
+def restore_invalidated(target, sub: str) -> str | None:
+    """The name behind a "?" marker, when it unambiguously exists again.
+
+    FreeCAD rewrites a subelement name it cannot resolve with a leading "?",
+    and that marker does persist: a real document carried `?Face9` in a
+    sketch's AttachmentSupport long after the recompute that broke it. When a
+    reference was invalidated by something momentary -- a sketch open for one
+    recompute, say -- the element can be back while the marker is not.
+
+    Restoring is only safe where the name can mean one thing. A sketch with
+    exactly one region leaves nothing for `InternalFace1` to be mistaken for.
+    Every other name is positional in a shape that has since been renumbered,
+    so the old number no longer picks out the old feature, and this declines.
+
+    Whether a Pad's Profile ever persists this form is unconfirmed; a headless
+    reproduction against the document that prompted it kept the resolved name
+    throughout, so the "Sub shape not found" lines in that session were
+    transient rather than a lasting corruption.
+    """
+    if not sub.startswith("?"):
+        return None
+    name = sub[1:]
+    if name != "InternalFace1" or sketch_regions(target) != 1:
+        return None
+    return name
+
+
 def plan_repairs(document) -> dict:
-    """What could be mended, and what could only be named."""
-    repairs, unresolved = [], []
+    """Three buckets: mend, offer, and name.
+
+    A reference is *mended* only on evidence: a "?" marker over a name that
+    can mean exactly one thing again, or a placement that still records the
+    plane of the face that went missing. Where the best candidate is merely
+    plausible it is *offered* instead, because applying it would be guessing
+    with the user's model. Everything else is *named*, and left alone.
+    """
+    repairs, suggestions, unresolved = [], [], []
     for finding in broken_references(document):
+        restored = restore_invalidated(finding["target"], finding["sub"])
+        if restored:
+            repairs.append(dict(finding, replacement=restored))
+            continue
         replacement = None
         if finding["repairable"]:
             replacement = suggest_attachment_face(finding["object"], finding["target"])
-        if replacement:
-            repairs.append(dict(finding, replacement=replacement))
-        else:
+        if not replacement:
             unresolved.append(finding)
-    return {"repairs": repairs, "unresolved": unresolved}
+        elif placement_is_unset(getattr(finding["object"], "Placement", None)):
+            suggestions.append(dict(finding, replacement=replacement))
+        else:
+            repairs.append(dict(finding, replacement=replacement))
+    return {"repairs": repairs, "suggestions": suggestions, "unresolved": unresolved}
 
 
 def apply_repair(repair) -> bool:
@@ -324,11 +411,14 @@ def apply_repair(repair) -> bool:
 
 
 def _describe(finding) -> str:
+    # FreeCAD's own "?" marker for an unresolved name only gets in the way
+    # once the message already says the reference is broken.
+    sub = (finding["sub"] or "").lstrip("?")
     return "{}.{} -> {}.{}".format(
         getattr(finding["object"], "Name", "?"),
         finding["property"],
         getattr(finding["target"], "Name", "?"),
-        finding["sub"] or "(whole object)",
+        sub or "(whole object)",
     )
 
 
@@ -341,12 +431,13 @@ def repair_document(document=None) -> dict:
     document = document if document is not None else App.ActiveDocument
     if document is None:
         notify(LABEL, "no document is open.", error=True)
-        return {"repaired": [], "unresolved": []}
+        return {"repaired": [], "suggestions": [], "unresolved": []}
 
     plan = plan_repairs(document)
-    if not plan["repairs"] and not plan["unresolved"]:
+    outstanding = plan["suggestions"] + plan["unresolved"]
+    if not plan["repairs"] and not outstanding:
         notify(LABEL, "every reference in this document resolves; nothing to repair.")
-        return {"repaired": [], "unresolved": []}
+        return {"repaired": [], "suggestions": [], "unresolved": []}
 
     repaired = []
     if plan["repairs"]:
@@ -363,17 +454,28 @@ def repair_document(document=None) -> dict:
                 _describe(repair), repair["replacement"]
             )
         )
+    for finding in plan["suggestions"]:
+        App.Console.PrintWarning(
+            "FusionMyFreeCAD: {} looks like it belongs on {}, but its placement was "
+            "reset when the reference broke, so it has been left alone. Select it and "
+            "use Map Sketch to confirm.\n".format(_describe(finding), finding["replacement"])
+        )
     for finding in plan["unresolved"]:
         App.Console.PrintWarning(
-            "FusionMyFreeCAD could not repair {}.\n".format(_describe(finding))
+            "FusionMyFreeCAD could not repair {}; nothing in the document records "
+            "where it was. Re-pick it by hand.\n".format(_describe(finding))
         )
-    _report(repaired, plan["unresolved"])
-    return {"repaired": repaired, "unresolved": plan["unresolved"]}
+    _report(repaired, outstanding)
+    return {
+        "repaired": repaired,
+        "suggestions": plan["suggestions"],
+        "unresolved": plan["unresolved"],
+    }
 
 
-def _report(repaired, unresolved) -> None:
+def _report(repaired, outstanding) -> None:
     """One sentence in the status bar; the detail is already in the Report view."""
-    if repaired and not unresolved:
+    if repaired and not outstanding:
         notify(
             LABEL,
             "reattached {} broken reference{}.".format(
@@ -386,7 +488,7 @@ def _report(repaired, unresolved) -> None:
             LABEL,
             "reattached {} of {} broken references; the rest are listed in the "
             "Report view and need re-picking by hand.".format(
-                len(repaired), len(repaired) + len(unresolved)
+                len(repaired), len(repaired) + len(outstanding)
             ),
             error=True,
         )
@@ -394,7 +496,7 @@ def _report(repaired, unresolved) -> None:
     notify(
         LABEL,
         "found {} broken reference{} that cannot be reattached automatically; "
-        "see the Report view.".format(len(unresolved), "" if len(unresolved) == 1 else "s"),
+        "see the Report view.".format(len(outstanding), "" if len(outstanding) == 1 else "s"),
         error=True,
     )
 
