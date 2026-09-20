@@ -287,7 +287,7 @@ def test_a_clean_document_is_left_alone(repair):
     )
 
     result = repair.repair_document(document)
-    assert result == {"repaired": [], "unresolved": []}
+    assert result == {"repaired": [], "suggestions": [], "unresolved": []}
     assert log == []
 
 
@@ -306,3 +306,152 @@ def test_a_document_that_only_has_unrepairable_breakage_is_not_touched(repair):
     assert result["repaired"] == []
     assert len(result["unresolved"]) == 1
     assert log == [], "nothing was mended, so nothing should be in the undo stack"
+
+
+# ---------------------------------------------------------------------------
+# What a real document taught these tests
+#
+# Everything below came out of running the scan against Chicken Dumper Hinge
+# rather than out of imagination. Two of them are bugs the fakes never caught:
+# the commonest attachment in any document read as broken, and the evidence
+# the repair was built on turned out not to survive the failure it repairs.
+# ---------------------------------------------------------------------------
+
+
+def test_a_sketch_on_an_origin_plane_is_not_broken(repair):
+    """The commonest attachment there is, and it has no shape behind it.
+
+    A sketch on XY_Plane links to the Origin object with the plane's *name*,
+    and an Origin has no Shape at all, so asking its shape for a subelement
+    called every such sketch broken. On a real document that was two false
+    positives out of three findings.
+    """
+    plane = _obj("XY_Plane")
+    origin = _obj("Origin", OriginFeatures=[plane, _obj("XZ_Plane"), _obj("X_Axis")])
+    assert repair.subelement_resolves(origin, "XY_Plane") is True
+    assert repair.subelement_resolves(origin, "YZ_Plane") is False
+
+
+def test_a_child_named_with_a_trailing_dot_still_resolves(repair):
+    """FreeCAD writes object paths with a trailing separator."""
+    origin = _obj("Origin", OutList=[_obj("XY_Plane")])
+    assert repair.subelement_resolves(origin, "XY_Plane.") is True
+
+
+def test_freecads_own_question_mark_is_taken_as_the_answer(repair):
+    """FreeCAD renames a subelement it cannot resolve to "?Face9"."""
+    pad = _obj("Pad", Shape=_shape(names=["?Face9", "Face9"]))
+    assert repair.subelement_resolves(pad, "?Face9") is False
+
+
+def test_the_marker_is_not_repeated_back_to_the_user(repair):
+    pad = _obj("Pad")
+    finding = {
+        "object": _obj("Sketch001"),
+        "property": "AttachmentSupport",
+        "target": pad,
+        "sub": "?Face9",
+    }
+    assert repair._describe(finding) == "Sketch001.AttachmentSupport -> Pad.Face9"
+
+
+def test_sharing_a_plane_is_not_enough_to_be_the_face(repair):
+    """The tabletop and the boss standing on it are not the same face."""
+    wanted = ((5.0, 0.0, 6.0), (0.0, 0.0, 1.0))
+    elsewhere = _face((0, 0, 6), (0, 0, 1), centre=(0, 0, 6), contains=False)
+    assert repair.face_match_rank(wanted, elsewhere) is None
+
+
+def test_a_placement_that_was_never_set_is_not_evidence(repair):
+    """An attachment failure resets the placement; it does not preserve it.
+
+    This is the correction that matters most: the repair was built on the
+    belief that a broken object still carries the plane of the face it lost.
+    Measured against a real document, a sketch that had been on the side of a
+    pad came back sitting at the origin, unrotated, with nothing left to
+    measure.
+    """
+    assert repair.placement_is_unset(_placement((0, 0, 0))) is True
+    assert repair.placement_is_unset(_placement((0, 0, 6))) is False
+    assert repair.placement_is_unset(_placement((0, 0, 0), normal=(0, -1, 0))) is False
+
+
+def test_a_reset_placement_is_offered_rather_than_applied(repair):
+    """Naming the likely face helps; moving the sketch there would be a guess."""
+    top = _face((0, 0, 0), (0, 0, 1), centre=(0, 0, 0), contains=True)
+    pad = _obj("Pad", Shape=_shape(faces=[top], names=["Face1"]))
+    sketch = _obj(
+        "Sketch001", AttachmentSupport=[(pad, ["?Face9"])], Placement=_placement((0, 0, 0))
+    )
+    document = types.SimpleNamespace(Objects=[pad, sketch])
+
+    plan = repair.plan_repairs(document)
+    assert plan["repairs"] == []
+    assert [(s["object"].Name, s["replacement"]) for s in plan["suggestions"]] == [
+        ("Sketch001", "Face1")
+    ]
+
+
+def test_a_suggestion_never_moves_anything(repair):
+    top = _face((0, 0, 0), (0, 0, 1), centre=(0, 0, 0), contains=True)
+    pad = _obj("Pad", Shape=_shape(faces=[top], names=["Face1"]))
+    sketch = _obj(
+        "Sketch001", AttachmentSupport=[(pad, ["?Face9"])], Placement=_placement((0, 0, 0))
+    )
+    log = []
+    document = types.SimpleNamespace(
+        Objects=[pad, sketch],
+        openTransaction=lambda label: log.append("open"),
+        commitTransaction=lambda: log.append("commit"),
+        recompute=lambda: log.append("recompute"),
+    )
+
+    result = repair.repair_document(document)
+    assert result["repaired"] == []
+    assert len(result["suggestions"]) == 1
+    assert sketch.AttachmentSupport == [(pad, ["?Face9"])]
+    assert log == []
+
+
+def _sketch_with(regions):
+    faces = [types.SimpleNamespace() for _ in range(regions)]
+    return _obj("Sketch", InternalShape=types.SimpleNamespace(Faces=faces))
+
+
+def test_a_profile_invalidated_mid_trim_is_restored(repair):
+    """A marker left behind after the thing it complained about came back.
+
+    FreeCAD's "?" prefix persists -- a real document still carried `?Face9`
+    in an attachment. Where the element is unambiguously available again,
+    clearing the marker restores the reference without choosing anything.
+    """
+    sketch = _sketch_with(1)
+    assert repair.restore_invalidated(sketch, "?InternalFace1") == "InternalFace1"
+
+
+def test_an_ambiguous_region_is_not_restored(repair):
+    """With several regions there is nothing to say which one was meant."""
+    assert repair.restore_invalidated(_sketch_with(3), "?InternalFace1") is None
+    assert repair.restore_invalidated(_sketch_with(0), "?InternalFace1") is None
+
+
+def test_a_renumbered_solid_face_is_never_restored_by_its_old_number(repair):
+    """Face9 on a rebuilt pad is a different face, not the same one returning."""
+    pad = _obj("Pad", Shape=_shape(names=["Face9"]))
+    assert repair.restore_invalidated(pad, "?Face9") is None
+
+
+def test_a_name_with_no_marker_is_not_a_restoration(repair):
+    assert repair.restore_invalidated(_sketch_with(1), "InternalFace1") is None
+
+
+def test_a_restored_profile_is_applied_not_merely_offered(repair):
+    sketch = _sketch_with(1)
+    pad = _obj("Pad", Profile=(sketch, ["?InternalFace1"]))
+    document = types.SimpleNamespace(Objects=[sketch, pad])
+
+    plan = repair.plan_repairs(document)
+    assert [(r["object"].Name, r["replacement"]) for r in plan["repairs"]] == [
+        ("Pad", "InternalFace1")
+    ]
+    assert plan["suggestions"] == [] and plan["unresolved"] == []
