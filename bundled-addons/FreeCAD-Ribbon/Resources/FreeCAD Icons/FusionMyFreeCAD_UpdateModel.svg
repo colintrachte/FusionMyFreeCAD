@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="solidGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#c3d9f0" />
+    </linearGradient>
+    <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#73d216" />
+      <stop offset="100%" stop-color="#4e9a06" />
+    </linearGradient>
+  </defs>
+
+  <!-- A feature and the one cut from it: the pair the update has to keep together. -->
+  <path d="M12 26 L28 18 L44 26 L28 34 Z" fill="url(#solidGrad)" stroke="#204a87" stroke-width="2"
+        stroke-linejoin="round" />
+  <path d="M12 26 L12 40 L28 48 L28 34 Z" fill="#729fcf" stroke="#204a87" stroke-width="2"
+        stroke-linejoin="round" />
+  <path d="M44 26 L44 40 L28 48 L28 34 Z" fill="#5a8ac0" stroke="#204a87" stroke-width="2"
+        stroke-linejoin="round" />
+
+  <!-- The change coming back round to everything below it. -->
+  <path d="M50 14 A18 18 0 1 1 22 10" fill="none" stroke="url(#arrowGrad)" stroke-width="5"
+        stroke-linecap="round" />
+  <path d="M50 4 L52 16 L40 15 Z" fill="#4e9a06" />
+</svg>

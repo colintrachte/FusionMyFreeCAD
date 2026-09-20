@@ -1,4 +1,9 @@
-"""Find and mend references that FreeCAD lost track of.
+"""Put a document back in agreement with itself.
+
+Two commands live here. **Repair References** finds face and edge references
+that no longer resolve and reattaches the ones it can identify. **Update
+Model** rebuilds every feature, because a change upstream does not reliably
+reach the features below it.
 
 When a feature is edited, the faces and edges of everything downstream are
 renumbered. FreeCAD's element map carries most references across, but not all
@@ -29,6 +34,7 @@ re-pointed at the wrong edge is worse than a chamfer that says it is broken.
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import FreeCAD as App
@@ -36,8 +42,9 @@ import FreeCADGui as Gui
 
 from fusion_common import notify, transaction
 
-#: Prefix every message from this command carries in the Report view.
+#: Prefix each command's messages carry in the Report view.
 LABEL = "Repair References"
+UPDATE_LABEL = "Update Model"
 
 #: Properties that name a subelement of another object's shape. Each is either
 #: a link with a list of subelement names, or a list of such links.
@@ -529,6 +536,177 @@ class RepairReferencesCommand:
         repair_document()
 
 
+# ---------------------------------------------------------------------------
+# Rebuilding what FreeCAD has been told is already up to date
+# ---------------------------------------------------------------------------
+
+
+#: Status flags that mean an object failed outright.
+FAILED_STATES = ("Invalid", "Error")
+
+#: Still marked as needing a rebuild after one was forced. A failed recompute
+#: takes its whole downstream with it -- FreeCAD filters those out of the
+#: queue -- so they come back untouched by the rebuild and still stale.
+STALE_STATE = "Touched"
+
+
+def _status_of(obj) -> str:
+    getter = getattr(obj, "getStatusString", None)
+    if callable(getter):
+        try:
+            text = getter()
+        except Exception:
+            text = ""
+        if text:
+            return str(text)
+    state = getattr(obj, "State", None) or []
+    return ", ".join(str(flag) for flag in state) or "no shape"
+
+
+def features_in_error(document) -> list:
+    """(name, status, kind) for everything that did not end up with a shape.
+
+    `kind` separates the feature that actually failed from the ones that were
+    never reached because of it. Saying which is which turns a list of seven
+    broken features into one thing to go and fix.
+    """
+    problems = []
+    for obj in getattr(document, "Objects", []) or []:
+        state = [str(flag) for flag in (getattr(obj, "State", None) or [])]
+        if any(flag in FAILED_STATES for flag in state):
+            problems.append((getattr(obj, "Name", "?"), _status_of(obj), "failed"))
+        elif STALE_STATE in state:
+            problems.append((getattr(obj, "Name", "?"), _status_of(obj), "not reached"))
+    return problems
+
+
+def mark_for_recompute(document) -> int:
+    """Tell every object it needs rebuilding, and say how many were told.
+
+    Necessary because `recompute(force=True)` does not do what its name
+    suggests. Reading the source settles it: the force flag only bypasses the
+    document's SkipRecompute flag, and each object is then still asked
+    `mustRecompute()` and skipped if it says no. Run against a real document
+    that returned 0 -- nothing rebuilt at all. The mark has to be set on the
+    objects themselves first.
+    """
+    marked = 0
+    for obj in getattr(document, "Objects", []) or []:
+        for method in ("enforceRecompute", "touch"):
+            call = getattr(obj, method, None)
+            if not callable(call):
+                continue
+            try:
+                call()
+            except Exception:
+                continue
+            marked += 1
+            break
+    return marked
+
+
+def update_model(document=None) -> dict:
+    """Rebuild every feature, whether or not FreeCAD thinks one is needed.
+
+    FreeCAD's own Refresh rebuilds only what is marked as needing it, and
+    PartDesign's task dialog clears that mark across the whole document the
+    moment you press OK -- the Python console shows
+    `App.getDocument(...).purgeTouched()` immediately before its recompute. So
+    a change to a pad is applied to the pad, and the pocket cut out of it is
+    told it is already current. Opening that pocket and pressing OK is the
+    usual way back, one feature at a time, down the whole tree.
+
+    Rebuilding regardless is the only thing that reliably carries a change
+    downstream, so that is what this does: every object is marked as needing
+    a recompute, and then the document is recomputed.
+    """
+    document = document if document is not None else App.ActiveDocument
+    if document is None:
+        notify(UPDATE_LABEL, "no document is open.", error=True)
+        return {"recomputed": 0, "errors": [], "failed": [], "blocked": []}
+
+    started = time.perf_counter()
+    try:
+        marked = mark_for_recompute(document)
+        recomputed = document.recompute(None, True)
+    except Exception as error:
+        notify(
+            UPDATE_LABEL,
+            "the rebuild did not finish: {}: {}".format(type(error).__name__, error),
+            error=True,
+        )
+        return {"recomputed": 0, "errors": [], "failed": [], "blocked": []}
+    elapsed = time.perf_counter() - started
+
+    try:
+        recomputed = int(recomputed)
+    except (TypeError, ValueError):
+        recomputed = marked
+
+    errors = features_in_error(document)
+    failed = [entry for entry in errors if entry[2] == "failed"]
+    blocked = [entry for entry in errors if entry[2] == "not reached"]
+    for name, status, kind in errors:
+        App.Console.PrintWarning(
+            "FusionMyFreeCAD: {} {}: {}\n".format(
+                name, "failed" if kind == "failed" else "was not reached", status
+            )
+        )
+
+    summary = "rebuilt {} feature{} in {:.1f}s".format(
+        recomputed, "" if recomputed == 1 else "s", elapsed
+    )
+    if failed:
+        # Name the first failure: the ones below it are its consequence, and
+        # fixing that one is usually the whole job.
+        notify(
+            UPDATE_LABEL,
+            "{}; {} failed ({}: {}){}.".format(
+                summary,
+                len(failed),
+                failed[0][0],
+                failed[0][1],
+                ", and {} below could not be reached".format(len(blocked)) if blocked else "",
+            ),
+            error=True,
+        )
+    elif blocked:
+        notify(
+            UPDATE_LABEL,
+            "{}; {} still needs rebuilding and is named in the Report view.".format(
+                summary, len(blocked)
+            ),
+            error=True,
+        )
+    else:
+        notify(UPDATE_LABEL, "{}.".format(summary))
+    return {"recomputed": recomputed, "errors": errors, "failed": failed, "blocked": blocked}
+
+
+class UpdateModelCommand:
+    """Rebuild the whole model so a change upstream reaches everything below it."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": "FusionMyFreeCAD_UpdateModel",
+            "MenuText": "Update Model",
+            "ToolTip": (
+                "Rebuild every feature, so a change to one carries down to everything "
+                "that depends on it. FreeCAD's Refresh only rebuilds what it has marked "
+                "as needing it, and editing a feature clears that mark across the whole "
+                "document -- which is why a pad can change without the pocket cut out of "
+                "it following. Fusion calls this Compute All."
+            ),
+        }
+
+    def IsActive(self):
+        return App.ActiveDocument is not None
+
+    def Activated(self):
+        update_model()
+
+
 def register(add_command=None):
     register_with = add_command or Gui.addCommand
     register_with("FusionMyFreeCAD_RepairReferences", RepairReferencesCommand())
+    register_with("FusionMyFreeCAD_UpdateModel", UpdateModelCommand())

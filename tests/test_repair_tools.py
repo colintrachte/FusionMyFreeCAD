@@ -455,3 +455,83 @@ def test_a_restored_profile_is_applied_not_merely_offered(repair):
         ("Pad", "InternalFace1")
     ]
     assert plan["suggestions"] == [] and plan["unresolved"] == []
+
+
+# ---------------------------------------------------------------------------
+# Update Model
+#
+# FreeCAD's Refresh rebuilds only what is marked as needing it, and PartDesign
+# clears that mark across the whole document when a feature dialog is
+# accepted: the console shows App.getDocument(...).purgeTouched() immediately
+# before its recompute. So a pad can change while the pocket cut out of it is
+# told it is already current.
+# ---------------------------------------------------------------------------
+
+
+def _document(objects=(), recomputed=3):
+    calls = []
+
+    def recompute(objs=None, force=False, check_cycle=False):
+        calls.append((objs, force, check_cycle))
+        return recomputed
+
+    return types.SimpleNamespace(Objects=list(objects), recompute=recompute, calls=calls)
+
+
+def test_every_feature_is_marked_before_the_rebuild(repair):
+    """`recompute(force=True)` does not force anything on its own.
+
+    The source settles it: the flag only bypasses the document's
+    SkipRecompute, and each object is then still asked `mustRecompute()` and
+    skipped if it says no. Run against a real document it rebuilt nothing at
+    all -- zero features -- until every object was marked first.
+    """
+    marks = []
+    objects = [
+        _obj("Pad", enforceRecompute=lambda: marks.append("Pad")),
+        _obj("Pocket", enforceRecompute=lambda: marks.append("Pocket")),
+    ]
+    document = _document(objects)
+    result = repair.update_model(document)
+    assert marks == ["Pad", "Pocket"]
+    assert document.calls == [(None, True, False)]
+    assert result["recomputed"] == 3
+
+
+def test_an_object_that_cannot_be_enforced_is_touched_instead(repair):
+    marks = []
+    obj = _obj("Old", touch=lambda: marks.append("Old"))
+    repair.update_model(_document([obj]))
+    assert marks == ["Old"]
+
+
+def test_the_feature_that_failed_is_told_apart_from_the_ones_below_it(repair):
+    """A failed recompute takes its whole downstream out of the queue.
+
+    Reporting seven broken features hides that six of them are the
+    consequence of the first. Naming the one that actually failed is the
+    difference between a wall of red and one thing to go and fix.
+    """
+    culprit = _obj(
+        "Sketch002",
+        State=["Touched", "Invalid"],
+        getStatusString=lambda: "Wire is not closed",
+    )
+    downstream = _obj("Pocket001", State=["Touched"])
+    result = repair.update_model(_document([culprit, downstream]))
+    assert [name for name, _status, _kind in result["failed"]] == ["Sketch002"]
+    assert [name for name, _status, _kind in result["blocked"]] == ["Pocket001"]
+    assert result["failed"][0][1] == "Wire is not closed"
+
+
+def test_a_clean_document_reports_nothing_wrong(repair):
+    fine = _obj("Pad", State=["Up-to-date"])
+    assert repair.features_in_error(_document([fine])) == []
+
+
+def test_a_rebuild_that_throws_does_not_take_the_command_with_it(repair):
+    def explode(*_args):
+        raise RuntimeError("OCC said no")
+
+    document = types.SimpleNamespace(Objects=[], recompute=explode)
+    assert repair.update_model(document)["recomputed"] == 0
