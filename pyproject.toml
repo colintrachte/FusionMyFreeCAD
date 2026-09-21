@@ -37,3 +37,6 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # The fakes deliberately mirror Qt and FreeCAD naming.
 "tests/fake_freecad.py" = ["N802", "N803"]
+# The local patches quote upstream's source verbatim, including its line lengths.
+# Reflowing a literal would stop it matching the file it has to patch.
+"tools/sync_bundled_addons.py" = ["E501"]

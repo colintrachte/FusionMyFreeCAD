@@ -35,6 +35,11 @@ without a modal dialog the user cannot dismiss, and behaves the way the Fusion-s
 promises. They are re-applied mechanically by `tools/sync_bundled_addons.py` and asserted by
 `tests/test_package.py`, so an upstream refresh cannot drop them silently.
 
+`vendor/` holds a plain upstream checkout -- FreeCAD Ribbon at the 1.11.1 commit recorded in
+`vendor/FreeCAD-Ribbon/UPSTREAM-BASELINE.txt` -- and nothing is edited there by hand. Every
+difference between that checkout and `bundled-addons/` is one of the changes below, applied from
+`LOCAL_PATCHES`. A patch whose anchor upstream has moved raises rather than guessing.
+
 **Dependency removal**
 
 - SearchBar's optional XML preference indexing uses Python's standard-library
@@ -44,6 +49,24 @@ promises. They are re-applied mechanically by `tools/sync_bundled_addons.py` and
 - FreeCAD Ribbon's optional icon download and SearchBar's version lookup use `urllib`.
 - The `<depend type="python">` entries the above made unnecessary are stripped from both bundled
   `package.xml` files.
+
+**Startup answers its own questions**
+
+Upstream asks the user, through modal dialogs, whether it may build its command cache, rebuild it
+for a new data format, and rebuild it again when the interface language has changed. At startup
+those dialogs open behind the splash screen, where they cannot be seen, answered or dismissed. The
+bundled cache check makes the same decisions itself and reports what it is doing to the report
+view. The progress window it opens keeps its close button, so a cache build can be abandoned.
+
+While it was being read, the same module's icon download proved to write what it fetched over
+`setup.py`; it writes the icon to the icon directory instead. That code path is not reachable from
+the FusionMyFreeCAD interface.
+
+**Large icons are large**
+
+Upstream seeds a missing large-icon preference from the small-icon setting, so a profile that has
+never set one gets large ribbon buttons the size of small ones. The bundled copy seeds it from the
+large default.
 
 **The panel title opens the overflow drawer**
 
@@ -69,6 +92,19 @@ than upstream's. Only the hooks -- an import, a signal, the separator's construc
 read of `maxColumns`, and one connection -- are edits to upstream modules, and
 `tools/sync_bundled_addons.py` re-applies them from `LOCAL_PATCHES` while carrying `fmf_widgets.py`
 across the refresh.
+
+**Panels follow the window width, and remember what the user did to them**
+
+FusionMyFreeCAD drives the ribbon from its own layout, which the plain add-on knows nothing about.
+The binding gains the hooks that serve it: rebuilding the panels that declare width thresholds when
+the window crosses one, recording a layout the user has dragged into shape, keeping direct drag
+usable outside customize mode, honouring an authoritative layout's explicit overflow list, and
+offering **Reset this panel** in the drawer of a panel FusionMyFreeCAD owns.
+
+**A drag starts only once the pointer has travelled**
+
+Upstream starts a drag from any movement while the button is down, so a slow click on a ribbon
+command can tear it out of its panel. A drag now starts only past the platform's drag distance.
 
 **FreeCAD's command icons are curated**
 

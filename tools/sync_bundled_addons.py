@@ -544,18 +544,1068 @@ CUSTOM_WIDGETS_DRAG_PATCH = (
     ),
 )
 
+# Modifications that used to be edited straight into the ignored vendor snapshot,
+# where nothing re-applied them and nothing could tell them apart from upstream's
+# own code. They are patches like the rest now, so vendor/ can be a plain upstream
+# checkout and an upstream refresh either re-applies them or says which anchor moved.
+
+
+# The cache module, which upstream reaches the network from and interrogates the
+# user from. Three changes, in file order: the icon download uses urllib instead of
+# requests (and writes the icon it fetched rather than over setup.py); the progress
+# dialog keeps its close button; and the startup cache check regenerates what it
+# needs, reporting to the console, instead of putting modal questions behind the
+# splash screen where they cannot be seen or dismissed.
+CACHE_FUNCTIONS_PATCH = (
+    (
+        "import Serialize_Ribbon\n"
+        "import webbrowser\n"
+        "import StyleMapping_Ribbon\n"
+        "import requests\n"
+        "\n"
+        "# Get the resources\n"
+        "ConfigDirectory = Parameters.CONFIG_DIR\n",
+        "import Serialize_Ribbon\n"
+        "import webbrowser\n"
+        "import StyleMapping_Ribbon\n"
+        "from urllib.request import urlopen\n"
+        "\n"
+        "# Get the resources\n"
+        "ConfigDirectory = Parameters.CONFIG_DIR\n",
+    ),
+    (
+        "    progressBar.setWindowFlag(Qt.WindowType.CustomizeWindowHint, True)\n"
+        "    progressBar.setWindowFlag(Qt.WindowType.WindowMinMaxButtonsHint, False)\n"
+        "    progressBar.setWindowFlag(Qt.WindowType.WindowMinimizeButtonHint, True)\n"
+        "    progressBar.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)\n"
+        "    progressBar.setMinimumSize(400, 20)\n"
+        "\n"
+        "    # Get the stylesheet from the main window and use it for this form\n",
+        "    progressBar.setWindowFlag(Qt.WindowType.CustomizeWindowHint, True)\n"
+        "    progressBar.setWindowFlag(Qt.WindowType.WindowMinMaxButtonsHint, False)\n"
+        "    progressBar.setWindowFlag(Qt.WindowType.WindowMinimizeButtonHint, True)\n"
+        "    progressBar.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, True)\n"
+        "    progressBar.setMinimumSize(400, 20)\n"
+        "\n"
+        "    # Get the stylesheet from the main window and use it for this form\n",
+    ),
+    (
+        "# endregion---------------------------------------------------------------------------------------\n"
+        "\n"
+        "def DownLoadIcons():\n"
+        "    PathList = []\n"
+        "\n"
+        "    url = 'https://raw.githubusercontent.com/FreeCAD/FreeCAD/main/src/Gui/Icons/3dx_pivot.png'\n"
+        "    \n"
+        "    \n"
+        "    response = requests.get(url)\n"
+        "    response.raise_for_status() # proper handle HTTP errors\n"
+        "\n"
+        "    file_content = response.text\n"
+        '    print(f"HTTP status: {response.status_code}")\n'
+        "\n"
+        '    with open("setup.py", "w") as file:\n'
+        "        file.write(file_content)\n"
+        "\n"
+        "        \n"
+        "def CheckDataFileVersion():\n"
+        "    DataFileIsUpToDate = False\n"
+        "    \n"
+        "    # Check if there is a datafile. if not, ask the user to create one.\n"
+        '    DataFile = os.path.join(ConfigDirectory, "RibbonDataFile.dat")\n'
+        "    if os.path.exists(DataFile) is False:\n"
+        "        Question = translate(\n"
+        '            "FreeCAD Ribbon",\n'
+        '            "The first time, a data file must be generated!\\n"\n'
+        '            "This can take a while! Do you want to proceed?",\n'
+        "        )\n"
+        '        Answer = StandardFunctions.Mbox(Question, "FreeCAD Ribbon", 1, "Question")\n'
+        '        if Answer == "yes":\n'
+        "            CreateCache()\n"
+        "        else:\n"
+        "            return\n"
+        "\n"
+        "    # region - Load data------------------------------------------------------------------\n"
+        "    #\n"
+        "    Data = {}\n"
+        "    # read ribbon structure from JSON file\n"
+        '    with open(DataFile, "r") as file:\n'
+        "        Data.update(json.load(file))\n"
+        "    file.close()\n"
+        "\n"
+        "    DataUpdateNeeded = False\n"
+        "    try:\n"
+        '        FileVersion = Data["dataVersion"]\n'
+        "        if FileVersion != DataFileVersion:\n"
+        "            DataUpdateNeeded = True\n"
+        "    except Exception:\n"
+        "        DataUpdateNeeded = True\n"
+        "    if DataUpdateNeeded is True:\n"
+        "        Question = translate(\n"
+        '            "FreeCAD Ribbon",\n'
+        '            "The current data file is based on an older format!\\n"\n'
+        '            "It is important to update the data!\\n"\n'
+        '            "Do you want to proceed?\\n"\n'
+        '            "This can take a while!",\n'
+        "        )\n"
+        "\n"
+        '        Answer = StandardFunctions.Mbox(Question, "FreeCAD Ribbon", 1, "Question")\n'
+        '        if Answer == "yes":\n'
+        "            CreateCache()\n"
+        "\n"
+        "    # get the system language\n"
+        '    FreeCAD_preferences = App.ParamGet("User parameter:BaseApp/Preferences/General")\n'
+        "    try:\n"
+        '        FCLanguage = FreeCAD_preferences.GetString("Language")\n'
+        "        # Check if the language in the data file machtes the system language\n"
+        "        IsSystemLanguage = True\n"
+        '        if FCLanguage != Data["Language"]:\n'
+        "            IsSystemLanguage = False\n"
+        "        # If the languguage doesn't match, ask the user to update the data\n"
+        "        if IsSystemLanguage is False:\n"
+        "            Question = translate(\n"
+        '                "FreeCAD Ribbon",\n'
+        '                "The data was generated for a differernt language!\\n"\n'
+        '                "Do you want to update the data?\\n"\n'
+        '                "This can take a while!",\n'
+        "            )\n"
+        "\n"
+        "            Answer = StandardFunctions.Mbox(\n"
+        '                Question, "FreeCAD Ribbon", 1, "Question"\n'
+        "            )\n"
+        '            if Answer == "yes":\n'
+        "                CreateCache()                    \n"
+        "    except Exception:\n"
+        "        pass\n"
+        "\n"
+        "    # test if List_Commands is correct\n"
+        "    i = 5\n"
+        "    if len(List_Commands) > 0:\n"
+        "        for item in List_Commands:\n"
+        "            if len(item) < 5:\n"
+        "                i = len(item)\n"
+        "                break\n"
+        "    if i < 5:\n"
+        "        Question = translate(\n"
+        '            "FreeCAD Ribbon",\n'
+        '            "It seems that the data file is not up-to-date.\\n"\n'
+        '            "Do you want to update the data?\\n"\n'
+        '            "This can take a while!",\n'
+        "        )\n"
+        '        Answer = StandardFunctions.Mbox(Question, "FreeCAD Ribbon", 1, "Question")\n'
+        '        if Answer == "yes":\n'
+        "            DataFileIsUpToDate = CreateCache()\n"
+        "    \n"
+        "    return DataFileIsUpToDate",
+        "# endregion---------------------------------------------------------------------------------------\n"
+        "\n"
+        "def DownLoadIcons():\n"
+        "    url = 'https://raw.githubusercontent.com/FreeCAD/FreeCAD/main/src/Gui/Icons/3dx_pivot.png'\n"
+        "    with urlopen(url, timeout=15) as response:\n"
+        "        file_content = response.read()\n"
+        '        print(f"HTTP status: {response.status}")\n'
+        '    with open(os.path.join(pathIcons, "3dx_pivot.png"), "wb") as file:\n'
+        "        file.write(file_content)\n"
+        "\n"
+        "        \n"
+        "def CheckDataFileVersion():\n"
+        '    """Ensure the cache exists without putting a modal dialog behind other startup UI."""\n'
+        '    DataFile = os.path.join(ConfigDirectory, "RibbonDataFile.dat")\n'
+        '    language = App.ParamGet("User parameter:BaseApp/Preferences/General").GetString("Language")\n'
+        "\n"
+        "    def regenerate(reason):\n"
+        '        App.Console.PrintMessage("FreeCAD Ribbon: {} Generating command cache...\\n".format(reason))\n'
+        "        try:\n"
+        "            return bool(CreateCache())\n"
+        "        except Exception as error:\n"
+        '            App.Console.PrintWarning("FreeCAD Ribbon cache generation failed: {}\\n".format(error))\n'
+        "            return False\n"
+        "\n"
+        "    if not os.path.isfile(DataFile):\n"
+        '        if not regenerate("First startup."):\n'
+        "            return False\n"
+        "\n"
+        "    try:\n"
+        '        with open(DataFile, "r", encoding="utf-8") as file:\n'
+        "            data = json.load(file)\n"
+        "    except (OSError, ValueError, TypeError):\n"
+        '        if not regenerate("The existing cache is unreadable."):\n'
+        "            return False\n"
+        '        with open(DataFile, "r", encoding="utf-8") as file:\n'
+        "            data = json.load(file)\n"
+        "\n"
+        '    commands = data.get("List_Commands", [])\n'
+        "    stale = (\n"
+        '        data.get("dataVersion") != DataFileVersion\n'
+        '        or data.get("Language", "") != language\n'
+        "        or any(len(item) < 5 for item in commands)\n"
+        "    )\n"
+        "    if stale:\n"
+        '        return regenerate("The cache is out of date.")\n'
+        "    return True\n",
+    ),
+)
+
+
+# The colour helper, so the package needs no Matplotlib at runtime.
+STANDARD_FUNCTIONS_COLOUR_PATCH = (
+    (
+        "    ColorRGB:   [255,255,255]\n"
+        "    Alpha:      0-1\n"
+        '    """\n'
+        "    from matplotlib import colors as mcolors\n"
+        "\n"
+        "    ColorRed = ColorRGB[0] / 255\n"
+        "    colorGreen = ColorRGB[1] / 255\n"
+        "    colorBlue = ColorRGB[2] / 255\n"
+        "\n"
+        "    color = (ColorRed, colorGreen, colorBlue)\n"
+        "\n"
+        "    result = mcolors.to_rgba(color, Alpha)\n"
+        "    if Hex is True:\n"
+        "        result = mcolors.to_hex((ColorRed, colorGreen, colorBlue, Alpha), KeepHexAlpha)\n"
+        "\n"
+        "    return result\n"
+        "\n",
+        "    ColorRGB:   [255,255,255]\n"
+        "    Alpha:      0-1\n"
+        '    """\n'
+        "    ColorRed = ColorRGB[0] / 255\n"
+        "    colorGreen = ColorRGB[1] / 255\n"
+        "    colorBlue = ColorRGB[2] / 255\n"
+        "\n"
+        "    color = (ColorRed, colorGreen, colorBlue)\n"
+        "\n"
+        "    result = (ColorRed, colorGreen, colorBlue, Alpha)\n"
+        "    if Hex is True:\n"
+        "        channels = [ColorRed, colorGreen, colorBlue]\n"
+        "        if KeepHexAlpha:\n"
+        "            channels.append(Alpha)\n"
+        '        result = "#" + "".join("{:02x}".format(max(0, min(255, round(value * 255)))) for value in channels)\n'
+        "\n"
+        "    return result\n"
+        "\n",
+    ),
+    (
+        "    \n"
+        "def CompareIcons(icon1: QIcon, icon2: QIcon):\n"
+        '    icon1 = Gui.getIcon("Std_OnlineHelp")\n'
+        "    return (icon1.pixmap(icon1.actualSize(QSize(16,16))).toImage() == icon2.pixmap(icon2.actualSize(QSize(16,16))).toImage())",
+        "    \n"
+        "def CompareIcons(icon1: QIcon, icon2: QIcon):\n"
+        '    icon1 = Gui.getIcon("Std_OnlineHelp")\n'
+        "    return (icon1.pixmap(icon1.actualSize(QSize(16,16))).toImage() == icon2.pixmap(icon2.actualSize(QSize(16,16))).toImage())\n",
+    ),
+)
+
+
+# Upstream seeds a missing large-icon size from the small-icon setting, which
+# makes every large ribbon button come back the size of a small one.
+PARAMETERS_ICON_SIZE_PATCH = (
+    (
+        '        or Settings.GetIntSetting("IconSize_Large") == 0\n'
+        "    ):\n"
+        '        ICON_SIZE_LARGE = int(DefaultSettings["IconSize_Large"])\n'
+        '        Settings.SetIntSetting("IconSize_Large", ICON_SIZE_SMALL)\n'
+        '    ICON_SIZE_LARGE = Settings.GetIntSetting("IconSize_Large")\n'
+        "\n"
+        "    if (\n",
+        '        or Settings.GetIntSetting("IconSize_Large") == 0\n'
+        "    ):\n"
+        '        ICON_SIZE_LARGE = int(DefaultSettings["IconSize_Large"])\n'
+        '        Settings.SetIntSetting("IconSize_Large", ICON_SIZE_LARGE)\n'
+        '    ICON_SIZE_LARGE = Settings.GetIntSetting("IconSize_Large")\n'
+        "\n"
+        "    if (\n",
+    ),
+)
+
+
+# The panel grid helper, so the package needs no NumPy at runtime. It tracks a few
+# hundred booleans; Python lists are enough, and the search is the same search.
+PANEL_NUMPY_PATCH = (
+    (
+        "from pydoc import text\n"
+        "import re\n"
+        "from typing import Any, Callable, Dict, List, Union, overload\n"
+        "\n"
+        "import numpy as np\n"
+        "\n"
+        "from PySide.QtGui import QIcon, QKeySequence, QFontMetrics\n"
+        "from PySide.QtWidgets import (\n",
+        "from pydoc import text\n"
+        "import re\n"
+        "from typing import Any, Callable, Dict, List, Union, overload\n"
+        "\n"
+        "from PySide.QtGui import QIcon, QKeySequence, QFontMetrics\n"
+        "from PySide.QtWidgets import (\n",
+    ),
+    (
+        "        :param rows: The number of rows in the grid layout.\n"
+        '        """\n'
+        "        self.rows = rows\n"
+        "        self.cells = np.ones((rows, 1), dtype=bool)\n"
+        "\n"
+        "    def request_cells(\n"
+        "        self, rowSpan: int = 1, colSpan: int = 1, mode: RibbonSpaceFindMode = ColumnWise\n",
+        "        :param rows: The number of rows in the grid layout.\n"
+        '        """\n'
+        "        self.rows = rows\n"
+        "        self.cells = [[True] for _ in range(rows)]\n"
+        "\n"
+        "    def request_cells(\n"
+        "        self, rowSpan: int = 1, colSpan: int = 1, mode: RibbonSpaceFindMode = ColumnWise\n",
+    ),
+    (
+        "        if rowSpan > self.rows:\n"
+        '            raise ValueError("RowSpan is too large")\n'
+        "        if mode == ColumnWise:\n"
+        "            for row in range(self.cells.shape[0] - rowSpan + 1):\n"
+        "                for col in range(self.cells.shape[1] - colSpan + 1):\n"
+        "                    if self.cells[row : row + rowSpan, col : col + colSpan].all():\n"
+        "                        self.cells[row : row + rowSpan, col : col + colSpan] = False\n"
+        "                        return row, col\n"
+        "        else:\n"
+        "            for col in range(self.cells.shape[1]):\n"
+        "                if self.cells[0, col:].all():\n"
+        "                    if self.cells.shape[1] - col < colSpan:\n"
+        "                        self.cells = np.append(\n"
+        "                            self.cells,\n"
+        "                            np.ones(\n"
+        "                                (self.rows, colSpan - (self.cells.shape[1] - col)),\n"
+        "                                dtype=bool,\n"
+        "                            ),\n"
+        "                            axis=1,\n"
+        "                        )\n"
+        "                    self.cells[0, col:] = False\n"
+        "                    return 0, col\n"
+        "        cols = self.cells.shape[1]\n"
+        "        colSpan1 = colSpan\n"
+        "        if self.cells[:, -1].all():\n"
+        "            cols -= 1\n"
+        "            colSpan1 -= 1\n"
+        "        self.cells = np.append(\n"
+        "            self.cells, np.ones((self.rows, colSpan1), dtype=bool), axis=1\n"
+        "        )\n"
+        "        self.cells[:rowSpan, cols : cols + colSpan] = False\n"
+        "        return 0, cols\n"
+        "\n"
+        "\n",
+        "        if rowSpan > self.rows:\n"
+        '            raise ValueError("RowSpan is too large")\n'
+        "        if mode == ColumnWise:\n"
+        "            for row in range(len(self.cells) - rowSpan + 1):\n"
+        "                for col in range(len(self.cells[0]) - colSpan + 1):\n"
+        "                    if all(\n"
+        "                        self.cells[r][c]\n"
+        "                        for r in range(row, row + rowSpan)\n"
+        "                        for c in range(col, col + colSpan)\n"
+        "                    ):\n"
+        "                        for r in range(row, row + rowSpan):\n"
+        "                            for c in range(col, col + colSpan):\n"
+        "                                self.cells[r][c] = False\n"
+        "                        return row, col\n"
+        "        else:\n"
+        "            for col in range(len(self.cells[0])):\n"
+        "                if all(self.cells[0][col:]):\n"
+        "                    missing = colSpan - (len(self.cells[0]) - col)\n"
+        "                    if missing > 0:\n"
+        "                        for row in self.cells:\n"
+        "                            row.extend([True] * missing)\n"
+        "                    for c in range(col, len(self.cells[0])):\n"
+        "                        self.cells[0][c] = False\n"
+        "                    return 0, col\n"
+        "        cols = len(self.cells[0])\n"
+        "        colSpan1 = colSpan\n"
+        "        if all(row[-1] for row in self.cells):\n"
+        "            cols -= 1\n"
+        "            colSpan1 -= 1\n"
+        "        if colSpan1 > 0:\n"
+        "            for row in self.cells:\n"
+        "                row.extend([True] * colSpan1)\n"
+        "        for row in range(rowSpan):\n"
+        "            for col in range(cols, cols + colSpan):\n"
+        "                self.cells[row][col] = False\n"
+        "        return 0, cols\n"
+        "\n"
+        "\n",
+    ),
+)
+
+
+# A ribbon button only starts a drag once the pointer has moved past the platform's
+# drag distance, so a slow click on a command no longer tears it out of its panel.
+CUSTOM_WIDGETS_DRAG_THRESHOLD_PATCH = (
+    (
+        "    QGridLayout,\n"
+        "    QPushButton,\n"
+        "    QGraphicsEffect,\n"
+        ")\n"
+        "from PySide.QtCore import (\n"
+        "    Qt,\n",
+        "    QGridLayout,\n"
+        "    QPushButton,\n"
+        "    QGraphicsEffect,\n"
+        "    QApplication,\n"
+        ")\n"
+        "from PySide.QtCore import (\n"
+        "    Qt,\n",
+    ),
+    (
+        "        self.layout.setAlignment(Qt.AlignmentFlag.AlignLeft)\n"
+        "        self.setFixedSize(self.widget.size())\n"
+        "          \n"
+        "    def mouseMoveEvent(self, e):\n"
+        "        if e.buttons() == Qt.MouseButton.LeftButton:\n"
+        "            try:\n"
+        "                drag = QDrag(self)\n",
+        "        self.layout.setAlignment(Qt.AlignmentFlag.AlignLeft)\n"
+        "        self.setFixedSize(self.widget.size())\n"
+        "          \n"
+        "    def mousePressEvent(self, e):\n"
+        "        self._dragStartPosition = e.pos()\n"
+        "        QToolButton.mousePressEvent(self, e)\n"
+        "\n"
+        "    def mouseMoveEvent(self, e):\n"
+        '        start = getattr(self, "_dragStartPosition", None)\n'
+        "        if start is None:\n"
+        "            return\n"
+        "        if (e.pos() - start).manhattanLength() < QApplication.startDragDistance():\n"
+        "            return\n"
+        "        if e.buttons() == Qt.MouseButton.LeftButton:\n"
+        "            try:\n"
+        "                drag = QDrag(self)\n",
+    ),
+    (
+        "            Label_Text.setToolTip(CommandButton.toolTip())\n"
+        "\n"
+        "        btn.mouseMoveEvent = lambda mouseEvent: CustomControls.mouseMoveEvent(\n"
+        "            btn, mouseEvent\n"
+        "        )\n"
+        "\n",
+        "            Label_Text.setToolTip(CommandButton.toolTip())\n"
+        "\n"
+        "        btn.mouseMoveEvent = lambda mouseEvent: CustomControls.mouseMoveEvent(\n"
+        "            btn, mouseEvent\n"
+        "        )\n"
+        "        btn.mousePressEvent = lambda mouseEvent: CustomControls.mousePressEvent(\n"
+        "            btn, mouseEvent\n"
+        "        )\n"
+        "\n",
+    ),
+    (
+        "        btn.mouseMoveEvent = lambda mouseEvent: CustomControls.mouseMoveEvent(\n"
+        "            btn, mouseEvent\n"
+        "        )\n"
+        "        \n"
+        "        # Hide the text if set in preferences\n"
+        "        if showText is False:\n",
+        "        btn.mouseMoveEvent = lambda mouseEvent: CustomControls.mouseMoveEvent(\n"
+        "            btn, mouseEvent\n"
+        "        )\n"
+        "        btn.mousePressEvent = lambda mouseEvent: CustomControls.mousePressEvent(\n"
+        "            btn, mouseEvent\n"
+        "        )\n"
+        "        \n"
+        "        # Hide the text if set in preferences\n"
+        "        if showText is False:\n",
+    ),
+    (
+        "    def EmptyButton():\n"
+        "        btn = QToolButton()\n"
+        "        btn.mouseMoveEvent = lambda mouseEvent: CustomControls.mouseMoveEvent(\n"
+        "            btn, mouseEvent\n"
+        "        )\n"
+        "        return btn\n",
+        "    def EmptyButton():\n"
+        "        btn = QToolButton()\n"
+        "        btn.mouseMoveEvent = lambda mouseEvent: CustomControls.mouseMoveEvent(\n"
+        "            btn, mouseEvent\n"
+        "        )\n"
+        "        btn.mousePressEvent = lambda mouseEvent: CustomControls.mousePressEvent(\n"
+        "            btn, mouseEvent\n"
+        "        )\n"
+        "        return btn\n",
+    ),
+    (
+        "        \n"
+        "    def setClearButtonEnabled(self, enable: bool):\n"
+        "        self.lineEdit.setClearButtonEnabled(enable)\n"
+        "        return",
+        "        \n"
+        "    def setClearButtonEnabled(self, enable: bool):\n"
+        "        self.lineEdit.setClearButtonEnabled(enable)\n"
+        "        return\n",
+    ),
+)
+
+
+# FusionMyFreeCAD's hooks into the ribbon binding itself: rebuilding width-aware
+# panels when the window crosses a responsive tier, recording a layout the user has
+# dragged into shape, keeping direct drag usable outside customize mode, honouring
+# an authoritative layout's explicit overflow, and offering Reset this panel.
+FCBINDING_INTEGRATION_PATCH = (
+    (
+        '        with open(Parameters.RIBBON_STRUCTURE_JSON, "r") as file:\n'
+        "            self.ribbonStructure.update(json.load(file))\n"
+        "        file.close()\n"
+        "        \n"
+        '        DataFile2 = os.path.join(ConfigDirectory, "RibbonDataFile2.dat")\n'
+        "        if os.path.exists(DataFile2) is True:\n",
+        '        with open(Parameters.RIBBON_STRUCTURE_JSON, "r") as file:\n'
+        "            self.ribbonStructure.update(json.load(file))\n"
+        "        file.close()\n"
+        "        self._responsiveWidthTierValue = self._responsiveWidthTier()\n"
+        "        self._responsiveRebuildPending = False\n"
+        "        \n"
+        '        DataFile2 = os.path.join(ConfigDirectory, "RibbonDataFile2.dat")\n'
+        "        if os.path.exists(DataFile2) is True:\n",
+    ),
+    (
+        "        mw.menuBar().show()\n"
+        "        return True\n"
+        "\n"
+        "    def eventFilter(self, obj, event):\n"
+        "        # Disable the standard hover behavior\n"
+        "        if event.type() == QEvent.Type.HoverMove:\n",
+        "        mw.menuBar().show()\n"
+        "        return True\n"
+        "\n"
+        "    def _responsiveWidthTier(self, Dict=None):\n"
+        '        """Return the highest responsive command threshold reached by the window."""\n'
+        '        structure = Dict if isinstance(Dict, dict) else getattr(self, "ribbonStructure", {})\n'
+        "        thresholds = {0}\n"
+        '        for workbench in structure.get("workbenches", {}).values():\n'
+        '            for panel in workbench.get("toolbars", {}).values():\n'
+        "                if not isinstance(panel, dict):\n"
+        "                    continue\n"
+        '                for minimumWidth in panel.get("responsive", {}).values():\n'
+        "                    try:\n"
+        "                        thresholds.add(int(minimumWidth))\n"
+        "                    except (TypeError, ValueError):\n"
+        "                        continue\n"
+        "        width = mw.width()\n"
+        "        return max(threshold for threshold in thresholds if width >= threshold)\n"
+        "\n"
+        "    def _rebuildResponsivePanels(self):\n"
+        '        """Rebuild only width-aware panels after the window crosses a size tier."""\n'
+        "        self._responsiveRebuildPending = False\n"
+        "        if self.CustomizeEnabled:\n"
+        "            return\n"
+        "        workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())\n"
+        "        category = self.currentCategory()\n"
+        "        if workbenchName is None or category is None:\n"
+        "            return\n"
+        "        Dict = self.workBenchDict\n"
+        '        if workbenchName not in Dict.get("workbenches", {}):\n'
+        "            Dict = self.ribbonStructure\n"
+        '        definitions = Dict.get("workbenches", {}).get(workbenchName, {}).get("toolbars", {})\n'
+        "        for panel in list(category.panels().values()):\n"
+        '            if not definitions.get(panel.objectName(), {}).get("responsive"):\n'
+        "                continue\n"
+        "            replacement = self.CreatePanel(\n"
+        "                workbenchName,\n"
+        "                panel.objectName(),\n"
+        "                addPanel=False,\n"
+        "                Dict=Dict,\n"
+        "                ignoreColumnLimit=False,\n"
+        "                showEnableControl=False,\n"
+        "                enableSeparator=False,\n"
+        "                ActivateButtons=True,\n"
+        "            )\n"
+        "            if replacement is None:\n"
+        "                continue\n"
+        "            category.replacePanel(panel, replacement)\n"
+        "            category._panels[replacement.title()] = replacement\n"
+        "            self.setPanelProperties(replacement)\n"
+        "            panel.close()\n"
+        "\n"
+        "    def resizeEvent(self, event):\n"
+        "        super().resizeEvent(event)\n"
+        "        tier = self._responsiveWidthTier()\n"
+        '        previousTier = getattr(self, "_responsiveWidthTierValue", tier)\n'
+        "        self._responsiveWidthTierValue = tier\n"
+        '        if tier == previousTier or getattr(self, "_responsiveRebuildPending", False):\n'
+        "            return\n"
+        "        self._responsiveRebuildPending = True\n"
+        "        QTimer.singleShot(75, self._rebuildResponsivePanels)\n"
+        "\n"
+        "    def eventFilter(self, obj, event):\n"
+        "        # Disable the standard hover behavior\n"
+        "        if event.type() == QEvent.Type.HoverMove:\n",
+    ),
+    (
+        "            \n"
+        "                    \n"
+        "        # update the ribbonstructure before writing it to disk\n"
+        '        if "quickAccessCommands" in self.workBenchDict:\n'
+        '            self.ribbonStructure["quickAccessCommands"] = self.workBenchDict["quickAccessCommands"]\n'
+        '        if "newPanels" in self.workBenchDict:\n',
+        "            \n"
+        "                    \n"
+        "        # update the ribbonstructure before writing it to disk\n"
+        "        # FusionMyFreeCAD panels declare a stable number of pinned commands. In\n"
+        "        # Arrange mode every menu command is shown, so the user's final order\n"
+        "        # determines which commands remain on the face of the panel.\n"
+        '        for workbench in self.workBenchDict.get("authoritativeWorkbenches", []):\n'
+        '            toolbars = self.workBenchDict.get("workbenches", {}).get(workbench, {}).get("toolbars", {})\n'
+        "            for panelName, toolbar in toolbars.items():\n"
+        '                if not isinstance(toolbar, dict) or "pinCount" not in toolbar:\n'
+        "                    continue\n"
+        '                order = list(toolbar.get("order", []))\n'
+        '                pinCount = max(0, min(int(toolbar.get("pinCount", 0)), len(order)))\n'
+        '                toolbar["overflow"] = order[pinCount:]\n'
+        '                toolbar["panelMenu"] = list(order)\n'
+        '        if "quickAccessCommands" in self.workBenchDict:\n'
+        '            self.ribbonStructure["quickAccessCommands"] = self.workBenchDict["quickAccessCommands"]\n'
+        '        if "newPanels" in self.workBenchDict:\n',
+    ),
+    (
+        '            self.ribbonStructure["customToolbars"] = self.workBenchDict["customToolbars"]\n'
+        "        \n"
+        '        for WorkBench in self.workBenchDict["workbenches"].keys():\n'
+        '            self.ribbonStructure["workbenches"][WorkBench] == self.workBenchDict["workbenches"][WorkBench]\n'
+        "        \n"
+        "        # CopyDict = {}\n"
+        '        # for WorkBench in self.workBenchDict["workbenches"].keys():\n',
+        '            self.ribbonStructure["customToolbars"] = self.workBenchDict["customToolbars"]\n'
+        "        \n"
+        '        for WorkBench in self.workBenchDict["workbenches"].keys():\n'
+        '            self.ribbonStructure["workbenches"][WorkBench] = self.workBenchDict["workbenches"][WorkBench]\n'
+        "        \n"
+        "        # CopyDict = {}\n"
+        '        # for WorkBench in self.workBenchDict["workbenches"].keys():\n',
+    ),
+    (
+        "        JsonFile = Parameters.RIBBON_STRUCTURE_JSON\n"
+        '        with open(JsonFile, "w") as outfile:\n'
+        "            json.dump(self.ribbonStructure, outfile, indent=4)\n"
+        "                \n"
+        "        # Close the temporary document\n"
+        "        try:\n",
+        "        JsonFile = Parameters.RIBBON_STRUCTURE_JSON\n"
+        '        with open(JsonFile, "w") as outfile:\n'
+        "            json.dump(self.ribbonStructure, outfile, indent=4)\n"
+        "        try:\n"
+        "            import fusion_bootstrap\n"
+        "\n"
+        "            fusion_bootstrap.record_customization(self.ribbonStructure)\n"
+        "        except (ImportError, AttributeError):\n"
+        "            # FreeCAD-Ribbon is also usable without FusionMyFreeCAD.\n"
+        "            pass\n"
+        "                \n"
+        "        # Close the temporary document\n"
+        "        try:\n",
+    ),
+    (
+        '    AddCommand_ActionData = ""\n'
+        "    AddCommand_Icon = None\n"
+        '    AddCommand_Text = ""\n'
+        "    \n"
+        "    def dragEnterEvent(self, event: QDragEnterEvent):         \n"
+        "        if self.CustomizeEnabled is True:\n"
+        "            if self.dragIndicator_QuickAccess is None:\n"
+        '                self.dragIndicator_QuickAccess = DragTargetIndicator(orientation="right")\n'
+        "            \n",
+        '    AddCommand_ActionData = ""\n'
+        "    AddCommand_Icon = None\n"
+        '    AddCommand_Text = ""\n'
+        "\n"
+        "    def _ensureDirectDragState(self):\n"
+        '        """Use the live ribbon structure as the editable model for direct dragging."""\n'
+        '        if self.workBenchDict.get("workbenches") is self.ribbonStructure.get("workbenches"):\n'
+        "            return\n"
+        "        for key in (\n"
+        '            "workbenches",\n'
+        '            "quickAccessCommands",\n'
+        '            "newPanels",\n'
+        '            "dropdownButtons",\n'
+        '            "ignoredToolbars",\n'
+        '            "ignoredWorkbenches",\n'
+        '            "iconOnlyToolbars",\n'
+        '            "customToolbars",\n'
+        '            "authoritativeWorkbenches",\n'
+        "        ):\n"
+        "            if key in self.ribbonStructure:\n"
+        "                self.workBenchDict[key] = self.ribbonStructure[key]\n"
+        "\n"
+        "    def _saveDirectDragState(self):\n"
+        '        """Persist a completed drop immediately; direct manipulation has no edit mode."""\n'
+        '        self.ribbonStructure["workbenches"] = self.workBenchDict["workbenches"]\n'
+        '        self.ribbonStructure["quickAccessCommands"] = self.workBenchDict.get(\n'
+        '            "quickAccessCommands", []\n'
+        "        )\n"
+        '        for workbench in self.workBenchDict.get("authoritativeWorkbenches", []):\n'
+        '            toolbars = self.workBenchDict["workbenches"].get(workbench, {}).get("toolbars", {})\n'
+        "            for toolbar in toolbars.values():\n"
+        "                if not isinstance(toolbar, dict):\n"
+        "                    continue\n"
+        '                order = list(toolbar.get("order", []))\n'
+        '                if "panelMenu" in toolbar:\n'
+        '                    toolbar["panelMenu"] = list(order)\n'
+        '                if "pinCount" in toolbar:\n'
+        '                    pinCount = max(0, min(int(toolbar["pinCount"]), len(order)))\n'
+        '                    pinned = [item for item in order if item not in toolbar.get("overflow", [])]\n'
+        '                    toolbar["overflow"] = [\n'
+        "                        item for item in order if item not in pinned[:pinCount]\n"
+        "                    ]\n"
+        '        with open(Parameters.RIBBON_STRUCTURE_JSON, "w") as outfile:\n'
+        "            json.dump(self.ribbonStructure, outfile, indent=4)\n"
+        "        try:\n"
+        "            import fusion_bootstrap\n"
+        "\n"
+        "            fusion_bootstrap.record_customization(self.ribbonStructure)\n"
+        "        except (ImportError, AttributeError):\n"
+        "            pass\n"
+        "\n"
+        "    def _resetOnePanel(self, panel):\n"
+        '        """Restore one FMF panel while retaining every other customization."""\n'
+        "        try:\n"
+        "            import fusion_bootstrap\n"
+        "\n"
+        "            workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())\n"
+        "            panelName = panel.objectName()\n"
+        "            ribbon = fusion_bootstrap.reset_panel_customization(workbenchName, panelName)\n"
+        "            self.ribbonStructure.clear()\n"
+        "            self.ribbonStructure.update(ribbon)\n"
+        "            self.workBenchDict.clear()\n"
+        "            self._ensureDirectDragState()\n"
+        "            replacement = self.CreatePanel(\n"
+        "                workbenchName,\n"
+        "                panelName,\n"
+        "                addPanel=False,\n"
+        "                Dict=self.workBenchDict,\n"
+        "                ignoreColumnLimit=False,\n"
+        "                showEnableControl=False,\n"
+        "                enableSeparator=False,\n"
+        "                ActivateButtons=True,\n"
+        "            )\n"
+        "            self.currentCategory().replacePanel(panel, replacement)\n"
+        "            self.setPanelProperties(replacement)\n"
+        "            self.currentCategory()._panels[replacement.objectName()] = replacement\n"
+        "            panel.close()\n"
+        "            App.Console.PrintMessage(\n"
+        '                "FusionMyFreeCAD reset the {} panel.\\n".format(replacement.title())\n'
+        "            )\n"
+        "        except (ImportError, AttributeError):\n"
+        "            return\n"
+        "    \n"
+        "    def dragEnterEvent(self, event: QDragEnterEvent):         \n"
+        "        self._ensureDirectDragState()\n"
+        "        if self.CustomizeEnabled is True or self.workBenchDict:\n"
+        "            if self.dragIndicator_QuickAccess is None:\n"
+        '                self.dragIndicator_QuickAccess = DragTargetIndicator(orientation="right")\n'
+        "            \n",
+        1,
+        "    def _ensureDirectDragState(self):\n",
+    ),
+    (
+        "        return\n"
+        "                       \n"
+        "    def dragLeaveEvent(self, event: QDragLeaveEvent):\n"
+        "        if self.CustomizeEnabled is True:\n"
+        "            # Hide the drag indicator when you leave the drag area\n"
+        "            self.dragIndicator_Buttons.close()\n"
+        "            self.dragIndicator_Panels.close()\n",
+        "        return\n"
+        "                       \n"
+        "    def dragLeaveEvent(self, event: QDragLeaveEvent):\n"
+        "        if self.CustomizeEnabled is True or self.workBenchDict:\n"
+        "            # Hide the drag indicator when you leave the drag area\n"
+        "            self.dragIndicator_Buttons.close()\n"
+        "            self.dragIndicator_Panels.close()\n",
+    ),
+    (
+        "        return\n"
+        "     \n"
+        "    def dragMoveEvent(self, event: QDragMoveEvent):\n"
+        "        if self.CustomizeEnabled is True:\n"
+        "            widget = event.source()\n"
+        "            \n"
+        "             # If you drag and drop a new command, you actually dragging the complete QListWidget\n",
+        "        return\n"
+        "     \n"
+        "    def dragMoveEvent(self, event: QDragMoveEvent):\n"
+        "        self._ensureDirectDragState()\n"
+        "        if self.CustomizeEnabled is True or self.workBenchDict:\n"
+        "            widget = event.source()\n"
+        "            \n"
+        "             # If you drag and drop a new command, you actually dragging the complete QListWidget\n",
+    ),
+    (
+        "                                    control = gridLayout.itemAt(n).widget().findChild(CustomControls)\n"
+        "                                    separator = gridLayout.itemAt(n).widget().findChild(CustomSeparator)\n"
+        "                                    if control is not None and type(control) is CustomControls:\n"
+        "                                        OrderList_Compare.append(self.ReturnCommand_string(Dict=self.workBenchDict, panel=panel, widget=control))\n"
+        "                                    if separator is not None and type(separator) is CustomSeparator:\n"
+        "                                        OrderList_Compare.append(separator.objectName())\n"
+        "                                if OrderList != OrderList_Compare:\n"
+        "                                    OrderList = OrderList_Compare\n"
+        "                                \n"
+        "                                # Get the indexes of the widgets\n"
+        "                                index_originalWidget = OrderList.index(self.ReturnCommand_string(Dict=self.workBenchDict, panel=panel, widget=OriginalWidget)) # This is the location were will be dropped\n"
+        "                                if DraggedWidget is not None:\n"
+        "                                    index_newWidget = OrderList.index(self.ReturnCommand_string(Dict=self.workBenchDict, panel=panel, widget=DraggedWidget)) # This is the original location of the dragged widget                                                        \n",
+        "                                    control = gridLayout.itemAt(n).widget().findChild(CustomControls)\n"
+        "                                    separator = gridLayout.itemAt(n).widget().findChild(CustomSeparator)\n"
+        "                                    if control is not None and type(control) is CustomControls:\n"
+        "                                        OrderList_Compare.append(self.ReturnCommand_string(Dict=self.workBenchDict, panel=panel, widget=control))\n"
+        "                                    if separator is not None and type(separator) is CustomSeparator:\n"
+        "                                        OrderList_Compare.append(separator.objectName())\n"
+        '                                if OrderList != OrderList_Compare and not self.workBenchDict["workbenches"][workbenchName]["toolbars"][title].get("overflow"):\n'
+        "                                    OrderList = OrderList_Compare\n"
+        "                                \n"
+        "                                # Get the indexes of the widgets\n"
+        "                                index_originalWidget = OrderList.index(self.ReturnCommand_string(Dict=self.workBenchDict, panel=panel, widget=OriginalWidget)) # This is the location were will be dropped\n"
+        "                                if DraggedWidget is not None:\n"
+        "                                    index_newWidget = OrderList.index(self.ReturnCommand_string(Dict=self.workBenchDict, panel=panel, widget=DraggedWidget)) # This is the original location of the dragged widget                                                        \n",
+    ),
+    (
+        "                                                            \n"
+        "                        # Create a new panel\n"
+        "                        workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())\n"
+        "                        newPanel = self.CreatePanel(workbenchName, panel.objectName(), addPanel=False, Dict=self.workBenchDict, ignoreColumnLimit=True, showEnableControl=True, enableSeparator=True, ActivateButtons=True)\n"
+        "                                                \n"
+        "                        # Add the panel to the list with long panels\n"
+        "                        if newPanel.panelOptionButton().isVisible():\n",
+        "                                                            \n"
+        "                        # Create a new panel\n"
+        "                        workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())\n"
+        "                        newPanel = self.CreatePanel(workbenchName, panel.objectName(), addPanel=False, Dict=self.workBenchDict, ignoreColumnLimit=False, showEnableControl=False, enableSeparator=False, ActivateButtons=True)\n"
+        "                                                \n"
+        "                        # Add the panel to the list with long panels\n"
+        "                        if newPanel.panelOptionButton().isVisible():\n",
+    ),
+    (
+        "                        \n"
+        "                        # Enable all buttons, so you can access them with a right click\n"
+        "                        self.activateButtons()\n"
+        "                        \n"
+        "                        event.accept()\n"
+        "                        return\n",
+        "                        \n"
+        "                        # Enable all buttons, so you can access them with a right click\n"
+        "                        self.activateButtons()\n"
+        "                        self._saveDirectDragState()\n"
+        "                        \n"
+        "                        event.accept()\n"
+        "                        return\n",
+    ),
+    (
+        "                \n"
+        "                # Close the drag indicator\n"
+        "                self.dragIndicator_Panels.close()\n"
+        "            except Exception as e:\n"
+        "                if Parameters.DEBUG_MODE:\n"
+        "                    print(e.with_traceback(e.__traceback__))\n",
+        "                \n"
+        "                # Close the drag indicator\n"
+        "                self.dragIndicator_Panels.close()\n"
+        "                self._saveDirectDragState()\n"
+        "            except Exception as e:\n"
+        "                if Parameters.DEBUG_MODE:\n"
+        "                    print(e.with_traceback(e.__traceback__))\n",
+    ),
+    (
+        "\n"
+        "        workbench = Gui.getWorkbench(workbenchName)\n"
+        "        # Get the list of toolbars from the active workbench\n"
+        "        ListToolbars: list = workbench.listToolbars()\n"
+        "        # Get custom toolbars that are created in the toolbar environment and add them to the list of toolbars\n"
+        "        CustomToolbars = self.List_ReturnCustomToolbars()\n"
+        "        for CustomToolbar in CustomToolbars:\n",
+        "\n"
+        "        workbench = Gui.getWorkbench(workbenchName)\n"
+        "        # Get the list of toolbars from the active workbench\n"
+        "        # FusionMyFreeCAD can provide a complete replacement for selected\n"
+        "        # workbenches.  In that case do not rediscover native toolbars and\n"
+        "        # append them after the configured panels.\n"
+        '        if workbenchName in Dict.get("authoritativeWorkbenches", []):\n'
+        "            ListToolbars: list = []\n"
+        "        else:\n"
+        "            ListToolbars: list = workbench.listToolbars()\n"
+        "        # Get custom toolbars that are created in the toolbar environment and add them to the list of toolbars\n"
+        "        CustomToolbars = self.List_ReturnCustomToolbars()\n"
+        "        for CustomToolbar in CustomToolbars:\n",
+    ),
+    (
+        '                OrderList: list = Dict["workbenches"][\n'
+        "                    workbenchName\n"
+        '                ]["toolbars"][panelName]["order"]\n'
+        "                \n"
+        "                # XXX check that positionsList consists of strings only\n"
+        "                def sortButtons(button: QToolButton):\n",
+        '                OrderList: list = Dict["workbenches"][\n'
+        "                    workbenchName\n"
+        '                ]["toolbars"][panelName]["order"]\n'
+        "                # FreeCAD-Ribbon can prune commands that register after its\n"
+        "                # initial toolbar scan. FMF's complete panelMenu remains the\n"
+        "                # authoritative order and prevents late commands such as\n"
+        "                # Create Sketch from wandering to the right edge.\n"
+        '                if workbenchName in Dict.get("authoritativeWorkbenches", []):\n'
+        '                    panelMenuOrder = Dict["workbenches"][workbenchName]["toolbars"][\n'
+        "                        panelName\n"
+        '                    ].get("panelMenu", [])\n'
+        "                    if panelMenuOrder:\n"
+        "                        OrderList = list(panelMenuOrder)\n"
+        '                        Dict["workbenches"][workbenchName]["toolbars"][panelName][\n'
+        '                            "order"\n'
+        "                        ] = list(OrderList)\n"
+        "                \n"
+        "                # XXX check that positionsList consists of strings only\n"
+        "                def sortButtons(button: QToolButton):\n",
+    ),
+    (
+        "        # Set the maximum columns\n"
+        "        maxColumns = Parameters.MAX_COLUMN_PANELS\n"
+        "\n"
+        "        # Define an action list of the actions that are byond the maximum columns\n"
+        "        ButtonList = []\n"
+        "\n"
+        "        # Go through the button list:\n"
+        "        for i in range(len(allButtons)):\n"
+        "            button = allButtons[i]\n"
+        "            CommandName = button.objectName()\n"
+        "            \n"
+        "            # count the number of buttons per type. Needed for proper sorting the buttons later.\n"
+        '            buttonSize = "small"\n',
+        "        # Set the maximum columns\n"
+        "        maxColumns = Parameters.MAX_COLUMN_PANELS\n"
+        "\n"
+        "        # Define an action list of the actions that are beyond the maximum columns\n"
+        "        ButtonList = []\n"
+        "        PanelMenuButtons = []\n"
+        "        panelDefinition = (\n"
+        '            Dict.get("workbenches", {})\n'
+        "            .get(workbenchName, {})\n"
+        '            .get("toolbars", {})\n'
+        "            .get(panelName, {})\n"
+        "        )\n"
+        '        explicitPanelMenu = set(panelDefinition.get("panelMenu", []))\n'
+        '        explicitOverflow = set(panelDefinition.get("overflow", []))\n'
+        '        responsiveCommands = panelDefinition.get("responsive", {})\n'
+        "\n"
+        "        # Go through the button list:\n"
+        "        for i in range(len(allButtons)):\n"
+        "            button = allButtons[i]\n"
+        "            CommandName = button.objectName()\n"
+        "\n"
+        "            if CommandName in explicitPanelMenu:\n"
+        "                PanelMenuButtons.append(button)\n"
+        "            \n"
+        "            # count the number of buttons per type. Needed for proper sorting the buttons later.\n"
+        '            buttonSize = "small"\n',
+        1,
+        "        # Define an action list of the actions that are beyond the maximum columns\n",
+    ),
+    (
+        "            elif shadowList.__contains__(CommandName) is True:                \n"
+        "                continue\n"
+        "            else:\n"
+        "                # If the number of columns is more than allowed,\n"
+        "                # Add the actions to the OptionPanel instead.\n"
+        "                if maxColumns > 0 and ignoreColumnLimit is False:\n",
+        "            elif shadowList.__contains__(CommandName) is True:                \n"
+        "                continue\n"
+        "            else:\n"
+        "                # Explicit overflow is the user-facing command inventory for a\n"
+        "                # panel. Ignore it only while arranging, when the complete panel\n"
+        "                # must be visible and draggable.\n"
+        "                minimumResponsiveWidth = responsiveCommands.get(CommandName)\n"
+        "                responsiveVisible = False\n"
+        "                try:\n"
+        "                    responsiveVisible = (\n"
+        "                        minimumResponsiveWidth is not None\n"
+        "                        and mw.width() >= int(minimumResponsiveWidth)\n"
+        "                    )\n"
+        "                except (TypeError, ValueError):\n"
+        "                    pass\n"
+        "                if (\n"
+        "                    CommandName in explicitOverflow\n"
+        "                    and not responsiveVisible\n"
+        "                    and ignoreColumnLimit is False\n"
+        "                ):\n"
+        "                    ButtonList.append(button)\n"
+        "                    panel.panelOptionButton().show()\n"
+        "                    continue\n"
+        "                # If the number of columns is more than allowed,\n"
+        "                # Add the actions to the OptionPanel instead.\n"
+        "                if maxColumns > 0 and ignoreColumnLimit is False:\n",
+        1,
+        "                # Explicit overflow is the user-facing command inventory for a\n",
+    ),
+    (
+        "            EnableControl.setHidden(True)\n"
+        "\n"
+        "        # Setup the panelOptionButton\n"
+        "        panel = self.PopulateOverflowMenu(panel, ButtonList)\n"
+        "                \n"
+        "        # Add a spacer. Otherwise alignment of a panel with one button will always be to the top\n"
+        "        # if len(allButtons) == 1:\n",
+        "            EnableControl.setHidden(True)\n"
+        "\n"
+        "        # Setup the panelOptionButton\n"
+        "        panel = self.PopulateOverflowMenu(\n"
+        "            panel, PanelMenuButtons if explicitPanelMenu else ButtonList\n"
+        "        )\n"
+        "                \n"
+        "        # Add a spacer. Otherwise alignment of a panel with one button will always be to the top\n"
+        "        # if len(allButtons) == 1:\n",
+    ),
+    (
+        "            Menu = CustomControls.CustomOptionMenu(\n"
+        "                OptionButton.menu(), actionList, self\n"
+        "            )\n"
+        "            OptionButton.setMenu(Menu)\n"
+        "            StyleSheet_Menu = (\n"
+        '                "* {font-size: " + str(Parameters.FONTSIZE_MENUS) + "px;}"\n',
+        "            Menu = CustomControls.CustomOptionMenu(\n"
+        "                OptionButton.menu(), actionList, self\n"
+        "            )\n"
+        "            workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())\n"
+        '            if workbenchName in self.ribbonStructure.get("authoritativeWorkbenches", []):\n'
+        "                Menu.addSeparator()\n"
+        "                resetAction = Menu.addAction(\n"
+        '                    translate("FreeCAD Ribbon", "Reset this panel")\n'
+        "                )\n"
+        "                resetAction.triggered.connect(lambda checked=False, item=panel: self._resetOnePanel(item))\n"
+        "            OptionButton.setMenu(Menu)\n"
+        "            StyleSheet_Menu = (\n"
+        '                "* {font-size: " + str(Parameters.FONTSIZE_MENUS) + "px;}"\n',
+    ),
+)
+
+
+# Order matters within a file: the patches recovered from the old vendor snapshot
+# run first, because the hooks below were written against a tree that already had
+# them and anchor on lines they restore.
 LOCAL_PATCHES = (
     (
         ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "panel.py"),
-        PANEL_TITLE_DRAWER_PATCH + PANEL_DIVIDER_PATCH,
+        PANEL_NUMPY_PATCH + PANEL_TITLE_DRAWER_PATCH + PANEL_DIVIDER_PATCH,
     ),
     (
         ("FreeCAD-Ribbon", "FCBinding.py"),
-        FCBINDING_DIVIDER_PATCH + FCBINDING_OVERFLOW_PATCH + FCBINDING_ACTIVATE_PATCH,
+        FCBINDING_INTEGRATION_PATCH
+        + FCBINDING_DIVIDER_PATCH
+        + FCBINDING_OVERFLOW_PATCH
+        + FCBINDING_ACTIVATE_PATCH,
     ),
     (
         ("FreeCAD-Ribbon", "CustomWidgets.py"),
-        CUSTOM_WIDGETS_DRAG_PATCH,
+        CUSTOM_WIDGETS_DRAG_THRESHOLD_PATCH + CUSTOM_WIDGETS_DRAG_PATCH,
+    ),
+    (
+        ("FreeCAD-Ribbon", "CacheFunctions.py"),
+        CACHE_FUNCTIONS_PATCH,
+    ),
+    (
+        ("FreeCAD-Ribbon", "Standard_Functions_Ribbon.py"),
+        STANDARD_FUNCTIONS_COLOUR_PATCH,
+    ),
+    (
+        ("FreeCAD-Ribbon", "Parameters_Ribbon.py"),
+        PARAMETERS_ICON_SIZE_PATCH,
     ),
 )
 
@@ -582,32 +1632,57 @@ def restore_fmf_files(saved: dict[tuple, bytes]) -> None:
         path.write_bytes(content)
 
 
-def patch_marker(anchor: str, replacement: str) -> str | None:
-    """The first whole line a patch introduces, or None when it only removes.
+def line_run(lines: list[str], block: list[str]) -> int:
+    """How many times `block` occurs in `lines` as a run of whole lines."""
+    if not block:
+        return 0
+    span = len(block)
+    return sum(1 for start in range(len(lines) - span + 1) if lines[start : start + span] == block)
+
+
+def patch_is_applied(
+    text: str,
+    lines: list[str],
+    anchor: str,
+    replacement: str,
+    expected: int,
+    proof: str | None = None,
+) -> bool:
+    """Whether this patch has already been made to `text`.
+
+    The evidence is the replacement standing in the file as a run of whole
+    lines, once per site the patch covers.
 
     Substring tests are not safe here. Upstream repeats the same drag handler at
     two indentation levels, so the shallower patch's text is a substring of the
     deeper one's, and checking `replacement in text` let an applied patch mask an
     unapplied one -- four of the five drag sites were silently skipped that way.
-    Some patches also insert around their anchor rather than consuming it, so the
-    anchor surviving proves nothing either way. Comparing a whole line against
-    the file's lines avoids both traps.
+    Comparing whole lines keeps the two apart, because the indentation is part of
+    the line.
+
+    Looking for a single line the patch introduces is not safe either: several
+    patches add a call that upstream already makes somewhere else in the same
+    file, and that line would read as "already applied" before the patch had run
+    even once.
+
+    A patch that only deletes introduces nothing, but its replacement is the
+    surrounding context with the removed lines gone, which is a run that appears
+    only once the deletion has been made.
+
+    Where that is genuinely impossible -- a later patch editing inside code this
+    one introduces, so the run is broken by design -- the patch names a `proof`
+    line instead: one line only it can have put there.
     """
+    if proof is not None:
+        return proof in lines
+    block = replacement.splitlines(keepends=True)
     anchor_lines = set(anchor.splitlines(keepends=True))
-    for line in replacement.splitlines(keepends=True):
-        if line not in anchor_lines and line.strip():
-            return line
-    return None
-
-
-def patch_is_applied(text: str, lines: list[str], anchor: str, replacement: str) -> bool:
-    """Whether this patch has already been made to `text`."""
-    marker = patch_marker(anchor, replacement)
-    if marker is not None:
-        return marker in lines
-    # A patch that only deletes introduces nothing to look for, so the absence
-    # of what it removes is the only evidence available.
-    return anchor not in text
+    if not [line for line in block if line.strip() and line not in anchor_lines]:
+        # A patch that only deletes leaves a replacement that is part of its own
+        # anchor, so the run matches whether or not the patch has run. What it
+        # removes being gone is the only evidence there is.
+        return anchor not in text
+    return line_run(lines, block) == expected
 
 
 def apply_local_patches() -> list[str]:
@@ -622,11 +1697,16 @@ def apply_local_patches() -> list[str]:
         path = DESTINATION_ROOT.joinpath(*parts)
         text = path.read_text(encoding="utf-8")
         for patch in patches:
-            # A patch is (anchor, replacement), or (anchor, replacement, count)
-            # where upstream repeats the same code, as the drag handlers do.
+            # A patch is (anchor, replacement); (anchor, replacement, count) where
+            # upstream repeats the same code, as the drag handlers do; or
+            # (anchor, replacement, count, proof) where a later patch edits inside
+            # this one's replacement and `proof` is the line that shows it ran.
             anchor, replacement = patch[0], patch[1]
             expected = patch[2] if len(patch) > 2 else 1
-            if patch_is_applied(text, text.splitlines(keepends=True), anchor, replacement):
+            proof = patch[3] if len(patch) > 3 else None
+            if patch_is_applied(
+                text, text.splitlines(keepends=True), anchor, replacement, expected, proof
+            ):
                 continue
             if text.count(anchor) != expected:
                 raise RuntimeError(
