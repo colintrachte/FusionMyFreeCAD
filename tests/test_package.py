@@ -488,15 +488,19 @@ def test_every_local_ui_patch_is_present_in_the_bundled_tree():
     sync = _sync_tool()
     for parts, patches in sync.LOCAL_PATCHES:
         text = BUNDLED.joinpath(*parts).read_text(encoding="utf-8")
+        lines = text.splitlines(keepends=True)
         for patch in patches:
-            # (anchor, replacement) or (anchor, replacement, occurrences).
-            # Presence is the invariant, not a count: where upstream repeats a
-            # handler the shorter replacement is a substring of the longer one,
-            # and some patches insert around their anchor rather than consuming
-            # it, so counting either side compares the wrong things.
+            # Ask the tool itself whether the patch reads as applied, rather than
+            # testing for the replacement here. A substring test compares the
+            # wrong things: where upstream repeats a handler the shorter
+            # replacement is a substring of the longer one, a patch that only
+            # deletes leaves a replacement that is part of its own anchor, and a
+            # later patch may edit inside an earlier one's replacement.
             anchor, replacement = patch[0], patch[1]
-            assert replacement in text, "{} is missing a local patch: {}".format(
-                parts[-1], anchor.strip().splitlines()[0]
+            expected = patch[2] if len(patch) > 2 else 1
+            proof = patch[3] if len(patch) > 3 else None
+            assert sync.patch_is_applied(text, lines, anchor, replacement, expected, proof), (
+                "{} is missing a local patch: {}".format(parts[-1], anchor.strip().splitlines()[0])
             )
 
 
@@ -519,13 +523,18 @@ def test_no_local_hook_probes_a_ribbon_panel_with_getattr():
     """
     offenders = []
     for parts, patches in _sync_tool().LOCAL_PATCHES:
+        # `self` is only a RibbonPanel inside panel.py; in FCBinding.py it is the
+        # ribbon bar and in CustomWidgets.py a tool button, neither of which traps
+        # attribute lookup. A variable actually named `panel` is a RibbonPanel
+        # wherever it appears.
+        probes = (
+            r"getattr\(\s*(self|panel)\s*," if parts[-1] == "panel.py" else r"getattr\(\s*panel\s*,"
+        )
         for patch in patches:
             replacement = patch[1]
             for line in replacement.splitlines():
                 stripped = line.strip()
-                if not stripped.startswith("#") and re.search(
-                    r"getattr\(\s*(self|panel)\s*,", stripped
-                ):
+                if not stripped.startswith("#") and re.search(probes, stripped):
                     offenders.append("{}: {}".format(parts[-1], stripped))
     assert offenders == [], (
         "Probe a RibbonPanel with __dict__.get() instead; getattr raises here: {}".format(offenders)
