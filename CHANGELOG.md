@@ -211,7 +211,7 @@ Repair References, corrected against a real document instead of a test double.
 - **Sketcher workflow commands**:
   - `FusionMyFreeCAD_AddMidline`: Generates construction centerlines between symmetric elements.
   - `FusionMyFreeCAD_ConstrainMidpoint`: One-step midpoint constraint on vertex and edge.
-  - `FusionMyFreeCAD_SmartSlot`: Parameterized center-to-center slot with tangent arcs.
+  - `FusionMyFreeCAD_CreateSlot`: Parameterized center-to-center slot with tangent arcs.
   - `FusionMyFreeCAD_SmartOffset`: Directional profile offset tool.
   - `FusionMyFreeCAD_SolverDiagnostics`: Plain-language solver diagnostics for under-constrained sketches.
 - **Datum Plane tools**:
@@ -220,7 +220,7 @@ Repair References, corrected against a real document instead of a test double.
   - `FusionMyFreeCAD_ParameterDock`: In-canvas dock widget for creating and editing variables and aliases. Multi-document safe with observer-driven synchronization and gap-tolerant spreadsheet reading.
 - **Studio Viewport & Theme**:
   - `FusionMyFreeCAD_StudioViewport`: Clean canvas viewport preset with subtle NaviCube positioning.
-  - `FusionMyFreeCAD_ModernZinc`: Sleek Zinc stylesheet.
+  - `FusionMyFreeCAD_ModernZincTheme`: Sleek Zinc stylesheet.
   - `FusionMyFreeCAD_RestoreViewport`: One-click viewport and style restoration.
 - **FreeCAD Core Suggestions Box**:
   - Cataloged core-bound features (e.g. dynamic Heads-Up Display and Ghost Sketches) in `docs/dev-guide/freecad_core_suggestions_box.md` to keep FMF runtime strictly focused on reliable add-on enhancements.
