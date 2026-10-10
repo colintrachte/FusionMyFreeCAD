@@ -58,7 +58,7 @@ jobs:
         run: python tools/build_addon_package.py
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: FusionMyFreeCAD-${{ inputs.version }}
           path: |
