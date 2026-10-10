@@ -41,6 +41,7 @@ Python console**, run:
 
 ```python
 import os
+
 print(os.path.join(App.getUserAppDataDir(), "Mod"))
 ```
 
