@@ -19,8 +19,8 @@
 ## Local Environment Pointers
 - **Python for tests:** `C:\Program Files\Python313\python.exe`
 - **Pytest:** `& "C:\Program Files\Python313\python.exe" -m pytest`
-- **FreeCAD 1.1 Executables:**
-  - GUI: `C:\Program Files\FreeCAD 1.1\bin\freecad.exe`
-  - Headless/CLI: `C:\Program Files\FreeCAD 1.1\bin\freecadcmd.exe`
+- **FreeCAD 1.1 Executables:** Locate the active installation with `Get-Command freecad.exe,
+  freecadcmd.exe` or use its actual install directory. Do not assume `C:\Program Files\FreeCAD 1.1`;
+  that path is not present on every development machine.
 - **Addon Mod Path:** `%APPDATA%\FreeCAD\v1-1\Mod\FusionMyFreeCAD` (PowerShell: `$env:APPDATA\FreeCAD\v1-1\Mod\FusionMyFreeCAD`, Linux: `~/.local/share/FreeCAD/Mod/FusionMyFreeCAD`)
 - **Local Dev Deploy:** `powershell -ExecutionPolicy Bypass -File .\tools\install-dev.ps1`

@@ -20,6 +20,16 @@ def load_helper():
     return module
 
 
+def load_validator():
+    spec = importlib.util.spec_from_file_location(
+        "validate_release_metadata", ROOT / "tools" / "validate_release_metadata.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
 def release_tree(tmp_path: Path) -> Path:
     (tmp_path / "Resources/FusionMyFreeCAD").mkdir(parents=True)
     (tmp_path / "docs/user-guide").mkdir(parents=True)
@@ -89,3 +99,25 @@ def test_prepare_rejects_ambiguous_versions(tmp_path, version):
 
     with pytest.raises(ValueError, match=r"X\.Y\.Z"):
         helper.prepare(root, version, "2026-09-01")
+
+
+def test_release_validator_accepts_complete_prepared_tree(tmp_path):
+    validator = load_validator()
+    root = release_tree(tmp_path)
+    notes = root / "docs/release-notes/RELEASE-NOTES-1.2.0.md"
+    notes.write_text("# FusionMyFreeCAD 1.2.0\n\nComplete notes.\n", encoding="utf-8")
+
+    validator.validate(root, "1.2.0")
+
+
+def test_release_validator_rejects_duplicate_changelog_section(tmp_path):
+    validator = load_validator()
+    root = release_tree(tmp_path)
+    (root / "docs/release-notes/RELEASE-NOTES-1.2.0.md").write_text(
+        "# FusionMyFreeCAD 1.2.0\n\nComplete notes.\n", encoding="utf-8"
+    )
+    with (root / "CHANGELOG.md").open("a", encoding="utf-8") as changelog:
+        changelog.write("\n## 1.2.0 — duplicate\n")
+
+    with pytest.raises(RuntimeError, match="exactly one"):
+        validator.validate(root, "1.2.0")

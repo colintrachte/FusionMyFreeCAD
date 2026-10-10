@@ -14,6 +14,14 @@ from pathlib import Path
 import pytest
 from fake_freecad import ROOT, _import_module
 
+sys.path.insert(0, str(ROOT / "tools"))
+from validate_layout_contracts import (
+    COMMAND_CONTRACTS,
+)
+from validate_layout_contracts import (
+    validate as validate_layout_contracts,
+)
+
 NAMESPACE = {"p": "https://wiki.freecad.org/Package_Metadata"}
 RESOURCES = ROOT / "Resources" / "FusionMyFreeCAD"
 BUNDLED = ROOT / "bundled-addons"
@@ -40,6 +48,11 @@ def test_one_version_everywhere(package, layout, manifest):
     version = package.findtext("p:version", namespaces=NAMESPACE)
     assert layout["layoutVersion"] == version
     assert manifest["layoutVersion"] == version
+
+
+def test_behavior_sensitive_layout_commands_match_contracts():
+    assert {"coincident", "mirror", "create-sketch", "pad", "pocket"} <= set(COMMAND_CONTRACTS)
+    validate_layout_contracts(ROOT)
 
 
 def test_required_files_are_present():

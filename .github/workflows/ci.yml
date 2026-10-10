@@ -40,6 +40,9 @@ jobs:
       - name: Check formatting
         run: ruff format --check .
 
+      - name: Validate behavior-sensitive command mappings
+        run: python tools/validate_layout_contracts.py
+
       # ruff's extend-exclude skips bundled-addons/, so edits to the vendored
       # ribbon and search payload are otherwise never linted -- that is how an
       # undefined QPoint reached a release and left FreeCAD with a blank window.

@@ -238,6 +238,31 @@ def test_sketch_repair_observer_recompute(sketch_env):
     obs.slotChangedObject(sketch, "Shape")
 
 
+def test_sketch_repair_observer_reports_failure(sketch_env, monkeypatch):
+    import fusion_bootstrap
+    import fusion_sketch_tools
+
+    doc = sketch_env.app.ActiveDocument or sketch_env._new_document()
+    sketch = doc.addObject("Sketcher::SketchObject", "Sketch")
+    reported = []
+
+    def explode(_sketch):
+        raise RuntimeError("OpenCASCADE failed")
+
+    monkeypatch.setattr(fusion_sketch_tools, "repair_sketch_internal_faces", explode)
+    monkeypatch.setattr(
+        fusion_bootstrap,
+        "record_startup_failure",
+        lambda step, error: reported.append((step, str(error))),
+    )
+
+    obs = fusion_bootstrap._SketchRepairObserver()
+    obs.slotChangedObject(sketch, "Shape")
+
+    assert obs._updating is False
+    assert reported == [("rebuild sketch faces after shape change", "OpenCASCADE failed")]
+
+
 def test_pad_selection_observer_internal_face(sketch_env):
     """_PadSelectionObserver enables picking InternalFace in 3D to set Pad profile."""
     import fusion_bootstrap
@@ -256,6 +281,32 @@ def test_pad_selection_observer_internal_face(sketch_env):
 
     # Profile should now be updated to (sketch, ['InternalFace1'])
     assert pad.Profile == (sketch, ["InternalFace1"])
+
+
+def test_pad_selection_observer_reports_failure_and_clears_busy(sketch_env, monkeypatch):
+    import fusion_bootstrap
+
+    doc = sketch_env.app.ActiveDocument or sketch_env._new_document()
+    body = doc.addObject("PartDesign::Body", "Body")
+    sketch = doc.addObject("Sketcher::SketchObject", "Sketch")
+    body.addObject(sketch)
+    pad = doc.addObject("PartDesign::Pad", "Pad")
+    pad.Profile = (sketch, [""])
+    body.addObject(pad)
+    reported = []
+    pad.recompute = lambda: (_ for _ in ()).throw(RuntimeError("Pad recompute failed"))
+    monkeypatch.setattr(
+        fusion_bootstrap,
+        "record_startup_failure",
+        lambda step, error: reported.append((step, str(error))),
+    )
+
+    obs = fusion_bootstrap._PadSelectionObserver()
+    obs.addSelection(doc.Name, sketch.Name, "Sketch.InternalFace1")
+
+    assert obs._busy is False
+    assert pad.Profile == (sketch, [""])
+    assert reported == [("assign selected sketch region to Pad", "Pad recompute failed")]
 
 
 # ---------------------------------------------------------------------------

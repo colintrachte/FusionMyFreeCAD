@@ -44,6 +44,8 @@ Run the automated checks and build locally:
 ruff check .
 ruff format --check .
 python -m pytest tests -q
+python tools/validate_layout_contracts.py
+python tools/validate_release_metadata.py 1.3.0
 python tools/build_addon_package.py
 ```
 
@@ -54,6 +56,7 @@ The last command creates these ignored files under `dist/`:
 
 Complete the **Interactive FreeCAD checklist** in `MAINTAINING.md`. Use a disposable or backed-up
 FreeCAD profile. Automated tests do not validate the real FreeCAD UI or production CAD output.
+Run the non-destructive real-FreeCAD command smoke check documented there before the manual pass.
 
 Inspect the ZIP before continuing. It must contain one top-level `FusionMyFreeCAD` folder, with
 `InitGui.py`, `package.xml`, `Resources`, and `bundled-addons` directly inside it.

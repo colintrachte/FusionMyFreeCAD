@@ -10,7 +10,7 @@ from __future__ import annotations
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from fusion_common import transaction
+from fusion_common import log_swallowed, transaction
 
 try:
     from PySide import QtCore, QtWidgets
@@ -308,8 +308,8 @@ if QtWidgets is not None:
                     if hasattr(sheet, "setAlias"):
                         try:
                             sheet.setAlias(f"B{row_sheet}", param_name)
-                        except Exception:
-                            pass
+                        except Exception as error:
+                            log_swallowed("create parameter alias", error)
                     doc.recompute()
 
                 r = self.table.rowCount()
@@ -355,8 +355,8 @@ if QtWidgets is not None:
                 if hasattr(sheet, "setAlias"):
                     try:
                         sheet.setAlias(f"B{row_sheet}", "")
-                    except Exception:
-                        pass
+                    except Exception as error:
+                        log_swallowed("remove parameter alias", error)
                 doc.recompute()
 
             self.refresh_parameters()
@@ -385,8 +385,8 @@ if QtWidgets is not None:
                         if current_name:
                             try:
                                 sheet.setAlias(f"B{row_sheet}", current_name)
-                            except Exception:
-                                pass
+                            except Exception as error:
+                                log_swallowed("update parameter alias", error)
                     doc.recompute()
 
                 if col == 1:
