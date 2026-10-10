@@ -326,7 +326,7 @@ plus: leave the sketch, hover the middle region in 3D, report what it highlights
     `PointOnObject` to borders) and `_floating_line_box` (a free interior line).
 - **CHANGELOG.md** 1.3.3 section describes: the 1.3.2 withdrawal + crash fix, the mirror behaviour
   as of `b0d86a5`, the icon, the quieter startup, and that the 1.3.2 Coincident/Point-on-Object
-  changes are not included. `docs/RELEASE-NOTES-1.3.3.md` mirrors it. Update both when the mirror
+  changes are not included. `docs/release-notes/RELEASE-NOTES-1.3.3.md` mirrors it. Update both when the mirror
   behaviour changes again.
 
 ---
@@ -337,7 +337,7 @@ plus: leave the sketch, hover the middle region in 3D, report what it highlights
   live "Latest". Do **not** re-publish `v1.3.2`. The `v1.3.2` git tag still points at `c32f982`.
 - `main` == `origin/main` at `b0d86a5` (session commits are pushed). Nothing is released as 1.3.3
   yet. `package.xml`, `layout-v3.json`, `layout-manifest.json` all say `1.3.3`; the CHANGELOG
-  1.3.3 section and `docs/RELEASE-NOTES-1.3.3.md` exist and must be kept current as the mirror
+  1.3.3 section and `docs/release-notes/RELEASE-NOTES-1.3.3.md` exist and must be kept current as the mirror
   behaviour changes. When the feature is actually right, follow `RELEASING.md` (there is a
   dispatchable GitHub Actions release workflow) to cut `v1.3.3`.
 - Commit-message convention in this repo ends with

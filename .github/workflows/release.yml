@@ -52,7 +52,7 @@ jobs:
                   f"Workflow version {version!r} does not match package.xml {packaged!r}"
               )
 
-          notes = Path(f"docs/RELEASE-NOTES-{version}.md")
+          notes = Path(f"docs/release-notes/RELEASE-NOTES-{version}.md")
           if not notes.is_file():
               raise SystemExit(f"Missing {notes}")
           if "TODO" in notes.read_text(encoding="utf-8"):
@@ -103,7 +103,7 @@ jobs:
             "dist/FusionMyFreeCAD-${RELEASE_VERSION}.zip.sha256" \
             --draft \
             --fail-on-no-commits \
-            --notes-file "docs/RELEASE-NOTES-${RELEASE_VERSION}.md" \
+            --notes-file "docs/release-notes/RELEASE-NOTES-${RELEASE_VERSION}.md" \
             --target "$GITHUB_SHA" \
             --title "FusionMyFreeCAD ${RELEASE_VERSION}"
 

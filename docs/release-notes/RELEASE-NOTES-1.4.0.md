@@ -33,7 +33,7 @@ FusionMyFreeCAD 1.4.0 is a major feature and reliability release. It introduces 
 - **Centralized Infrastructure (`fusion_common.py`)**: Canonical `RUNTIME_MODULES` manifest, atomic `transaction(doc, label)` context manager, standard notifications, and base `SketcherCommand`.
 - **Packaging Integrity Gate**: Release builder and validator verify that all packaged runtime modules and assets are tracked in Git.
 - **Deterministic Test Suite**: Clean dynamic module eviction eliminates cross-test state pollution across all 194 unit tests.
-- **FreeCAD Core Suggestions Box**: Cleanly catalogs core-bound ideas (Heads-Up Display, Ghost Sketches, Unified Extrude) in `docs/freecad_core_suggestions_box.md`.
+- **FreeCAD Core Suggestions Box**: Cleanly catalogs core-bound ideas (Heads-Up Display, Ghost Sketches, Unified Extrude) in `docs/dev-guide/freecad_core_suggestions_box.md`.
 
 ---
 

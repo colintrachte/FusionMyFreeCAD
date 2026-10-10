@@ -182,7 +182,7 @@ Four documented opt-outs (`SetStartWorkbench`, `SetNavigation`, `SetShortcuts`, 
 
 Removing the add-on through Addon Manager deletes `Mod/FusionMyFreeCAD` but leaves `RibbonUI_Data/`, `FusionMyFreeCAD-addon-state.json`, `FusionMyFreeCAD-usage.json`, `FusionMyFreeCAD-runtime-status.json`, and every applied preference. The docs say to click Restore UI first; users will not.
 
-**Fix:** publish a standalone one-file recovery macro in `tools/` that performs a restore from the state file without the add-on installed, and link it from `docs/INSTALL-FREECAD-ADDON.md`.
+**Fix:** publish a standalone one-file recovery macro in `tools/` that performs a restore from the state file without the add-on installed, and link it from `docs/user-guide/INSTALL-FREECAD-ADDON.md`.
 
 ---
 

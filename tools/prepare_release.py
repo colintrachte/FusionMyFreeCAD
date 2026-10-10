@@ -43,7 +43,6 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
     except ValueError as error:
         raise ValueError("Date must use the form YYYY-MM-DD") from error
 
-    old_version = current_version(root)
     changed: list[Path] = []
 
     package_path = root / "package.xml"
@@ -81,30 +80,47 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
         ):
             changed.append(path)
 
-    replacements = {
-        root / "README.md": (
-            (f"Version **{old_version}**", f"Version **{version}**"),
-            (f"FusionMyFreeCAD-{old_version}.zip", f"FusionMyFreeCAD-{version}.zip"),
-            (f"[{old_version} release]", f"[{version} release]"),
-            (f"/tag/v{old_version}", f"/tag/v{version}"),
-        ),
-        root / "docs/INSTALL-FREECAD-ADDON.md": (
-            (f"FusionMyFreeCAD-{old_version}.zip", f"FusionMyFreeCAD-{version}.zip"),
-            (f"[{old_version} release]", f"[{version} release]"),
-            (f"/tag/v{old_version}", f"/tag/v{version}"),
-        ),
-    }
-    for path, pairs in replacements.items():
+    readme_path = root / "README.md"
 
-        def update_links(text: str, pairs=pairs, path=path) -> str:
-            for old, new in pairs:
-                if old not in text:
-                    raise RuntimeError(f"Expected release reference {old!r} in {path}")
-                text = text.replace(old, new)
-            return text
+    def update_readme(text: str) -> str:
+        status = (
+            "## Status\n\n"
+            f"Version **{version}** is available from\n"
+            "[GitHub Releases](https://github.com/colintrachte/"
+            f"FusionMyFreeCAD/releases/tag/v{version}) as a\n"
+            "self-contained archive. FusionMyFreeCAD has not yet been submitted to FreeCAD's "
+            "add-on index;\n"
+            "catalog publication remains separate work.\n"
+        )
+        text, count = re.subn(
+            r"## Status\n\n.*?(?=\n## Install\n)", status, text, count=1, flags=re.DOTALL
+        )
+        if count != 1:
+            raise RuntimeError(f"Could not find the Status section in {readme_path}")
+        return update_download_references(text, version, readme_path)
 
-        if update_text_file(path, update_links):
-            changed.append(path)
+    def update_download_references(text: str, target: str, path: Path) -> str:
+        replacements = (
+            (r"FusionMyFreeCAD-[0-9]+\.[0-9]+\.[0-9]+\.zip", f"FusionMyFreeCAD-{target}.zip"),
+            (r"\[[0-9]+\.[0-9]+\.[0-9]+ release\]", f"[{target} release]"),
+            (r"/tag/v[0-9]+\.[0-9]+\.[0-9]+", f"/tag/v{target}"),
+        )
+        for pattern, replacement in replacements:
+            text, count = re.subn(pattern, replacement, text, count=1)
+            if count != 1:
+                raise RuntimeError(
+                    f"Could not find exactly one release reference matching {pattern!r} in {path}"
+                )
+        return text
+
+    if update_text_file(readme_path, update_readme):
+        changed.append(readme_path)
+
+    install_path = root / "docs/user-guide/INSTALL-FREECAD-ADDON.md"
+    if update_text_file(
+        install_path, lambda text: update_download_references(text, version, install_path)
+    ):
+        changed.append(install_path)
 
     changelog_path = root / "CHANGELOG.md"
     changelog_heading = f"## {version} — {release_date}"
@@ -123,7 +139,8 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
         update_text_file(changelog_path, add_changelog_section)
         changed.append(changelog_path)
 
-    notes_path = root / "docs" / f"RELEASE-NOTES-{version}.md"
+    notes_path = root / "docs" / "release-notes" / f"RELEASE-NOTES-{version}.md"
+    notes_path.parent.mkdir(parents=True, exist_ok=True)
     if not notes_path.exists():
         notes_path.write_text(
             f"# FusionMyFreeCAD {version}\n\n"
@@ -133,7 +150,7 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
             f"`FusionMyFreeCAD-{version}.zip.sha256` from this release. Replace the entire "
             "existing `Mod/FusionMyFreeCAD` folder; do not merge it with an older version.\n\n"
             "See the [installation guide](https://github.com/colintrachte/"
-            f"FusionMyFreeCAD/blob/v{version}/docs/INSTALL-FREECAD-ADDON.md) and "
+            f"FusionMyFreeCAD/blob/v{version}/docs/user-guide/INSTALL-FREECAD-ADDON.md) and "
             "[full changelog](https://github.com/colintrachte/"
             f"FusionMyFreeCAD/blob/v{version}/CHANGELOG.md).\n",
             encoding="utf-8",

@@ -64,6 +64,7 @@ USAGE_PATH = bootstrap.USAGE_PATH
 RIBBON_PATH = bootstrap.RIBBON_PATH
 
 _manifest_cache = None
+_adaptive_command_workbenches_cache = None
 _usage_cache = None
 _usage_write_pending = False
 _status_write_pending = False
@@ -71,6 +72,7 @@ _problems = []
 _displaced_shortcuts = []
 _last_workbench = ""
 _task_accept_filter = None
+_deferred_tokens = {}
 
 
 def _record_problem(text):
@@ -110,17 +112,28 @@ def _defer(label, function, attempts=10, interval=200):
     needs does not exist yet. Giving up is recorded rather than passed over in
     silence, which is what a fixed startup delay did whenever it guessed wrong.
     """
+    token = _deferred_tokens.get(label, 0) + 1
+    _deferred_tokens[label] = token
     remaining = {"attempts": attempts}
 
     def attempt():
+        # Workbench changes can arrive in a burst (notably when entering or
+        # leaving a sketch).  Only the newest request for a named UI task is
+        # useful; allowing every older retry chain to continue repeats the
+        # same main-window scans while FreeCAD is trying to redraw.
+        if _deferred_tokens.get(label) != token:
+            return
         remaining["attempts"] -= 1
         try:
             if function():
+                _deferred_tokens.pop(label, None)
                 return
         except Exception as error:
+            _deferred_tokens.pop(label, None)
             _record_problem("{} failed: {}".format(label, error))
             return
         if remaining["attempts"] <= 0:
+            _deferred_tokens.pop(label, None)
             _record_problem("{} was not available after {} attempts".format(label, attempts))
             return
         QtCore.QTimer.singleShot(interval, attempt)
@@ -441,6 +454,21 @@ def load_manifest():
     return _manifest_cache
 
 
+def adaptive_workbenches_by_command():
+    """Return the cached reverse index used by command-usage tracking."""
+    global _adaptive_command_workbenches_cache
+    if _adaptive_command_workbenches_cache is None:
+        reverse = {}
+        for workbench in load_manifest().get("adaptivePins", {}):
+            for _panel, group in adaptive_groups(workbench):
+                for command in group.get("commands", {}):
+                    reverse.setdefault(command, []).append(workbench)
+        _adaptive_command_workbenches_cache = {
+            command: tuple(workbenches) for command, workbenches in reverse.items()
+        }
+    return _adaptive_command_workbenches_cache
+
+
 def load_usage():
     global _usage_cache
     if _usage_cache is not None:
@@ -512,12 +540,7 @@ def schedule_usage_write():
 
 
 def record_usage(command):
-    adaptive = load_manifest().get("adaptivePins", {})
-    candidates = [
-        name
-        for name in adaptive
-        if any(command in group.get("commands", {}) for _panel, group in adaptive_groups(name))
-    ]
+    candidates = adaptive_workbenches_by_command().get(command, ())
     if not candidates:
         return
     try:

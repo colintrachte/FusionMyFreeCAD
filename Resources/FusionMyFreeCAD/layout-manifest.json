@@ -143,7 +143,7 @@
     "Sketcher_CompSlot",
     "Sketcher_CompToggleConstraints",
     "Sketcher_ConstrainBlock",
-    "Sketcher_ConstrainCoincident",
+    "Sketcher_ConstrainCoincidentUnified",
     "Sketcher_ConstrainEqual",
     "Sketcher_ConstrainHorVer",
     "Sketcher_ConstrainParallel",
@@ -1041,7 +1041,7 @@
           "capacity": 4,
           "defaults": [
             "Sketcher_ConstrainHorVer",
-            "Sketcher_ConstrainCoincident",
+            "Sketcher_ConstrainCoincidentUnified",
             "Sketcher_ConstrainEqual",
             "Sketcher_CompExternal"
           ],
@@ -1304,7 +1304,7 @@
               "Horizontal / Vertical",
               "Constraint_HorVer"
             ],
-            "Sketcher_ConstrainCoincident": [
+            "Sketcher_ConstrainCoincidentUnified": [
               "SketcherWorkbench",
               "small",
               "Coincident",

@@ -10,18 +10,18 @@ format, and everything it changes can be undone from inside FreeCAD.
 
 ## Status
 
-Version **1.4.0** is available from
-[GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.4.0) as a
+Version **1.8.0** is available from
+[GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.8.0) as a
 self-contained archive. FusionMyFreeCAD has not yet been submitted to FreeCAD's add-on index;
 catalog publication remains separate work.
 
 ## Install
 
-Download `FusionMyFreeCAD-1.4.0.zip` from the
-[1.4.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.4.0), extract its
+Download `FusionMyFreeCAD-1.8.0.zip` from the
+[1.8.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.4.0), extract its
 top-level `FusionMyFreeCAD` folder into FreeCAD's user `Mod` directory, and restart FreeCAD. Full
 platform-by-platform steps, verification, update, and removal instructions are in
-[`docs/INSTALL-FREECAD-ADDON.md`](docs/INSTALL-FREECAD-ADDON.md).
+[`docs/user-guide/INSTALL-FREECAD-ADDON.md`](docs/user-guide/INSTALL-FREECAD-ADDON.md).
 
 The archive contains everything needed: the ribbon engine, command search, layouts, shortcuts,
 Smart Dimension settings, the navigation cube, adaptive FREQUENT panels, verification, and
@@ -52,7 +52,7 @@ The Symmetric constraint is always a top-level button and can be reordered direc
 Sketcher has two adjacent mirror controls. The small **Mirror + Constraints** button — FreeCAD's
 Mirror icon with a green "+" badge — sits in front of the native **Mirror**: select geometry and
 then a mirror line or sketch axis, and it adds a live **Symmetric** link between each element and
-its copy so moving one moves the other, keeps mirrored circles and arcs the same size, and copies
+its copy so moving one moves the other, keeps mirrored circles the same size, and copies
 any endpoint attachments a link cannot cover so mirrored profiles stay closed. The larger **Mirror**
 button is FreeCAD's original interactive tool and remains available for point symmetry and
 unsupported inputs.
@@ -71,7 +71,10 @@ personalisation along with restoring the other shipped defaults.
 FusionMyFreeCAD adds several streamlined tools designed for speed and parity with modern parametric workflows:
 
 ### Sketch tools
-- **Mirror + Constraints**: Mirrored geometry receives live **Symmetric** constraints, radius equality, and copied endpoint attachments so profiles remain closed and dynamic.
+- **Coincident**: The ribbon uses FreeCAD's unified command, applying point-to-point Coincident or
+  Point-on-Object according to the selected endpoints and edges.
+- **Mirror + Constraints**: Mirrored geometry receives live **Symmetric** constraints, circle
+  radius equality, and copied endpoint attachments so profiles remain closed and dynamic.
 - **Add Midline**: Generates a construction centerline between selected parallel edges or symmetric elements.
 - **Constrain Midpoint**: Snaps and constrains a vertex to the midpoint of an edge in one action.
 - **Smart Slot**: Automatically creates a center-to-center slot with tangent end arcs and parallel constraint relationships.
@@ -83,6 +86,15 @@ FusionMyFreeCAD adds several streamlined tools designed for speed and parity wit
 
 ### 3D and features
 - **Contextual Extrude**: Smart extrusion invoked via `E` or ribbon. Launches the active body's Pad if editing inside a PartDesign Body, or triggers contextual direct extrusion.
+- **Repair References**: Audits broken face and edge links, repairs only unambiguous references,
+  and reports suggestions where the remaining evidence is insufficient to change the document.
+- **Update Model**: Marks the model tree for recomputation before rebuilding it, then distinguishes
+  the feature that failed from downstream features that were never reached.
+
+### Export
+- The **EXPORT** panel provides selection-aware STEP, STL, 3MF, and DXF commands. Export commands
+  validate that the selected object is suitable for the requested format and leave the active
+  modelling context when required.
 
 ### Parameters & viewport
 - **Parameters Dock**: In-canvas sidebar widget for quickly adding, inspecting, and editing spreadsheet parameters and aliases without navigating to the Spreadsheet workbench. Includes document-safe binding and gap tolerance.
@@ -130,7 +142,11 @@ output.
 
 ## Documentation
 
-- [`docs/INSTALL-FREECAD-ADDON.md`](docs/INSTALL-FREECAD-ADDON.md) — install, verify, update, remove
+- [`docs/user-guide/`](docs/user-guide/) — user installation and workflow guides
+- [`docs/dev-guide/`](docs/dev-guide/) — developer, packaging, and release guides
+- [`docs/user-guide/INSTALL-FREECAD-ADDON.md`](docs/user-guide/INSTALL-FREECAD-ADDON.md) — install, verify, update, remove
+- [`docs/dev-guide/DEVELOPMENT-INSTALL.md`](docs/dev-guide/DEVELOPMENT-INSTALL.md) — rebuild and update a local FreeCAD installation from this checkout
+- [`docs/release-notes/`](docs/release-notes/) — versioned release notes
 - [`CHANGELOG.md`](CHANGELOG.md) — user-visible release history
 - [`RELEASING.md`](RELEASING.md) — prepare, validate, build, and upload a release without assistance
 - [`MAINTAINING.md`](MAINTAINING.md) — architecture, change procedures, validation, release checklist
@@ -154,7 +170,7 @@ after touching anything under `bundled-addons/`:
 ```bash
 ruff check --isolated --select F821 --exclude '*.pyi' --exclude '*_ui.py' bundled-addons/
 ```
- The development requirements pin the test and
+The development requirements pin the test and
 formatting tools so local formatting cannot drift from the release gate.
 
 Only the FreeCAD command icons referenced by the layout are bundled; the full collection remains

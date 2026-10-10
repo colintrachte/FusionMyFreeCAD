@@ -7,8 +7,9 @@ or newer and Python 3.11 or newer, as declared in `package.xml`.
 
 1. Close FreeCAD.
 2. Back up your FreeCAD user-data directory if it contains a profile you care about.
-3. Download `FusionMyFreeCAD-1.4.0.zip` and its `.sha256` file from the
-   [1.4.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.4.0).
+3. Download `FusionMyFreeCAD-1.8.0.zip` and its `.sha256` file from the
+   [1.8.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.8.0). The
+   repository's 1.8.0 development state has not yet been published as a release archive.
 4. Optionally verify the archive against the published SHA-256 checksum.
 5. Open the archive and copy its top-level `FusionMyFreeCAD` folder into the `Mod` directory under
    your FreeCAD user-data directory.
@@ -55,6 +56,10 @@ After startup:
 2. Confirm the Fusion-style Ribbon panels appear.
 3. In an **INSPECT** panel, choose **Verify UI**.
 4. Exercise command search and one harmless command such as **Fit All**.
+
+For a focused Sketcher check, select two endpoints and click **Coincident**. The unified control
+adds point-to-point Coincident for two endpoints and Point-on-Object when the second selection is
+an edge.
 
 **Verify UI** reports each check as OK or FAILED, lists the detail behind any failure, and names the
 next step to try. It also lists every keyboard shortcut FusionMyFreeCAD took from another command,

@@ -222,6 +222,16 @@ def test_deferred_work_reports_an_exception(env, runtime):
     assert any("no such dock" in problem for problem in runtime._problems)
 
 
+def test_newer_deferred_work_supersedes_an_older_retry_chain(env, runtime):
+    calls = []
+
+    runtime._defer("action scan", lambda: calls.append("old") or True, interval=0)
+    runtime._defer("action scan", lambda: calls.append("new") or True, interval=0)
+    FakeTimer.pump()
+
+    assert calls == ["new"]
+
+
 def test_model_tree_is_docked_left_and_shows_the_model_tab(env, runtime):
     dock = FakeDock(object_name="Combo View", window_title="Combo View")
     dock.tabs = FakeTabWidget(["&Tasks", "&Model"])
@@ -349,6 +359,23 @@ def test_recorded_usage_is_persisted(env, bootstrap, runtime):
 
     usage = json.loads(Path(bootstrap.USAGE_PATH).read_text("utf-8"))
     assert usage["workbenches"]["PartDesignWorkbench"]["PartDesign_Draft"]["score"] == 1.0
+
+
+def test_adaptive_command_reverse_index_is_built_once(env, runtime, monkeypatch):
+    real_groups = runtime.adaptive_groups
+    calls = {"count": 0}
+
+    def counted_groups(workbench):
+        calls["count"] += 1
+        return real_groups(workbench)
+
+    monkeypatch.setattr(runtime, "adaptive_groups", counted_groups)
+    first = runtime.adaptive_workbenches_by_command()
+    second = runtime.adaptive_workbenches_by_command()
+
+    assert first is second
+    assert "PartDesignWorkbench" in first["PartDesign_Draft"]
+    assert calls["count"] == len(runtime.load_manifest()["adaptivePins"])
 
 
 def test_refresh_rewrites_the_frequent_panel_and_records_the_new_digest(env, bootstrap, runtime):

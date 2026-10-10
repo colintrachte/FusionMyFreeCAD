@@ -332,12 +332,28 @@ def test_mirror_with_constraints_sits_beside_the_native_mirror(layout, manifest)
     assert "FusionMyFreeCAD_ConstrainMidpoint" in const_order
     assert const_by_name["FusionMyFreeCAD_ConstrainMidpoint"][2] == "small"
     assert const_by_name["FusionMyFreeCAD_ConstrainMidpoint"][3] == "Midpoint"
+    assert "Sketcher_ConstrainCoincidentUnified" in const_order
+    assert "Sketcher_ConstrainCoincident" not in const_order
     assert (
         const_order.index("FusionMyFreeCAD_ConstrainMidpoint")
-        - const_order.index("Sketcher_ConstrainCoincident")
+        - const_order.index("Sketcher_ConstrainCoincidentUnified")
         == 1
     )
     assert "FusionMyFreeCAD_ConstrainMidpoint" in manifest["primaryCommands"]
+
+    frequent_panel = {panel["name"]: panel for panel in layout["workbenches"]["SketcherWorkbench"]}[
+        "Fusion Sketch Frequent_newPanel"
+    ]
+    frequent_order = [entry[0] for entry in frequent_panel["commands"]]
+    assert "Sketcher_ConstrainCoincidentUnified" in frequent_order
+    assert "Sketcher_ConstrainCoincident" not in frequent_order
+
+    frequent_manifest = manifest["adaptivePins"]["SketcherWorkbench"]["panels"][
+        "Fusion Sketch Frequent_newPanel"
+    ]
+    assert "Sketcher_ConstrainCoincidentUnified" in frequent_manifest["defaults"]
+    assert "Sketcher_ConstrainCoincidentUnified" in frequent_manifest["commands"]
+    assert "Sketcher_ConstrainCoincident" not in frequent_manifest["commands"]
 
 
 # ---------------------------------------------------------------------------

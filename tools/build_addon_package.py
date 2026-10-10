@@ -22,7 +22,7 @@ PACKAGE_METADATA_FILES = (
     "THIRD_PARTY_NOTICES.md",
     "CHANGELOG.md",
     "README.md",
-    "docs/INSTALL-FREECAD-ADDON.md",
+    "docs/user-guide/INSTALL-FREECAD-ADDON.md",
     # The install guide tells users to recover with this macro after removing the
     # add-on, so it has to travel inside the archive.
     "tools/RestoreFusionMyFreeCAD.FCMacro",
