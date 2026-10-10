@@ -41,6 +41,8 @@ ruff check .
 ruff format --check .
 ruff check --isolated --select F821 --exclude '*.pyi' --exclude '*_ui.py' bundled-addons/
 python -m pytest tests -q
+python tools/validate_layout_contracts.py
+python tools/validate_release_metadata.py <version>
 python tools/build_addon_package.py
 ```
 
@@ -58,6 +60,8 @@ Inspect the archive before upload. It must have one top-level `FusionMyFreeCAD` 
 `InitGui.py`, `package.xml`, `Resources/`, and `bundled-addons/`. Verify the checksum and complete
 the interactive FreeCAD checklist in [MAINTAINING.md](../../MAINTAINING.md) using a disposable or
 backed-up profile.
+Also run the non-destructive real-FreeCAD command smoke check in
+[MAINTAINING.md](../../MAINTAINING.md) before the manual UI checklist.
 
 ## 4. Commit and push the release candidate
 

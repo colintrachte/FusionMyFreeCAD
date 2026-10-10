@@ -4,9 +4,15 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
 ## 1.8.0 — 2026-10-09
 
-TODO: Summarize user-visible changes, fixes, and upgrade notes.
+### Regression hardening
 
-## Unreleased
+- Failures while rebuilding selectable sketch regions or assigning a selected region to a Pad are
+  now recorded for **Verify UI** instead of being silently ignored. A failed Pad assignment also
+  restores the previous profile and sketch visibility.
+- Behavior-sensitive ribbon commands now have explicit layout contracts, including unified
+  Coincident, native Mirror, Create Sketch, Pad, and Pocket. CI rejects accidental substitutions.
+- Local and GitHub release checks now share one metadata validator, including duplicate changelog
+  detection. GitHub Actions dependencies are monitored for runtime deprecations.
 
 ### Faster workbench transitions
 
@@ -22,8 +28,6 @@ TODO: Summarize user-visible changes, fixes, and upgrade notes.
   Selecting two endpoints applies a point-to-point Coincident constraint, while selecting an
   endpoint and an edge applies Point-on-Object instead of leaving the button with no applicable
   action.
-
-## 1.8.0 — 2026-09-20
 
 ### Update Model
 

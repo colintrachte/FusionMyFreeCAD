@@ -125,6 +125,16 @@ If rebuilding fails, the report distinguishes the feature that actually failed
 from downstream features that were never reached. This avoids presenting one
 broken input as a separate failure in every dependent feature.
 
+## Reliability safeguards
+
+Failures while rebuilding selectable sketch regions or assigning a selected
+region to a Pad are now shown by **Verify UI** instead of being silently
+ignored. If a Pad assignment fails, its previous profile and the sketch's
+visibility are restored.
+
+Release and layout checks now guard behavior-sensitive commands and reject
+incomplete or contradictory release metadata before an archive is uploaded.
+
 ## Other fixes retained from 1.5.0
 
 - Ribbon icons can be dragged to reorder them again. Qt 6 removed the call every

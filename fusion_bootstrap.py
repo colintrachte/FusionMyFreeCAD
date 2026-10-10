@@ -1221,8 +1221,8 @@ class _SketchEditWorkbenchObserver:
                         else (0.0, 0.0, 0.0)
                     )
                     _center_camera(view, center=origin, height=_default_camera_scale())
-        except Exception:
-            pass
+        except Exception as error:
+            record_startup_failure("center new sketch view", error)
 
     def slotResetEdit(self, view_provider):
         obj = getattr(view_provider, "Object", None)
@@ -1232,16 +1232,16 @@ class _SketchEditWorkbenchObserver:
             import fusion_sketch_tools
 
             fusion_sketch_tools.repair_sketch_internal_faces(obj)
-        except Exception:
-            pass
+        except Exception as error:
+            record_startup_failure("rebuild sketch faces after edit", error)
         # Clear whole-sketch selection so multi-region sketches don't trick the user
         # with an all-green highlight that fails when Extrude (Pad) is clicked.
         try:
             from PySide import QtCore
 
             QtCore.QTimer.singleShot(100, lambda: Gui.Selection.clearSelection())
-        except Exception:
-            pass
+        except Exception as error:
+            record_startup_failure("clear sketch selection after edit", error)
 
 
 class ParameterTableCommand:
@@ -1326,8 +1326,8 @@ class _SketchRepairObserver:
                 # profile, so it is rebuilt on leaving edit instead.
                 if fusion_sketch_tools.active_sketch() is not obj:
                     fusion_sketch_tools.repair_sketch_internal_faces(obj)
-            except Exception:
-                pass
+            except Exception as error:
+                record_startup_failure("rebuild sketch faces after shape change", error)
             finally:
                 self._updating = False
         elif (
@@ -1350,8 +1350,8 @@ class _SketchRepairObserver:
                         and (not sub_elements or sub_elements == [""] or sub_elements == ("",))
                     ):
                         sketch_obj.Visibility = True
-            except Exception:
-                pass
+            except Exception as error:
+                record_startup_failure("restore multi-region Pad profile visibility", error)
 
 
 _sketch_edit_observer = None
@@ -1415,15 +1415,21 @@ class _PadSelectionObserver:
 
             if target_pad:
                 self._busy = True
+                previous_profile = target_pad.Profile
+                previous_visibility = sketch_obj.Visibility
                 try:
                     target_pad.Profile = (sketch_obj, [sub_part])
                     target_pad.recompute()
                     doc.recompute()
                     sketch_obj.Visibility = False
+                except Exception:
+                    target_pad.Profile = previous_profile
+                    sketch_obj.Visibility = previous_visibility
+                    raise
                 finally:
                     self._busy = False
-        except Exception:
-            pass
+        except Exception as error:
+            record_startup_failure("assign selected sketch region to Pad", error)
 
     def removeSelection(self, doc_name, obj_name, sub_name, mouse_pos=None):
         pass

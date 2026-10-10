@@ -32,38 +32,7 @@ jobs:
           python-version: "3.13"
 
       - name: Confirm release metadata
-        env:
-          RELEASE_VERSION: ${{ inputs.version }}
-        run: |
-          python - <<'PY'
-          import os
-          import re
-          import xml.etree.ElementTree as ET
-          from pathlib import Path
-
-          version = os.environ["RELEASE_VERSION"]
-          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
-              raise SystemExit("Version must use X.Y.Z form without a leading v")
-
-          root = ET.parse("package.xml").getroot()
-          packaged = next(child.text for child in root if child.tag.endswith("version"))
-          if packaged != version:
-              raise SystemExit(
-                  f"Workflow version {version!r} does not match package.xml {packaged!r}"
-              )
-
-          notes = Path(f"docs/release-notes/RELEASE-NOTES-{version}.md")
-          if not notes.is_file():
-              raise SystemExit(f"Missing {notes}")
-          if "TODO" in notes.read_text(encoding="utf-8"):
-              raise SystemExit(f"Finish the TODO in {notes} before releasing")
-
-          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
-          if f"## {version} " not in changelog:
-              raise SystemExit(f"CHANGELOG.md has no {version} section")
-          if "TODO" in changelog:
-              raise SystemExit("Finish every CHANGELOG.md TODO before releasing")
-          PY
+        run: python tools/validate_release_metadata.py "${{ inputs.version }}"
 
       - name: Install pinned release tools
         run: python -m pip install --upgrade -r requirements-dev.txt
@@ -73,6 +42,9 @@ jobs:
 
       - name: Check formatting
         run: ruff format --check .
+
+      - name: Validate behavior-sensitive command mappings
+        run: python tools/validate_layout_contracts.py
 
       # Mirrors the CI gate: bundled-addons/ is outside ruff's configured scope,
       # so a release must not be the first thing to run it.
