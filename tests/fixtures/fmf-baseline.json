@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "platform": "Windows-11-10.0.26300-SP0",
+  "python": "3.14.3",
+  "workbenches": {
+    "PartDesignWorkbench": {
+      "panels": 9,
+      "pinned": 41,
+      "overflow": 21
+    },
+    "PartWorkbench": {
+      "panels": 8,
+      "pinned": 26,
+      "overflow": 41
+    },
+    "SketcherWorkbench": {
+      "panels": 10,
+      "pinned": 50,
+      "overflow": 37
+    },
+    "SurfaceWorkbench": {
+      "panels": 6,
+      "pinned": 21,
+      "overflow": 6
+    }
+  },
+  "liveFreeCAD": {
+    "version": "26.3.0devR47870",
+    "revision": "a61ee58c265ca735e1ddbd2df0a9ca78574b5284",
+    "sourceBuild": "<upstream-reference>/FreeCAD/.pixi/envs/default/Library/bin/FreeCAD.exe",
+    "activeWorkbench": "PartDesignWorkbench",
+    "listedWorkbenchCount": 20,
+    "profile": "isolated",
+    "nativeActionProbe": "tests/fixtures/freecad-native-action.json"
+  }
+}

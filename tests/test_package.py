@@ -59,6 +59,7 @@ def test_required_files_are_present():
     required = [
         ROOT / "Init.py",
         ROOT / "InitGui.py",
+        ROOT / "fusion_actions.py",
         ROOT / "fusion_bootstrap.py",
         ROOT / "fusion_sketch_tools.py",
         ROOT / "LICENSE",
@@ -74,6 +75,31 @@ def test_required_files_are_present():
     ]
     missing = [str(path.relative_to(ROOT)) for path in required if not path.is_file()]
     assert missing == []
+
+
+def test_runtime_local_imports_are_declared_for_packaging():
+    """A source-checkout import must not hide a module omitted from release ZIPs."""
+    import ast
+
+    from fusion_common import RUNTIME_MODULES
+
+    declared = {Path(name).stem for name in RUNTIME_MODULES}
+    runtime_tree = ast.parse((RESOURCES / "runtime.py").read_text(encoding="utf-8"))
+    imported = {
+        alias.name.split(".", 1)[0]
+        for node in ast.walk(runtime_tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+        if alias.name.startswith("fusion_")
+    }
+    imported.update(
+        node.module.split(".", 1)[0]
+        for node in ast.walk(runtime_tree)
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("fusion_")
+    )
+    assert imported <= declared, "Undeclared packaged runtime imports: {}".format(
+        sorted(imported - declared)
+    )
 
 
 def test_every_python_file_compiles():
@@ -636,6 +662,7 @@ def test_build_addon_package_produces_a_loadable_archive(package):
         for required in (
             "FusionMyFreeCAD/InitGui.py",
             "FusionMyFreeCAD/package.xml",
+            "FusionMyFreeCAD/fusion_actions.py",
             "FusionMyFreeCAD/fusion_bootstrap.py",
             "FusionMyFreeCAD/Resources/FusionMyFreeCAD/runtime.py",
             "FusionMyFreeCAD/bundled-addons/FreeCAD-Ribbon/InitGui.py",

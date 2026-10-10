@@ -18,11 +18,13 @@ except ImportError:  # pragma: no cover - older FreeCAD bindings
 
 try:
     import fusion_bootstrap as bootstrap
+    from fusion_actions import NativeActionAdapter
 except ImportError:  # pragma: no cover - executed outside the add-on directory
     _ADDON_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if _ADDON_ROOT not in sys.path:
         sys.path.insert(0, _ADDON_ROOT)
     import fusion_bootstrap as bootstrap
+    from fusion_actions import NativeActionAdapter
 
 
 SHORTCUTS = {
@@ -85,6 +87,9 @@ def _record_problem(text):
 
 def _qaction_type():
     return getattr(QtGui, "QAction", None) or QtWidgets.QAction
+
+
+ACTIONS = NativeActionAdapter(Gui, _qaction_type())
 
 
 def _application_shortcut_context():
@@ -875,7 +880,7 @@ def reconcile_actions(main_window=None):
     context = _application_shortcut_context()
     newly_displaced = []
     for command, shortcut in SHORTCUTS.items():
-        target = by_name.get(command)
+        target = ACTIONS.resolve(command)
         if target is None:
             continue
         wanted = _portable(shortcut)

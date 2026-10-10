@@ -23,6 +23,8 @@ extend-exclude = [
     "prototype",
     # Research notes and historical rationale; not release inputs.
     "research",
+    # Versioned project-management kit; validated by its own doctor and route checks.
+    "helper_scripts/PMT",
 ]
 
 [tool.ruff.lint]

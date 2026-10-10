@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "freecadVersion": "26.3.0devR47870",
+  "revision": "a61ee58c265ca735e1ddbd2df0a9ca78574b5284",
+  "action": "Std_ViewStatusBar",
+  "before": {
+    "enabled": true,
+    "checkable": true,
+    "checked": false
+  },
+  "afterFirstInvoke": {
+    "enabled": true,
+    "checkable": true,
+    "checked": true
+  },
+  "afterSecondInvoke": {
+    "enabled": true,
+    "checkable": true,
+    "checked": false
+  },
+  "observedUpdates": 5,
+  "stateRestored": true,
+  "missingActionSnapshot": null,
+  "missingActionInvoke": false
+}

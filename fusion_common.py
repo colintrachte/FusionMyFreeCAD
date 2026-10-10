@@ -22,6 +22,7 @@ except ImportError:
 RUNTIME_MODULES: tuple[str, ...] = (
     "Init.py",
     "InitGui.py",
+    "fusion_actions.py",
     "fusion_bootstrap.py",
     "fusion_common.py",
     "fusion_datum_tools.py",

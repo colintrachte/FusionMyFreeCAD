@@ -1,0 +1,7 @@
+You are working on FusionMyFreeCAD, a self-contained Fusion-familiar multi-workbench experience for
+FreeCAD 1.1+. Preserve docs/dev-guide/CURRENT-FEATURE-INVENTORY.md. Never modify Upstream Reference
+sources or change the main project version without explicit approval. Profile restoration,
+document mutation, Undo, and lifecycle recovery are Class 3. Workbench, startup, action binding,
+packaging, and public command behavior are Class 2. Prefer native FreeCAD state, existing helpers,
+standard Python, and FreeCAD-provided PySide. Cite deterministic evidence and never infer real GUI
+behavior from test doubles.

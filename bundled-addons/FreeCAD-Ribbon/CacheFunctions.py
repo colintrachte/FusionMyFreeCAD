@@ -88,6 +88,11 @@ StringList_Toolbars = []
 List_WorkBenchToolBarItems = []
 List_Commands = []
 
+# Automated consumers can restrict first-run cache initialization to the
+# workbenches they actually own.  The variable is deliberately opt-in so a
+# standalone Ribbon installation keeps its existing all-workbench behavior.
+CACHE_WORKBENCHES_ENV = "FREECAD_RIBBON_CACHE_WORKBENCHES"
+
 # Create lists for the several list in the json file.
 List_IgnoredToolbars = []
 List_IconOnly_Toolbars = []
@@ -766,6 +771,14 @@ def loadAllWorkbenches(AutoHide=True, HideOnly=False, FinishMessage="", progress
         activeWorkbench = Gui.activeWorkbench().name()
         progressBar.show()
         lst = Gui.listWorkbenches()
+        requested = {
+            name.strip()
+            for name in os.environ.get(CACHE_WORKBENCHES_ENV, "").split(",")
+            if name.strip()
+        }
+        if requested:
+            requested.add(activeWorkbench)
+            lst = {name: value for name, value in lst.items() if name in requested}
         progressBar.setMaximum(len(lst) - 1 + maximum)
         for i, wb in enumerate(lst):
             try:

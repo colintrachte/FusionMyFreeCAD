@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "freecadVersion": "26.3.0devR47870",
+  "revision": "a61ee58c265ca735e1ddbd2df0a9ca78574b5284",
+  "command": "Sketcher_ConstrainCoincidentUnified",
+  "selection": ["Vertex2", "Vertex3"],
+  "constraintsBefore": 0,
+  "constraintsAfter": 1,
+  "constraintTypes": ["Coincident"],
+  "passed": true,
+  "note": "Executed through FreeCADGui.runCommand in a real source-built sketch."
+}

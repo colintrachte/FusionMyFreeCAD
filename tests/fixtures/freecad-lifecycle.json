@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "freecadVersion": "26.3.0devR47870",
+  "revision": "a61ee58c265ca735e1ddbd2df0a9ca78574b5284",
+  "validBefore": true,
+  "restoreProblems": [],
+  "recoveryDirectoryCreated": true,
+  "preferencesRestoredExactly": true,
+  "stateRemovedByRestore": true,
+  "reapplyOutcome": "recovered",
+  "secondPrepareOutcome": "unchanged",
+  "baselineUnchanged": true,
+  "validAfter": true,
+  "passed": true
+}
