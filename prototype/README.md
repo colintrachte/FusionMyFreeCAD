@@ -1,7 +1,7 @@
 # FusionMyFreeCAD prototype 1
 
 > **Simpler path:** This manual procedure is retained for troubleshooting. For normal use, install
-> the self-contained add-on by following `../docs/INSTALL-FREECAD-ADDON.md`.
+> the self-contained add-on by following `../docs/user-guide/INSTALL-FREECAD-ADDON.md`.
 
 This is a reversible FreeCAD 1.1.3 UI prototype based on native Part Design and Sketcher commands.
 

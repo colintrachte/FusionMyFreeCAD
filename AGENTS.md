@@ -1,5 +1,14 @@
 # Agent Workspace Guidelines for FusionMyFreeCAD
 
+## Version Authority
+- **Never increment or otherwise change FusionMyFreeCAD's main project/release version without the
+  user's explicit prior approval.** The current 1.8.0 version is accepted and must not be rolled
+  back merely because it was previously incremented without consultation.
+- Do not infer permission for a future project-version bump from a feature request, bug fix,
+  documentation update, package build, deployment, or release-preparation request. Ask first.
+- This rule does not prohibit ordinary changes to unrelated versioned schemas, formats,
+  dependencies, compatibility declarations, or internal data when the task requires them.
+
 ## Internal Scratchpad & Snippet Cache: `ai_poop/`
 - **Default / Project-Local:** All agent scratchpads, FreeCAD diagnostic snippets, and execution helpers belong in the project-local [`ai_poop/`](./ai_poop/README.md).
 - **Check local first:** Before creating one-off diagnostic scripts, FreeCAD subprocess runners, or Coin3D calculations, check `ai_poop/`.

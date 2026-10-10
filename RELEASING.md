@@ -31,7 +31,7 @@ Replace `1.3.0` with the new version. The command updates `package.xml`, both Ri
 versions, the current download links, and the release date. It also creates:
 
 - a new section at the top of `CHANGELOG.md`;
-- `docs/RELEASE-NOTES-1.3.0.md` for the text shown on GitHub.
+- `docs/release-notes/RELEASE-NOTES-1.3.0.md` for the text shown on GitHub.
 
 Open those two files and replace every `TODO` with plain-language changes, fixes, and any upgrade
 warning. Do not move old release notes into the new file; they remain historical records.
@@ -65,7 +65,7 @@ Review the diff, then commit and push the prepared release candidate:
 ```powershell
 git diff --check
 git status --short
-git add package.xml README.md CHANGELOG.md docs/INSTALL-FREECAD-ADDON.md docs/RELEASE-NOTES-1.3.0.md Resources/FusionMyFreeCAD/layout-v3.json Resources/FusionMyFreeCAD/layout-manifest.json
+git add package.xml README.md CHANGELOG.md docs/user-guide/INSTALL-FREECAD-ADDON.md docs/release-notes/RELEASE-NOTES-1.3.0.md Resources/FusionMyFreeCAD/layout-v3.json Resources/FusionMyFreeCAD/layout-manifest.json
 git commit -m "Prepare FusionMyFreeCAD 1.3.0"
 git push origin main
 ```

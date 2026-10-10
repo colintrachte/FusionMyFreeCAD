@@ -2,6 +2,27 @@
 
 All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
+## 1.8.0 — 2026-10-09
+
+TODO: Summarize user-visible changes, fixes, and upgrade notes.
+
+## Unreleased
+
+### Faster workbench transitions
+
+- Repeated workbench activations now supersede older pending copies of the same deferred UI task.
+  Entering or leaving a sketch no longer leaves redundant shortcut, navigation-cube, or model-tree
+  retry chains scanning the main window while FreeCAD is redrawing it.
+- Adaptive command usage now uses a cached command-to-workbench index instead of walking every
+  adaptive panel whenever a tracked command is clicked.
+
+### Coincident constraint button
+
+- The Sketcher ribbon's **Coincident** controls now invoke FreeCAD's unified coincident command.
+  Selecting two endpoints applies a point-to-point Coincident constraint, while selecting an
+  endpoint and an edge applies Point-on-Object instead of leaving the button with no applicable
+  action.
+
 ## 1.8.0 — 2026-09-20
 
 ### Update Model
@@ -202,13 +223,13 @@ Repair References, corrected against a real document instead of a test double.
   - `FusionMyFreeCAD_ModernZinc`: Sleek Zinc stylesheet.
   - `FusionMyFreeCAD_RestoreViewport`: One-click viewport and style restoration.
 - **FreeCAD Core Suggestions Box**:
-  - Cataloged core-bound features (e.g. dynamic Heads-Up Display and Ghost Sketches) in `docs/freecad_core_suggestions_box.md` to keep FMF runtime strictly focused on reliable add-on enhancements.
+  - Cataloged core-bound features (e.g. dynamic Heads-Up Display and Ghost Sketches) in `docs/dev-guide/freecad_core_suggestions_box.md` to keep FMF runtime strictly focused on reliable add-on enhancements.
 
 ### Reliability & Infrastructure
 - **Shared Infrastructure (`fusion_common.py`)**: Centralized `RUNTIME_MODULES` canonical manifest, unified atomic `transaction(doc, label)` context manager, standard `notify()`, base `SketcherCommand`, and swallowed exception logging (`log_swallowed`).
 - **Release Packaging Gate**: `tools/build_addon_package.py` and `validate_addon.py` now import `RUNTIME_MODULES` from `fusion_common.py` as single source of truth, and verify that all packaged runtime modules and assets are tracked in git.
 - **Test Suite Hardening**: Fixed test-induced global state mutation by dynamic module eviction; 100% pass across all 198 tests with zero flakiness.
-- **Repository Hygiene**: Replaced the 15.7 MB static PDF in `docs/` with official web documentation links (`docs/FREECAD-MANUAL-LINK.md`) and made agent guide paths portable.
+- **Repository Hygiene**: Replaced the 15.7 MB static PDF in `docs/` with official web documentation links (`docs/user-guide/FREECAD-MANUAL-LINK.md`) and made agent guide paths portable.
 
 ## 1.3.3 — 2026-09-03
 
