@@ -48,18 +48,18 @@ visibility transition is reversible and never removes the stock implementations.
 
 ## Next — Owned workbenches without regressions
 
-- [ ] **Score 5 🥇 · Class 2 — Register four namespaced FMF workbench shells**
+- [x] **Score 5 🥇 · Class 2 — Register four namespaced FMF workbench shells**
 
   **ID:** task_b2010000000000000000000000000001
-  **Status:** Implementation complete — deterministic verification passed; live FreeCAD verification pending
-  **Outcome:** Register FMF Design, Part, Sketch, and Surface workbenches behind a feature flag while leaving current production behavior available.
+  **Status:** Shipped — deterministic checks and live FreeCAD registration/visibility verification passed
+  **Outcome:** Register FMF Design, Part, Sketch, and Surface as distinct, stable workbenches while retaining the stock workbenches as reversible alternatives.
   **Work mode:** Forge + Steward
   **Execution size:** Large
   **Uncertainty:** High
-  **Protected behavior:** The legacy path remains until owned workbenches pass all gates.
-  **Acceptance:** Four stable IDs/classes/icons register without mutating stock workbench definitions; first-party code uses `freecad/FusionMyFreeCAD/` without `sys.path` mutation.
-  **Expected evidence:** Schema, registration, clean-launch, and side-by-side activation results.
-  **Implement:** `package.xml` · `InitGui.py` · `freecad/FusionMyFreeCAD/__init__.py` · `freecad/FusionMyFreeCAD/init_gui.py` · `freecad/FusionMyFreeCAD/workbenches.py`
+  **Protected behavior:** Stock workbenches remain registered and usable whenever FMF is disabled.
+  **Acceptance:** Four stable IDs/classes/icons register without mutating or unregistering stock workbench definitions.
+  **Evidence:** Automated registration tests passed; FreeCAD 1.1.1 displayed all four FMF workbenches and switched between FMF and stock families without restart.
+  **Implement:** `package.xml` · `InitGui.py` · `fusion_workbenches.py` · `fusion_bootstrap.py`
   **Context:** `docs/dev-guide/workbench-parity.md` · `docs/dev-guide/ACTIVATION-AND-RESTORATION.md`
   **Read:** `<freecad>/src/Gui/FreeCADGuiInit.py` · `<freecad>/src/Gui/Workbench.cpp`
   **Route:** paid-ai
@@ -70,7 +70,7 @@ visibility transition is reversible and never removes the stock implementations.
 - [ ] **Score 5 🥇 · Class 2 — Project all curated layouts into owned workbenches**
 
   **ID:** task_b2020000000000000000000000000002
-  **Status:** Implementation complete — owned layout projection and legacy-state migration tests passed; live parity pending
+  **Status:** In verification — owned layout projection and legacy-state migration tests passed; FMF Design is live-confirmed, but full four-workbench parity remains
   **Outcome:** Preserve every pinned, overflow, dropdown, responsive, adaptive, personalization, label, icon, and size behavior inside the corresponding FMF-owned workbench.
   **Work mode:** Steward
   **Execution size:** Large
@@ -124,20 +124,19 @@ visibility transition is reversible and never removes the stock implementations.
 - [x] **Score 5 🥇 · Class 2 — Add reversible stock-workbench visibility controls**
 
   **ID:** task_b2050000000000000000000000000005
-  **Status:** Implementation complete — reversible visibility-state tests passed; live selector refresh pending
+  **Status:** Shipped — reversible state tests and live no-restart selector switching passed
   **Outcome:** Enabling FMF hides the corresponding stock workbenches; disabling FMF unhides them and hides the FMF family.
   **Work mode:** Steward
   **Execution size:** Medium
   **Uncertainty:** Medium
-  **Protected behavior:** Native workbenches are never removed or rewritten and remain available whenever FMF is disabled.
-  **Acceptance:** Repeated enable/disable cycles expose exactly one workbench family, preserve unrelated visibility choices, and never autoload a hidden FMF workbench.
-  **Expected evidence:** State fixtures and workbench-selector GUI verification.
-  **Implement:** `freecad/FusionMyFreeCAD/workbench_visibility.py` · `freecad/FusionMyFreeCAD/activation.py` · `fusion_bootstrap.py`
-  **Context:** `research/freecad-addon-index-readiness-2026-10-09.md`
+  **Protected behavior:** The Ribbon remains active, unrelated workbench tabs are untouched, and stock workbenches are never removed or rewritten.
+  **Acceptance:** Repeated enable/disable cycles expose exactly one of the four corresponding workbench families, preserve unrelated visibility choices, avoid unregistering workbenches, and never autoload a hidden FMF workbench.
+  **Evidence:** Automated lifecycle/state tests passed; live FreeCAD 1.1.1 verification confirmed immediate switching without restart and successful right-click customization while FMF was disabled.
+  **Implement:** `fusion_bootstrap.py` · `fusion_workbenches.py` · `bundled-addons/FreeCAD-Ribbon/FCBinding.py` · `Resources/FusionMyFreeCAD/preferences.ui`
+  **Context:** `docs/dev-guide/ACTIVATION-AND-RESTORATION.md` · `tests/test_install.py` · `tests/test_runtime.py`
   **Route:** kimi
   **Context Load:** 323
   **Chars:** ~80,629 text total (largest: fusion_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
-  **Blocked by:** task_b2040000000000000000000000000004
 
 - [ ] **Score 5 🥇 · Class 2 — Make shortcut activation conflict-safe**
 
@@ -161,8 +160,7 @@ visibility transition is reversible and never removes the stock implementations.
 - [ ] **Score 4 🥇 · Class 2 — Consolidate personalization and scope runtime observers**
 
   **ID:** task_b2070000000000000000000000000007
-  **Status:** In progress — owned contexts and deterministic teardown are implemented; live timing
-  and repeated enable/disable verification remain
+  **Status:** In progress — owned contexts, deterministic teardown, and repeated live enable/disable behavior are verified; performance timings and broader personalization journeys remain
   **Outcome:** Give stable-ID personalization one owner and activate expensive scans, filters, observers, and adaptive rewrites only in their owning FMF contexts.
   **Work mode:** Forge + Steward
   **Execution size:** Large
@@ -293,7 +291,8 @@ visibility transition is reversible and never removes the stock implementations.
 
 ## Rejected directions
 
-- One generic FMF workbench; generic toolbar discovery as the core taxonomy; wholesale merges of
+- One generic FMF workbench; unregistering workbenches or disabling the whole Ribbon as a visibility
+  mechanism; generic toolbar discovery as the core taxonomy; wholesale merges of
   NeoRibbon, ToolSeek, PieMenu, FreeCAD-Nxt, or OpenTheme; a second usage database; adaptive
   movement outside FREQUENT; production telemetry; speculative QtQuick shell replacement; Git
   history rewriting; or an unapproved main-version change.
@@ -303,4 +302,5 @@ visibility transition is reversible and never removes the stock implementations.
 Now is committed; Next is a vertical-slice architecture program; Later is evidence-driven. During
 Next, reserve roughly 60% for owned-workbench migration, 30% for restoration/testing/technical
 health, and 10% for urgent regressions. Verify with `python -m pytest tests -q`,
-`python validate_addon.py`, `ruff check .`, `ruff format --check .`, and PMT route/check commands.
+`python tools/validate_layout_contracts.py`, `python tools/validate_release_metadata.py 1.8.0`,
+`ruff check .`, `ruff format --check .`, and PMT route/check commands.

@@ -588,9 +588,13 @@ def test_a_frequent_section_keeps_its_shape_whatever_is_promoted(env, bootstrap,
 def test_sketcher_has_a_frequent_section_alongside_its_slot_swaps(env, bootstrap, runtime):
     """A workbench may carry both kinds of adaptive section."""
     bootstrap.prepare()
+    now = runtime._utc_now()
     runtime.load_usage()["workbenches"]["SketcherWorkbench"] = {
-        "Sketcher_CreateBSpline": {"score": 9.0, "lastUsed": runtime._utc_now().isoformat()},
-        "Sketcher_ConstrainTangent": {"score": 9.0, "lastUsed": runtime._utc_now().isoformat()},
+        "Sketcher_CreateBSpline": {
+            "score": 9.0,
+            "lastUsed": (now - timedelta(seconds=1)).isoformat(),
+        },
+        "Sketcher_ConstrainTangent": {"score": 9.0, "lastUsed": now.isoformat()},
     }
     assert runtime.refresh_adaptive_panel("SketcherWorkbench") is True
 
