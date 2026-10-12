@@ -82,7 +82,7 @@ whole FusionMyFreeCAD interface.
 
 ## Settings
 
-**Edit -> Preferences -> FusionMyFreeCAD** exposes activation plus four behavior switches: start
+**Edit -> Preferences -> FMF** exposes activation plus four behavior switches: start
 workbench, Fusion navigation and navigation cube, Fusion keyboard shortcuts, and the optional
 starter design (off by default).
 
@@ -113,7 +113,7 @@ active `Mod/FusionMyFreeCAD` folder is the release archive described above.
    corresponding stock workbench, restores managed preferences and shortcuts, and hides FMF's
    workbenches without deleting their saved layout or personalization. It also disconnects FMF's
    live callbacks and closes its Parameters dock.
-2. Restart FreeCAD so the workbench selector reloads the saved visibility state, then close FreeCAD.
+2. Confirm the selector immediately shows the stock workbenches, then close FreeCAD.
 3. Remove only the `Mod/FusionMyFreeCAD` directory.
 4. Start FreeCAD and confirm the prior UI is active.
 

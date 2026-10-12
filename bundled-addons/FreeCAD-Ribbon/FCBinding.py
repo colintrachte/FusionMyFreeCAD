@@ -1760,6 +1760,14 @@ class ModernMenu(RibbonBar):
                 # If the panel has an overflow menu, replace it with a complete (long) panel
                 if objPanel.panelOptionButton().isVisible():
                     newPanel = self.CreatePanel(workbenchName=workbenchName, panelName=objPanel.objectName(), addPanel=False, Dict=self.workBenchDict, ignoreColumnLimit=True, showEnableControl=True, enableSeparator=True, ActivateButtons=True)                                
+                    if newPanel is None:
+                        App.Console.PrintWarning(
+                            "FusionMyFreeCAD: could not expand panel '{}' for "
+                            "customization; leaving the existing panel unchanged.\n".format(
+                                objPanel.objectName()
+                            )
+                        )
+                        continue
                     replacedPanel = self.currentCategory().replacePanel(objPanel, newPanel)
                     # For some reason, the font of the panel title will be reset after replacing a panel, set its properties again.
                     self.setPanelProperties(replacedPanel)
@@ -3628,9 +3636,9 @@ class ModernMenu(RibbonBar):
         return
 
     def onWbActivated(self):        
-        if not self._fmfAuthoritativeWorkbenchActive():
-            self._setFmfChromeVisible(False)
-            return
+        # The Ribbon is the application chrome for every workbench. FMF only
+        # owns the layouts of its four namespaced workbenches; selecting a stock
+        # or unrelated workbench must never blank the entire Ribbon.
         self._setFmfChromeVisible(True)
         if len(mw.findChildren(QDockWidget, "Ribbon")) > 0:
             if Parameters.AUTOHIDE_RIBBON is False:

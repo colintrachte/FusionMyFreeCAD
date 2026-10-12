@@ -61,6 +61,7 @@ def test_required_files_are_present():
         ROOT / "InitGui.py",
         ROOT / "fusion_actions.py",
         ROOT / "fusion_bootstrap.py",
+        ROOT / "fusion_workbenches.py",
         ROOT / "fusion_sketch_tools.py",
         ROOT / "LICENSE",
         ROOT / "THIRD_PARTY_NOTICES.md",
@@ -75,6 +76,23 @@ def test_required_files_are_present():
     ]
     missing = [str(path.relative_to(ROOT)) for path in required if not path.is_file()]
     assert missing == []
+
+
+def test_current_fmf_owned_names_do_not_use_fusion_prefix(layout):
+    assert set(layout["workbenches"]) == {
+        "FMFDesignWorkbench",
+        "FMFPartWorkbench",
+        "FMFSketchWorkbench",
+        "FMFSurfaceWorkbench",
+    }
+    panel_names = [panel["name"] for panels in layout["workbenches"].values() for panel in panels]
+    assert all(not name.startswith("Fusion ") for name in panel_names)
+
+
+def test_dev_installer_rejects_saved_scratch_profile():
+    source = (ROOT / "tools" / "install-dev.ps1").read_text(encoding="utf-8-sig")
+    assert "Test-IsScratchModDir" in source
+    assert "Ignoring saved isolated test profile" in source
 
 
 def test_runtime_local_imports_are_declared_for_packaging():
@@ -114,18 +132,24 @@ def test_no_nested_git_repositories_in_the_payload():
     assert list(BUNDLED.rglob(".git")) == []
 
 
-def test_bundled_ribbon_respects_live_disable_state():
+def test_bundled_ribbon_keeps_non_fmf_workbenches_visible():
     source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     method = next(
         node
         for node in ast.walk(tree)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and node.name == "_fmfAuthoritativeWorkbenchActive"
+        and node.name == "onWbActivated"
     )
     method_source = ast.get_source_segment(source, method)
-    assert "FusionMyFreeCAD" in method_source
-    assert 'GetBool("Enabled", True)' in method_source
+    assert "_setFmfChromeVisible(True)" in method_source
+    assert "_setFmfChromeVisible(False)" not in method_source
+
+
+def test_bundled_ribbon_customization_rejects_a_missing_replacement_panel():
+    source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text(encoding="utf-8")
+    assert "if newPanel is None:" in source
+    assert "leaving the existing panel unchanged" in source
 
 
 # ---------------------------------------------------------------------------

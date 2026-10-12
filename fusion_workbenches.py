@@ -142,3 +142,32 @@ def register() -> None:
         if workbench_class.WorkbenchId not in existing:
             Gui.addWorkbench(workbench_class())
     _registered = True
+
+
+def unregister() -> None:
+    """Remove FMF identities and make FreeCAD rebuild its workbench selector."""
+    global _registered
+    existing = set(Gui.listWorkbenches()) if hasattr(Gui, "listWorkbenches") else set()
+    for workbench_class in WORKBENCH_CLASSES:
+        if workbench_class.WorkbenchId in existing:
+            Gui.removeWorkbench(workbench_class.WorkbenchId)
+    _registered = False
+
+
+def refresh_selector() -> None:
+    """Ask FreeCAD to rebuild workbench controls without requiring a restart."""
+
+    class FMFWorkbenchRefresh(Gui.Workbench):
+        MenuText = "FMF workbench refresh"
+
+        def GetClassName(self):
+            return "Gui::PythonWorkbench"
+
+        def Initialize(self):
+            pass
+
+    name = FMFWorkbenchRefresh.__name__
+    existing = set(Gui.listWorkbenches()) if hasattr(Gui, "listWorkbenches") else set()
+    if name not in existing:
+        Gui.addWorkbench(FMFWorkbenchRefresh())
+    Gui.removeWorkbench(name)

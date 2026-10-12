@@ -620,6 +620,17 @@ class FakeTimer:
 
     queue: ClassVar[list] = []
 
+    def __init__(self, _parent=None):
+        self.timeout = Signal()
+        self.interval = None
+        self.started = False
+
+    def setInterval(self, interval):
+        self.interval = interval
+
+    def start(self):
+        self.started = True
+
     @classmethod
     def singleShot(cls, _delay, callback):
         cls.queue.append(callback)
@@ -1407,6 +1418,7 @@ class Environment:
         gui.addWorkbench = lambda workbench: self.workbenches.__setitem__(
             workbench.__class__.__name__, workbench
         )
+        gui.removeWorkbench = lambda name: self.workbenches.pop(name, None)
         gui.listWorkbenches = lambda: dict(self.workbenches)
         gui.getWorkbench = lambda name: self.workbenches[name]
         gui.getMainWindow = lambda: self.main_window

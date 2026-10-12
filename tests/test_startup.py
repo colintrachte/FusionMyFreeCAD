@@ -24,6 +24,23 @@ def _run_init_gui(env, bootstrap, monkeypatch, stub_vendors=True):
     return _import_module("fusion_init_gui_under_test", ROOT / "InitGui.py")
 
 
+def test_init_gui_runs_from_freecads_function_scoped_exec(env, bootstrap, monkeypatch):
+    """FreeCAD executes InitGui.py inside a loader method, not as an imported module."""
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+    monkeypatch.setattr(bootstrap, "validate_enabled_ui", lambda: None)
+    monkeypatch.setattr(bootstrap, "load_vendor", lambda *_args: None)
+    monkeypatch.setattr(bootstrap, "run_runtime", lambda: None)
+    source = (ROOT / "InitGui.py").read_text(encoding="utf-8")
+
+    def freecad_loader():
+        exec(compile(source, ROOT / "InitGui.py", "exec"))
+
+    freecad_loader()
+
+    assert env.preference_pages == [(bootstrap.PREFERENCES_UI, "FMF")]
+    assert "FMFDesignWorkbench" in env.workbenches
+
+
 def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
     _run_init_gui(env, bootstrap, monkeypatch)
     assert set(env.commands) == {
@@ -100,6 +117,53 @@ def test_owned_workbenches_register_without_replacing_native_workbenches(env, bo
     assert env.workbenches["FMFPartWorkbench"].GetClassName() == "PartGui::Workbench"
     assert env.workbenches["FMFSketchWorkbench"].GetClassName() == "SketcherGui::Workbench"
     assert env.workbenches["FMFSurfaceWorkbench"].GetClassName() == "SurfaceGui::Workbench"
+    assert env.workbenches["FMFDesignWorkbench"].MenuText == "FMF Design"
+    assert env.workbenches["FMFPartWorkbench"].MenuText == "FMF Part"
+    assert env.workbenches["FMFSketchWorkbench"].MenuText == "FMF Sketch"
+    assert env.workbenches["FMFSurfaceWorkbench"].MenuText == "FMF Surface"
+
+
+def test_owned_workbench_registration_migrates_development_ids(env, bootstrap):
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+    general = env.param("User parameter:BaseApp/Preferences/General")
+    general.SetString("AutoloadModule", "FusionDesignWorkbench")
+    workbenches = env.param(bootstrap.WORKBENCH_PREFERENCE_ROOT)
+    workbenches.SetString("Disabled", "DraftWorkbench,FusionSketchWorkbench")
+    workbenches.SetString("Ordered", "FusionDesignWorkbench,PartWorkbench")
+
+    bootstrap.register_owned_workbenches()
+
+    assert general.GetString("AutoloadModule") == "FMFDesignWorkbench"
+    disabled = set(workbenches.GetString("Disabled").split(","))
+    assert "DraftWorkbench" in disabled
+    assert set(bootstrap.OWNED_TO_NATIVE_WORKBENCH.values()) <= disabled
+    assert not set(bootstrap.OWNED_TO_NATIVE_WORKBENCH) & disabled
+    assert workbenches.GetString("Ordered") == "FMFDesignWorkbench,PartWorkbench"
+
+
+def test_customization_migrates_fmf_owned_names(env, bootstrap):
+    Path(bootstrap.CUSTOMIZATION_PATH).write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "layoutVersion": bootstrap.PACKAGE_VERSION,
+                "workbenches": {
+                    "FusionDesignWorkbench": {
+                        "panelOrder": ["Fusion Frequent_newPanel"],
+                        "panels": {"Fusion Frequent_newPanel": {"order": []}},
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    customization = bootstrap._read_customization()
+
+    assert "FusionDesignWorkbench" not in customization["workbenches"]
+    saved = customization["workbenches"]["FMFDesignWorkbench"]
+    assert saved["panelOrder"] == ["FMF Frequent_newPanel"]
+    assert set(saved["panels"]) == {"FMF Frequent_newPanel"}
 
 
 def test_owned_workbench_registration_stays_off_outside_the_pilot(env, bootstrap):
@@ -114,21 +178,22 @@ def test_owned_workbench_visibility_preserves_unrelated_user_choices(env, bootst
     workbenches.SetString("Disabled", "DraftWorkbench,SurfaceWorkbench")
 
     bootstrap.set_owned_workbench_visibility(True)
-    disabled = workbenches.GetString("Disabled").split(",")
+    disabled = set(workbenches.GetString("Disabled").split(","))
     assert "DraftWorkbench" in disabled
     assert "SurfaceWorkbench" in disabled
-    assert not set(bootstrap.OWNED_TO_NATIVE_WORKBENCH) & set(disabled)
+    assert set(bootstrap.OWNED_TO_NATIVE_WORKBENCH.values()) <= disabled
+    assert not set(bootstrap.OWNED_TO_NATIVE_WORKBENCH) & disabled
 
     bootstrap.set_owned_workbench_visibility(False)
     disabled = set(workbenches.GetString("Disabled").split(","))
     assert "DraftWorkbench" in disabled
-    assert "SurfaceWorkbench" in disabled
+    assert "SurfaceWorkbench" not in disabled
+    assert not set(bootstrap.OWNED_TO_NATIVE_WORKBENCH.values()) & disabled
     assert set(bootstrap.OWNED_TO_NATIVE_WORKBENCH) <= disabled
 
 
-def test_hiding_stock_workbenches_is_reversed_without_unhiding_user_choices(env, bootstrap):
+def test_switching_workbench_families_is_idempotent(env, bootstrap):
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
-    env.param(bootstrap.PREFERENCE_ROOT).SetBool("HideNativeWorkbenches", True)
     workbenches = env.param(bootstrap.WORKBENCH_PREFERENCE_ROOT)
     workbenches.SetString("Disabled", "PartWorkbench,DraftWorkbench")
 
@@ -137,10 +202,34 @@ def test_hiding_stock_workbenches_is_reversed_without_unhiding_user_choices(env,
     bootstrap.set_owned_workbench_visibility(False)
 
     disabled = set(workbenches.GetString("Disabled").split(","))
-    assert "PartWorkbench" in disabled
+    assert "PartWorkbench" not in disabled
     assert "DraftWorkbench" in disabled
     assert "PartDesignWorkbench" not in disabled
     assert set(bootstrap.OWNED_TO_NATIVE_WORKBENCH) <= disabled
+
+
+def test_disabled_mode_never_starts_in_an_fmf_workbench(env, bootstrap):
+    general = env.param("User parameter:BaseApp/Preferences/General")
+    general.SetString("AutoloadModule", "FMFSketchWorkbench")
+
+    bootstrap.set_owned_workbench_visibility(False)
+    bootstrap.sync_start_workbench(False)
+
+    assert general.GetString("AutoloadModule") == "SketcherWorkbench"
+
+
+def test_enabled_mode_uses_fmf_design_only_when_requested(env, bootstrap):
+    preferences = env.param(bootstrap.PREFERENCE_ROOT)
+    general = env.param("User parameter:BaseApp/Preferences/General")
+    general.SetString("AutoloadModule", "PartWorkbench")
+
+    bootstrap.sync_start_workbench(True)
+    assert general.GetString("AutoloadModule") == "FMFDesignWorkbench"
+
+    preferences.SetBool("SetStartWorkbench", False)
+    bootstrap.sync_start_workbench(False)
+    bootstrap.sync_start_workbench(True)
+    assert general.GetString("AutoloadModule") == "PartDesignWorkbench"
 
 
 def test_owned_mode_disable_switches_to_native_without_removing_layout(env, bootstrap, monkeypatch):
@@ -166,6 +255,84 @@ def test_owned_mode_disable_switches_to_native_without_removing_layout(env, boot
     assert Path(bootstrap.RIBBON_PATH).read_bytes() == ribbon_before
 
 
+def test_preferences_toggle_switches_workbench_families_live(env, bootstrap, monkeypatch):
+    preferences = env.param(bootstrap.PREFERENCE_ROOT)
+    preferences.SetBool("UseOwnedWorkbenches", True)
+    monkeypatch.setattr(bootstrap, "prepare", lambda: "unchanged")
+    monkeypatch.setattr(bootstrap, "run_runtime", lambda: None)
+    monkeypatch.setattr(bootstrap, "load_vendor", lambda *_args: None)
+    monkeypatch.setattr(bootstrap, "_restore_native_ui_now", lambda: None)
+    monkeypatch.setattr(bootstrap, "install_lifecycle_menu", lambda: None)
+
+    bootstrap.register_owned_workbenches()
+    bootstrap.install_activation_monitor()
+    preferences.SetBool("Enabled", False)
+    bootstrap.reconcile_activation_preference()
+
+    disabled = set(env.param(bootstrap.WORKBENCH_PREFERENCE_ROOT).GetString("Disabled").split(","))
+    assert not set(bootstrap.OWNED_TO_NATIVE_WORKBENCH.values()) & disabled
+    assert set(bootstrap.OWNED_TO_NATIVE_WORKBENCH) <= disabled
+    assert set(bootstrap.OWNED_TO_NATIVE_WORKBENCH) <= set(env.workbenches)
+    assert env.active_workbench == "PartDesignWorkbench"
+
+    preferences.SetBool("Enabled", True)
+    bootstrap.reconcile_activation_preference()
+
+    disabled = set(env.param(bootstrap.WORKBENCH_PREFERENCE_ROOT).GetString("Disabled").split(","))
+    assert set(bootstrap.OWNED_TO_NATIVE_WORKBENCH.values()) <= disabled
+    assert not set(bootstrap.OWNED_TO_NATIVE_WORKBENCH) & disabled
+    assert set(bootstrap.OWNED_TO_NATIVE_WORKBENCH) <= set(env.workbenches)
+    assert env.active_workbench == "FMFDesignWorkbench"
+
+
+def test_ribbon_family_switch_hides_only_the_corresponding_four_tabs(env, bootstrap):
+    class TabBar:
+        def __init__(self):
+            self.ids = [
+                None,
+                "AssemblyWorkbench",
+                "PartDesignWorkbench",
+                "FMFDesignWorkbench",
+                "PartWorkbench",
+                "FMFPartWorkbench",
+            ]
+            self.visible = [True] * len(self.ids)
+            self.current = 0
+
+        def count(self):
+            return len(self.ids)
+
+        def tabData(self, index):
+            return self.ids[index]
+
+        def setTabVisible(self, index, visible):
+            self.visible[index] = visible
+
+        def setCurrentIndex(self, index):
+            self.current = index
+
+    tabs = TabBar()
+    ribbon = type("Ribbon", (), {"tabBar": lambda self: tabs})()
+    dock = env.pyside.QtWidgets.QDockWidget(object_name="Ribbon")
+    dock.setWidget(ribbon)
+    env.main_window.docks.append(dock)
+
+    env.active_workbench = "FMFDesignWorkbench"
+    assert bootstrap.set_ribbon_workbench_family(True) is True
+    visibility = dict(zip(tabs.ids, tabs.visible, strict=True))
+    assert visibility["AssemblyWorkbench"] is True
+    assert visibility["PartDesignWorkbench"] is False
+    assert visibility["FMFDesignWorkbench"] is True
+
+    env.active_workbench = "PartDesignWorkbench"
+    assert bootstrap.set_ribbon_workbench_family(False) is True
+    visibility = dict(zip(tabs.ids, tabs.visible, strict=True))
+    assert visibility["AssemblyWorkbench"] is True
+    assert visibility["PartDesignWorkbench"] is True
+    assert visibility["FMFDesignWorkbench"] is False
+    assert tabs.ids[tabs.current] == "PartDesignWorkbench"
+
+
 def test_disabled_startup_registers_only_lifecycle_commands(env, bootstrap, monkeypatch):
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("Enabled", False)
     calls = []
@@ -183,7 +350,7 @@ def test_disabled_startup_registers_only_lifecycle_commands(env, bootstrap, monk
         "FusionMyFreeCAD_Restore",
         "FusionMyFreeCAD_Verify",
     }
-    assert calls == []
+    assert calls == ["SearchBar", "FreeCAD_Ribbon"]
     assert env.selection_observers == []
     assert env.document_observers == []
 
@@ -220,6 +387,22 @@ def test_enabled_ui_validation_accepts_native_chrome_with_hidden_ribbon(
     FakeTimer.pump()
 
     assert bootstrap.is_enabled() is True
+    assert bootstrap.startup_failures() == []
+
+
+def test_enabled_ui_validation_defers_when_main_window_is_hidden(env, bootstrap, monkeypatch):
+    monkeypatch.setattr(env.main_window, "isVisible", lambda: False, raising=False)
+    recovery_calls = []
+    monkeypatch.setattr(
+        bootstrap, "_restore_native_ui_now", lambda: recovery_calls.append("native-ui")
+    )
+    monkeypatch.setattr(bootstrap, "install_lifecycle_menu", lambda: recovery_calls.append("menu"))
+
+    bootstrap.validate_enabled_ui()
+    FakeTimer.pump()
+
+    assert bootstrap.is_enabled() is True
+    assert recovery_calls == []
     assert bootstrap.startup_failures() == []
 
 
@@ -583,7 +766,7 @@ def test_the_preferences_page_is_registered(env, bootstrap, monkeypatch):
     _run_init_gui(env, bootstrap, monkeypatch)
     assert len(env.preference_pages) == 1
     path, group = env.preference_pages[0]
-    assert group == "FusionMyFreeCAD"
+    assert group == "FMF"
     assert Path(path).is_file()
 
 
@@ -618,7 +801,7 @@ def test_the_preferences_page_covers_every_switch_the_runtime_reads(bootstrap):
         if element.get("name") == "prefEntry"
     }
     # These activation controls are consumed by bootstrap before runtime.py is loaded.
-    assert entries == read_by_runtime | {"Enabled", "HideNativeWorkbenches"}
+    assert entries == read_by_runtime | {"Enabled"}
     paths = {
         element.find("cstring").text
         for element in tree.iter("property")

@@ -422,6 +422,33 @@ FCBINDING_ACTIVATE_PATCH = (
     ),
 )
 
+FCBINDING_WORKBENCH_FAMILY_PATCH = (
+    (
+        "    def onWbActivated(self):        \n"
+        "        if not self._fmfAuthoritativeWorkbenchActive():\n"
+        "            self._setFmfChromeVisible(False)\n"
+        "            return\n"
+        "        self._setFmfChromeVisible(True)\n",
+        "    def onWbActivated(self):        \n"
+        "        # The Ribbon is the application chrome for every workbench. FMF only\n"
+        "        # owns the layouts of its four namespaced workbenches; selecting a stock\n"
+        "        # or unrelated workbench must never blank the entire Ribbon.\n"
+        "        self._setFmfChromeVisible(True)\n",
+    ),
+    (
+        "                    replacedPanel = self.currentCategory().replacePanel(objPanel, newPanel)\n",
+        "                    if newPanel is None:\n"
+        "                        App.Console.PrintWarning(\n"
+        "                            \"FusionMyFreeCAD: could not expand panel '{}' for \"\n"
+        '                            "customization; leaving the existing panel unchanged.\\n".format(\n'
+        "                                objPanel.objectName()\n"
+        "                            )\n"
+        "                        )\n"
+        "                        continue\n"
+        "                    replacedPanel = self.currentCategory().replacePanel(objPanel, newPanel)\n",
+    ),
+)
+
 FCBINDING_OVERFLOW_PATCH = (
     (
         "                if (\n"
@@ -1627,7 +1654,8 @@ LOCAL_PATCHES = (
         FCBINDING_INTEGRATION_PATCH
         + FCBINDING_DIVIDER_PATCH
         + FCBINDING_OVERFLOW_PATCH
-        + FCBINDING_ACTIVATE_PATCH,
+        + FCBINDING_ACTIVATE_PATCH
+        + FCBINDING_WORKBENCH_FAMILY_PATCH,
     ),
     (
         ("FreeCAD-Ribbon", "CustomWidgets.py"),

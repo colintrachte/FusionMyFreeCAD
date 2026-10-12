@@ -387,6 +387,33 @@ def test_owned_mode_migrates_native_usage_history(env, bootstrap, runtime):
     assert usage["workbenches"]["FMFDesignWorkbench"]["PartDesign_Pad"]["score"] == 4.0
 
 
+def test_owned_mode_migrates_development_usage_and_pin_names(env, bootstrap, runtime):
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+    Path(runtime.USAGE_PATH).parent.mkdir(parents=True, exist_ok=True)
+    Path(runtime.USAGE_PATH).write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "workbenches": {"FusionDesignWorkbench": {}},
+                "pins": {
+                    "FusionDesignWorkbench": {
+                        "Fusion Frequent_newPanel": {"kept": ["PartDesign_Pad"]}
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    usage = runtime.load_usage()
+
+    assert "FusionDesignWorkbench" not in usage["workbenches"]
+    assert "FMFDesignWorkbench" in usage["workbenches"]
+    assert usage["pins"]["FMFDesignWorkbench"]["FMF Frequent_newPanel"]["kept"] == [
+        "PartDesign_Pad"
+    ]
+
+
 def test_adaptive_command_reverse_index_is_built_once(env, runtime, monkeypatch):
     real_groups = runtime.adaptive_groups
     calls = {"count": 0}
@@ -432,9 +459,7 @@ def test_sketcher_slot_swap_keeps_non_candidates_in_place(env, bootstrap, runtim
     bootstrap.prepare()
     path = Path(bootstrap.RIBBON_PATH)
     before = json.loads(path.read_text("utf-8"))
-    toolbar = before["workbenches"]["SketcherWorkbench"]["toolbars"][
-        "FMF Sketch Create_newPanel"
-    ]
+    toolbar = before["workbenches"]["SketcherWorkbench"]["toolbars"]["FMF Sketch Create_newPanel"]
     fixed = [
         c
         for c in toolbar["order"]

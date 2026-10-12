@@ -254,17 +254,13 @@ def _width_bar(stored=None, model="current"):
 
 def test_a_section_never_dragged_has_no_stored_width(math_module):
     """It must then size itself exactly as upstream does."""
-    got = math_module.stored_panel_width(
-        _width_bar(), "PartDesignWorkbench", "FMF Create_newPanel"
-    )
+    got = math_module.stored_panel_width(_width_bar(), "PartDesignWorkbench", "FMF Create_newPanel")
     assert got is None
 
 
 def test_a_dragged_section_remembers_its_width(math_module):
     bar = _width_bar(412, model=math_module.WIDTH_MODEL)
-    assert (
-        math_module.stored_panel_width(bar, "PartDesignWorkbench", "FMF Create_newPanel") == 412
-    )
+    assert math_module.stored_panel_width(bar, "PartDesignWorkbench", "FMF Create_newPanel") == 412
 
 
 def test_a_width_from_an_earlier_measurement_is_retired(math_module):

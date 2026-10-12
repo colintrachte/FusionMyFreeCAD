@@ -111,21 +111,20 @@ Each lives in an **INSPECT** panel:
 | **Verify FusionMyFreeCAD** | Checks the installed layout, the restore point, the bundled payload, and any startup or runtime failure, and reports what to do next |
 | **Reset FusionMyFreeCAD** | Returns the whole ribbon, managed preferences, and shortcuts to the shipped defaults; this clears all panel personalisation |
 | **Disable FusionMyFreeCAD** | Switches an active FMF workbench to its stock counterpart, restores managed preferences and shortcuts, disconnects FMF runtime services, hides FMF workbenches, and keeps FMF disabled across restarts |
-| **Enable FusionMyFreeCAD** | Re-enables and exposes the FMF-owned Design, Part, Sketch, and Surface workbenches without rewriting stock workbench layouts |
+| **Enable FusionMyFreeCAD** | Exposes the FMF-owned Design, Part, Sketch, and Surface workbenches and hides their stock counterparts without rewriting stock workbench layouts |
 
-Restart FreeCAD after enabling or disabling so the workbench selector reflects the saved state.
+Enabling or disabling updates the workbench selector immediately and persists the state.
 Run **Disable FusionMyFreeCAD** before removing it in Addon Manager. If you have already removed it,
 [`tools/RestoreFusionMyFreeCAD.FCMacro`](tools/RestoreFusionMyFreeCAD.FCMacro) performs the same
 profile recovery as a standalone macro.
 
 ## Settings
 
-**Edit → Preferences → FusionMyFreeCAD** exposes the opt-outs:
+**Edit → Preferences → FMF** exposes the opt-outs:
 
 | Setting | Default | Effect |
 |---|---|---|
-| Enable FusionMyFreeCAD | on | Loads the FMF interface and behavior after restart |
-| Hide corresponding stock workbenches | off | Hides the four stock equivalents while FMF is enabled; their prior visibility is restored on disable |
+| Enable FMF | on | Loads the FMF interface and behavior after restart |
 | Start in the FMF Design workbench | on | Sets FMF Design as the autoload workbench |
 | Use Fusion-style navigation and the navigation cube | on | Revit navigation style, navigation cube top-right |
 | Apply Fusion keyboard shortcuts | on | `L` `R` `C` `D` `E` `H` `T` `O` `P` `X` and friends |

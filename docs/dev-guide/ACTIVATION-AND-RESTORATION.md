@@ -8,10 +8,11 @@ user deltas made after activation. They must never be collapsed into one snapsho
 - **Installed disabled:** lifecycle commands and Preferences are registered; no opinionated profile changes.
 - **Activating:** the original baseline is durably captured before the first managed write.
 - **Active:** the FMF-owned Design, Part, Sketch, and Surface workbenches are registered; FMF
-  defaults plus user deltas are in effect. Stock workbenches remain structurally untouched.
+  defaults plus user deltas are in effect. Their stock counterparts remain structurally untouched
+  but are hidden from the selector.
 - **Disabling:** an active FMF workbench is mapped to its stock counterpart, managed preferences
   and shortcuts are restored from the immutable baseline, and FMF workbench entries are hidden.
-- **Disabled:** stock workbenches and native chrome remain usable; the generated FMF layout and
+- **Disabled:** stock workbenches and the bundled Ribbon remain usable; the generated FMF layout and
   personalization stay on disk for lossless re-enable. This state persists across restarts and
   enablement remains available in Preferences and the FusionMyFreeCAD menu.
 - **Recovery required:** an interrupted transition is detected and completed or rolled back before
@@ -24,10 +25,11 @@ then commit the active marker. Failure reverses completed writes. Declining acti
 managed writes. Repeated enable, disable, and reset operations are idempotent.
 
 Disable prevents observers and event filters from loading on the next launch, restores exact
-preference existence/type/value, restores each prior shortcut owner, restores only stock-workbench
-visibility that FMF itself changed, disconnects live runtime callbacks, removes feature observers,
-and closes the Parameters dock. It makes native toolbars discoverable immediately; a restart is
-required for FreeCAD's workbench selector to reread its saved visibility list. It does not delete the
+preference existence/type/value, restores each prior shortcut owner, unhides all four corresponding
+stock workbenches, hides all four FMF workbenches, disconnects live runtime callbacks, removes
+feature observers, and closes the Parameters dock. Any FMF autoload workbench is mapped to its stock
+counterpart, so disabled FMF never starts in a hidden FMF workbench. It refreshes the workbench
+selector immediately without hiding the Ribbon or unrelated workbench tabs. It does not delete the
 FMF layout or personalization. Shutdown must never persist an empty native toolbar strip. Uninstall is
 preceded by disable where the host supports it; the standalone recovery macro remains the recovery
 path when files are already removed.
@@ -39,9 +41,9 @@ their current subscriptions. Layout defaults remain in the layout JSON; user per
 delta keyed by stable IDs. No service may overwrite the baseline during upgrade or Reset.
 
 The shipped layout is authoritative only for `FMFDesignWorkbench`, `FMFPartWorkbench`,
-`FMFSketchWorkbench`, and `FMFSurfaceWorkbench`. The vendored ribbon hides native chrome only
-for those IDs. Activating any stock workbench hides the FMF ribbon and leaves that workbench's own
-toolbars and menu active.
+`FMFSketchWorkbench`, and `FMFSurfaceWorkbench`. The vendored Ribbon remains the application chrome
+for FMF, stock, and unrelated workbenches. Activation changes only the visibility of the four FMF
+tabs and their four stock counterparts; it must never hide the whole Ribbon.
 
 ## Required failure tests
 
@@ -68,7 +70,7 @@ FMF writes bounded structured diagnostics under
 session-linked startup steps, vendor loading, durations, exceptions, and the final UI-health
 snapshot. `session-status.json` reports `starting`, `healthy`, `degraded`, or
 `activation_rolled_back`; `healthy` is not written until the deferred visual check confirms a
-visible Ribbon, or until disabled startup restores the native interface.
+visible Ribbon, or until disabled startup restores the stock workbench tabs.
 
 Use **FusionMyFreeCAD → Copy Diagnostic Summary** for a short support report or
 **FusionMyFreeCAD → Open Diagnostics Folder** for the complete local evidence. Logs rotate at

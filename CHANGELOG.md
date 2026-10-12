@@ -6,6 +6,11 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
 ### Regression hardening
 
+- FMF-owned workbenches and ribbon panels now consistently use the FMF name: **FMF Design**,
+  **FMF Part**, **FMF Sketch**, and **FMF Surface**. Saved workbench IDs, panel customization,
+  adaptive pins, usage history, and autoload preferences from development builds are migrated.
+- The Preferences page is again registered as **FMF**. The development installer now ignores a
+  saved `ai_poop` test-profile destination instead of silently updating the wrong FreeCAD profile.
 - Disabling FMF in a running session now disconnects its workbench callback, event filter, feature
   observers, dress-up enhancer, and Parameters dock. The bundled Ribbon also checks FMF's enabled
   state before showing itself, preventing late callbacks from taking native chrome back over.

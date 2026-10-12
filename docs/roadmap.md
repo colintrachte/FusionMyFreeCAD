@@ -10,8 +10,8 @@ version remains 1.8.0 unless the owner explicitly approves a change.
 Deliver FMF-owned Design, Part, Sketch, and Surface workbenches that are superior everyday
 alternatives to their stock equivalents while retaining one-package setup, complete command access,
 Fusion-familiar workflows, FMF modelling enhancements, exact recovery, and good performance. Users
-may explicitly hide corresponding stock workbenches after activation; hiding is reversible and is
-never required for FMF operation.
+use the FMF workbench family while enabled and the corresponding stock family while disabled. The
+visibility transition is reversible and never removes the stock implementations.
 
 ## Product gates
 
@@ -121,16 +121,16 @@ never required for FMF operation.
   **Chars:** ~75,174 text total (largest: fusion_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Blocked by:** task_a1040000000000000000000000000004 · task_b2030000000000000000000000000003
 
-- [ ] **Score 5 🥇 · Class 2 — Add reversible stock-workbench visibility controls**
+- [x] **Score 5 🥇 · Class 2 — Add reversible stock-workbench visibility controls**
 
   **ID:** task_b2050000000000000000000000000005
   **Status:** Implementation complete — reversible visibility-state tests passed; live selector refresh pending
-  **Outcome:** Offer a separate action that names stock workbenches to hide, records exact prior visibility, and provides one-action reversal.
+  **Outcome:** Enabling FMF hides the corresponding stock workbenches; disabling FMF unhides them and hides the FMF family.
   **Work mode:** Steward
   **Execution size:** Medium
   **Uncertainty:** Medium
-  **Protected behavior:** FMF remains complete with stock workbenches visible; native workbenches are never removed.
-  **Acceptance:** Mixed prior visibility restores exactly through Restore, disable, removal recovery, and repeated cycles; docs identify the Index conflict.
+  **Protected behavior:** Native workbenches are never removed or rewritten and remain available whenever FMF is disabled.
+  **Acceptance:** Repeated enable/disable cycles expose exactly one workbench family, preserve unrelated visibility choices, and never autoload a hidden FMF workbench.
   **Expected evidence:** State fixtures and workbench-selector GUI verification.
   **Implement:** `freecad/FusionMyFreeCAD/workbench_visibility.py` · `freecad/FusionMyFreeCAD/activation.py` · `fusion_bootstrap.py`
   **Context:** `research/freecad-addon-index-readiness-2026-10-09.md`

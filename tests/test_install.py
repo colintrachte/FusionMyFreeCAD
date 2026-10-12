@@ -37,9 +37,7 @@ def test_owned_mode_migrates_saved_native_customization(env, bootstrap):
 
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
     generated, _version = bootstrap._merge_layout()
-    migrated = generated["workbenches"]["FMFDesignWorkbench"]["toolbars"][
-        "FMF Create_newPanel"
-    ]
+    migrated = generated["workbenches"]["FMFDesignWorkbench"]["toolbars"]["FMF Create_newPanel"]
     assert migrated["order"] == panel["order"]
 
 
@@ -286,7 +284,9 @@ def test_restore_clears_the_applied_version_marker(env, bootstrap):
     assert bootstrap.is_enabled() is False
 
 
-def test_enable_after_disable_prepares_fmf_again(env, bootstrap):
+def test_enable_after_disable_prepares_fmf_again(env, bootstrap, monkeypatch):
+    monkeypatch.setattr(bootstrap, "run_runtime", lambda: None)
+    monkeypatch.setattr(bootstrap, "load_vendor", lambda *_args: None)
     bootstrap.prepare()
     bootstrap.restore()
     assert bootstrap.is_enabled() is False
@@ -370,9 +370,7 @@ def test_verify_surfaces_displaced_shortcuts(installed):
 def test_verify_detects_a_tampered_panel_title(installed):
     path = Path(installed.RIBBON_PATH)
     ribbon = json.loads(path.read_text("utf-8"))
-    ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]["FMF Create_newPanel"]["title"] = (
-        "X"
-    )
+    ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]["FMF Create_newPanel"]["title"] = "X"
     path.write_text(json.dumps(ribbon), encoding="utf-8")
 
     valid, checks, problems = installed.verify()

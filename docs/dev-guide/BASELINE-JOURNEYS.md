@@ -70,9 +70,9 @@ short note for each item; attach screenshots for items 1, 3, 5, and 9.
    confirm each file is created and non-empty.
 8. Search and adaptation: find one command using Fusion terminology and one using its FreeCAD name;
    invoke a FREQUENT candidate repeatedly, restart, and confirm only FREQUENT changes.
-9. Lifecycle: run Verify FusionMyFreeCAD, note the result, run Reset FusionMyFreeCAD and restart, then disable
-   FusionMyFreeCAD. Restart again and confirm native menus/toolbars and the pre-FMF workbench
-   appearance remain active. Re-enable FMF in Preferences and restart to confirm it returns.
+9. Lifecycle: run Verify FusionMyFreeCAD, note the result, run Reset FusionMyFreeCAD, then disable
+   FusionMyFreeCAD. Confirm immediately that native menus/toolbars and stock workbenches return.
+   Re-enable FMF in Preferences and confirm immediately that its workbench family returns.
 
 Report the FreeCAD version, Windows display scale, whether the profile was already customized, and
 rough cold-start time. Any failure keeps this gate open; do not work around it merely to obtain a

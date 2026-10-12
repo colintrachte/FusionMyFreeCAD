@@ -59,6 +59,14 @@ function Save-ModDir([string]$path) {
     Write-Host "Saved to $configPath (git-ignored)" -ForegroundColor DarkGray
 }
 
+function Test-IsScratchModDir([string]$path) {
+    if (-not $path) { return $false }
+    $full = [System.IO.Path]::GetFullPath($path)
+    $scratch = [System.IO.Path]::GetFullPath((Join-Path $repo 'ai_poop'))
+    return $full.StartsWith($scratch + [System.IO.Path]::DirectorySeparatorChar,
+        [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 function Get-Candidates {
     $bases = @()
     if ($env:APPDATA)      { $bases += (Join-Path $env:APPDATA 'FreeCAD') }
@@ -120,7 +128,15 @@ if ($List) {
 }
 
 # --- resolve the Mod directory -------------------------------------------------
-if (-not $ModDir) { $ModDir = Get-SavedModDir }
+if (-not $ModDir) {
+    $savedModDir = Get-SavedModDir
+    if (Test-IsScratchModDir $savedModDir) {
+        Write-Warning "Ignoring saved isolated test profile: $savedModDir"
+    }
+    else {
+        $ModDir = $savedModDir
+    }
+}
 
 if (-not $ModDir) {
     $cands = @(Get-Candidates)

@@ -4,6 +4,8 @@
   snapshots, and menu commands for copying a support summary or opening the diagnostics folder.
 - FMF no longer reports activation healthy until the Ribbon is visibly usable; failed activation
   is logged and automatically rolls back to the native interface.
+- FMF-owned workbenches and panels consistently use FMF names, and the FreeCAD Preferences page is
+  registered under **FMF**. Development-build names and saved customization migrate automatically.
 
 Arrange the ribbon around the way you work, keep complex sketches responsive,
 and recover more quickly when changes leave downstream features out of date.
@@ -165,8 +167,8 @@ workbenches. Its ribbon no longer replaces the layouts of the stock
 workbenches. **Disable FusionMyFreeCAD** switches back to the corresponding
 stock workbench, restores managed preferences and shortcuts, disconnects its
 runtime callbacks and observers, closes its Parameters dock, and hides the FMF
-workbenches without deleting their saved layout or personalization. Restarting
-FreeCAD after the switch refreshes the workbench selector.
-**Enable FusionMyFreeCAD** exposes them again. Hiding the corresponding stock
-workbenches is a separate reversible preference. **Reset FusionMyFreeCAD**
+workbenches without deleting their saved layout or personalization. The bundled
+Ribbon and every unrelated workbench remain visible, and the selector refreshes immediately.
+**Enable FusionMyFreeCAD** exposes them again and hides their stock counterparts.
+**Reset FusionMyFreeCAD**
 restores FMF's shipped defaults without disabling it.

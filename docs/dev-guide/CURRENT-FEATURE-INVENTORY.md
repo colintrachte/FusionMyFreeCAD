@@ -29,8 +29,8 @@ The core experience is:
 FMF-owned workbenches are intended to be superior day-to-day replacements for the corresponding
 stock FreeCAD workbenches, not reduced demonstration shells. They must provide enough command
 coverage, context transitions, discoverability, personalization, and workflow enhancement that a
-user can reasonably choose to hide the stock equivalents without losing access to necessary work.
-Hiding stock workbenches remains a separate, explicit, reversible user choice.
+user can use the FMF replacements without losing access to necessary work. While FMF is enabled,
+the corresponding stock workbenches are hidden from the selector; disabling FMF reverses that state.
 
 An Index-readiness refactor may add one explicit first-run activation step, but should not turn
 installation into a multi-package or manual configuration exercise.
@@ -71,10 +71,8 @@ count as available; commands omitted entirely require a documented rationale and
 The replacement must preserve access to native FreeCAD commands rather than forking their modelling
 semantics unnecessarily.
 
-After activation, FMF may offer **Hide corresponding stock workbenches** as a clearly separate
-choice. The action must list exactly which workbenches will be hidden, preserve their prior
-visibility, never remove them, and provide an always-available **Show stock workbenches** reversal.
-FMF must remain functional when the user leaves the stock workbenches visible.
+Activation hides the four corresponding stock workbenches and exposes the FMF family. Disabling
+performs the inverse. The stock implementations remain installed and structurally untouched.
 
 ## Immediate, self-contained installation
 

@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import sys
+import time
 import traceback
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
@@ -1032,8 +1033,10 @@ def register_owned_workbenches():
     _migrate_owned_identity_preferences()
     import fusion_workbenches
 
+    enabled = is_enabled()
+    set_owned_workbench_visibility(enabled)
     fusion_workbenches.register()
-    set_owned_workbench_visibility(True)
+    sync_start_workbench(enabled)
     return True
 
 
@@ -1062,35 +1065,43 @@ def _migrate_owned_identity_preferences():
 
 
 def set_owned_workbench_visibility(enabled):
-    """Expose exactly the workbench family used by FMF without losing user choices."""
+    """Expose FMF workbenches or their stock counterparts, never both families."""
     group = App.ParamGet(WORKBENCH_PREFERENCE_ROOT)
     preferences = App.ParamGet(PREFERENCE_ROOT)
     disabled = _workbench_list(group.GetString("Disabled", ""))
     owned = tuple(OWNED_TO_NATIVE_WORKBENCH)
     native = tuple(OWNED_TO_NATIVE_WORKBENCH.values())
-    hidden_by_fmf = set(_workbench_list(preferences.GetString("NativeHiddenByFMF", "")))
 
     if enabled:
         disabled = [workbench for workbench in disabled if workbench not in owned]
-        newly_hidden = [
-            workbench
-            for workbench in native
-            if workbench in hidden_by_fmf and workbench in disabled
-        ]
-        if preferences.GetBool("HideNativeWorkbenches", False):
-            for workbench in native:
-                if workbench not in disabled:
-                    disabled.append(workbench)
-                    newly_hidden.append(workbench)
-        _write_workbench_list(preferences, "NativeHiddenByFMF", newly_hidden)
+        for workbench in native:
+            if workbench not in disabled:
+                disabled.append(workbench)
     else:
         for workbench in owned:
             if workbench not in disabled:
                 disabled.append(workbench)
-        disabled = [workbench for workbench in disabled if workbench not in hidden_by_fmf]
-        preferences.RemString("NativeHiddenByFMF")
+        disabled = [workbench for workbench in disabled if workbench not in native]
+
+    # Remove state written by the earlier optional-hide implementation. Visibility
+    # is now an invariant of FMF's enabled state rather than a second preference.
+    preferences.RemString("NativeHiddenByFMF")
+    preferences.RemBool("HideNativeWorkbenches")
 
     _write_workbench_list(group, "Disabled", disabled)
+    App.saveParameter()
+
+
+def sync_start_workbench(enabled):
+    """Keep FreeCAD's startup workbench within the currently visible family."""
+    preferences = App.ParamGet(PREFERENCE_ROOT)
+    general = App.ParamGet("User parameter:BaseApp/Preferences/General")
+    autoload = general.GetString("AutoloadModule", "")
+
+    if enabled and preferences.GetBool("SetStartWorkbench", True):
+        general.SetString("AutoloadModule", "FMFDesignWorkbench")
+    elif autoload in OWNED_TO_NATIVE_WORKBENCH:
+        general.SetString("AutoloadModule", OWNED_TO_NATIVE_WORKBENCH[autoload])
     App.saveParameter()
 
 
@@ -1128,18 +1139,45 @@ def activate_owned_workbench(workbench):
     main_window.menuBar().hide()
 
 
-def sync_ui_mode_to_active_workbench():
-    """Select FMF or native chrome from the active workbench identity."""
-    import fusion_workbenches
+def set_ribbon_workbench_family(enabled):
+    """Show exactly one FMF/stock workbench family without hiding the Ribbon."""
+    from PySide import QtWidgets
 
-    try:
-        active = Gui.activeWorkbench().name()
-    except Exception:
-        return
-    if is_enabled() and owned_workbenches_enabled() and active in fusion_workbenches.FMF_TO_NATIVE:
-        activate_owned_workbench(active)
-    else:
-        _restore_native_ui_now()
+    ribbon_dock = Gui.getMainWindow().findChild(QtWidgets.QDockWidget, "Ribbon")
+    ribbon = ribbon_dock.widget() if ribbon_dock is not None else None
+    tab_bar = ribbon.tabBar() if ribbon is not None and hasattr(ribbon, "tabBar") else None
+    if tab_bar is None or not hasattr(tab_bar, "setTabVisible"):
+        return False
+
+    owned = set(OWNED_TO_NATIVE_WORKBENCH)
+    native = set(OWNED_TO_NATIVE_WORKBENCH.values())
+    active = active_workbench_name()
+    active_index = None
+    for index in range(tab_bar.count()):
+        workbench = tab_bar.tabData(index)
+        if workbench in owned:
+            tab_bar.setTabVisible(index, enabled)
+        elif workbench in native:
+            tab_bar.setTabVisible(index, not enabled)
+        if workbench == active:
+            active_index = index
+    if active_index is not None:
+        tab_bar.setCurrentIndex(active_index)
+    ribbon_dock.show()
+    Gui.getMainWindow().menuBar().hide()
+    return True
+
+
+def defer_ribbon_workbench_family(enabled):
+    """Apply tab visibility after Ribbon has finished building its categories."""
+    from PySide import QtCore
+
+    QtCore.QTimer.singleShot(0, lambda: set_ribbon_workbench_family(enabled))
+
+
+def sync_ui_mode_to_active_workbench():
+    """Keep the Ribbon active and synchronize its FMF/stock tab family."""
+    set_ribbon_workbench_family(is_enabled() and owned_workbenches_enabled())
 
 
 def defer_ui_mode_sync():
@@ -1153,8 +1191,12 @@ def enable():
     """Enable FMF persistently and prepare its state for the next launch."""
     App.ParamGet(PREFERENCE_ROOT).SetBool("Enabled", True)
     App.saveParameter()
+    register_commands()
     register_owned_workbenches()
     outcome = prepare()
+    run_runtime()
+    load_vendor("SearchBar", os.path.join(ADDON_ROOT, "bundled-addons", "SearchBar"))
+    load_vendor("FreeCAD_Ribbon", os.path.join(ADDON_ROOT, "bundled-addons", "FreeCAD-Ribbon"))
     active = active_workbench_name()
     replacement = NATIVE_TO_OWNED_WORKBENCH.get(active)
     if replacement:
@@ -1179,6 +1221,7 @@ def disable():
     preferences.RemString("AppliedVersion")
     preferences.SetBool("Enabled", False)
     set_owned_workbench_visibility(False)
+    sync_start_workbench(False)
     runtime = sys.modules.get("_fusion_my_freecad_runtime")
     if runtime is not None and hasattr(runtime, "uninstall"):
         try:
@@ -1194,7 +1237,7 @@ def disable():
         problems.append("Appearance restoration: {}".format(error))
     if replacement:
         Gui.activateWorkbench(replacement)
-    _restore_native_ui_now()
+    defer_ribbon_workbench_family(False)
     install_lifecycle_menu()
     return "FusionMyFreeCAD is disabled. FMF settings remain available at {}.".format(
         BASELINE_PATH
@@ -1601,7 +1644,7 @@ def register_preferences_page():
     """
     if not os.path.isfile(PREFERENCES_UI):
         raise RuntimeError("FusionMyFreeCAD preferences page is missing: {}".format(PREFERENCES_UI))
-    Gui.addPreferencePage(PREFERENCES_UI, "FusionMyFreeCAD")
+    Gui.addPreferencePage(PREFERENCES_UI, "FMF")
 
 
 _sketch_edit_observer = None
@@ -1840,7 +1883,7 @@ def _restore_native_ui_now():
 
 
 def restore_disabled_native_ui():
-    """Make FreeCAD's native chrome usable after Ribbon-owned state is restored."""
+    """Restore stock tabs while keeping the bundled Ribbon usable."""
     from PySide import QtCore
 
     # FreeCAD applies its persisted QMainWindow state after add-on InitGui files.
@@ -1850,11 +1893,57 @@ def restore_disabled_native_ui():
 
         if owned_workbenches_enabled():
             set_owned_workbench_visibility(False)
-        _restore_native_ui_now()
+            sync_start_workbench(False)
+            set_ribbon_workbench_family(False)
         diagnostics.event("info", "ui", "disabled restoration", "healthy")
-        diagnostics.set_status("healthy", enabled=False, nativeUiRestored=True)
+        diagnostics.set_status("healthy", enabled=False, stockTabsRestored=True)
 
     QtCore.QTimer.singleShot(0, restore_and_record)
+
+
+_activation_monitor = None
+_observed_enabled = None
+_activation_transition = False
+
+
+def reconcile_activation_preference():
+    """Apply an Enable FMF preference change immediately in the running GUI."""
+    global _observed_enabled, _activation_transition
+    enabled = is_enabled()
+    if _activation_transition or enabled == _observed_enabled:
+        return
+    previous = _observed_enabled
+    _observed_enabled = enabled
+    _activation_transition = True
+    try:
+        if enabled:
+            enable()
+        else:
+            disable()
+    except Exception as error:
+        App.ParamGet(PREFERENCE_ROOT).SetBool("Enabled", bool(previous))
+        App.saveParameter()
+        _observed_enabled = previous
+        record_startup_failure("live activation preference", error)
+        App.Console.PrintError(
+            "FusionMyFreeCAD: live activation preference failed: {}\n".format(error)
+        )
+    finally:
+        _activation_transition = False
+
+
+def install_activation_monitor():
+    """Watch the Preferences checkbox and apply it without restarting FreeCAD."""
+    global _activation_monitor, _observed_enabled
+    if _activation_monitor is not None:
+        return
+    from PySide import QtCore
+
+    _observed_enabled = is_enabled()
+    _activation_monitor = QtCore.QTimer(Gui.getMainWindow())
+    _activation_monitor.setInterval(250)
+    _activation_monitor.timeout.connect(reconcile_activation_preference)
+    _activation_monitor.start()
 
 
 def validate_enabled_ui():
@@ -1875,9 +1964,13 @@ def validate_enabled_ui():
 
         active_workbench = safe(lambda: Gui.activeWorkbench().name(), "unknown")
         central_widget = safe(lambda: main_window.centralWidget())
+        window_visible = safe(lambda: main_window.isVisible())
+        window_minimized = safe(lambda: main_window.isMinimized(), False)
         snapshot = {
             "activeWorkbench": active_workbench,
             "windowFlags": safe(lambda: int(main_window.windowFlags())),
+            "windowVisible": window_visible,
+            "windowMinimized": window_minimized,
             "menuVisible": safe(lambda: main_window.menuBar().isVisible()),
             "centralWidgetVisible": bool(
                 central_widget and safe(lambda: central_widget.isVisible(), False)
@@ -1891,6 +1984,17 @@ def validate_enabled_ui():
                 if safe(lambda toolbar=toolbar: toolbar.isVisible(), False)
             ],
         }
+        # A hidden/background FreeCAD process cannot provide meaningful visual
+        # health evidence. In particular, automation may intentionally launch
+        # FreeCAD with a hidden top-level window. Do not turn a persistent user
+        # preference off based on that diagnostic-only state.
+        if window_visible is False or window_minimized:
+            failures = startup_failures()
+            state = "degraded" if failures else "validation_deferred"
+            diagnostics.event("info", "ui", "enabled validation", state, **snapshot)
+            diagnostics.set_status(state, startupFailures=failures, **snapshot)
+            return
+
         owned_active = active_workbench in OWNED_TO_NATIVE_WORKBENCH
         ribbon_usable = bool(
             ribbon
@@ -2107,3 +2211,88 @@ def load_vendor(name, directory):
         durationMs=round((datetime.now(UTC) - started).total_seconds() * 1000, 2),
         sentinels={module: module in sys.modules for module in VENDOR_SENTINELS.get(name, ())},
     )
+
+
+def _startup_step(label, function, *arguments):
+    """Run one startup step while preserving access to recovery commands."""
+    import fusion_common as diagnostics
+
+    started = time.perf_counter()
+    diagnostics.event("info", "startup", label, "started", packageVersion=PACKAGE_VERSION)
+    try:
+        function(*arguments)
+        diagnostics.event(
+            "info",
+            "startup",
+            label,
+            "completed",
+            durationMs=round((time.perf_counter() - started) * 1000, 2),
+            packageVersion=PACKAGE_VERSION,
+        )
+        return True
+    except Exception as error:
+        App.Console.PrintError("FusionMyFreeCAD: {} failed: {}\n".format(label, error))
+        App.Console.PrintLog(traceback.format_exc())
+        record_startup_failure(label, error)
+        diagnostics.diagnostic_exception(
+            "startup",
+            label,
+            error,
+            durationMs=round((time.perf_counter() - started) * 1000, 2),
+            packageVersion=PACKAGE_VERSION,
+        )
+        diagnostics.set_status("degraded", failedStep=label, error=str(error))
+        return False
+
+
+def start():
+    """Initialize FMF from FreeCAD's function-scoped InitGui loader."""
+    import fusion_common as diagnostics
+
+    clear_startup_failures()
+    register_lifecycle_commands()
+    register_preferences_page()
+    install_lifecycle_menu()
+    install_activation_monitor()
+    _startup_step("owned workbench registration", register_owned_workbenches)
+
+    diagnostics.start_session(is_enabled(), PACKAGE_VERSION, App.Version())
+    try:
+        if is_enabled():
+            _startup_step("feature command registration", register_commands)
+            _startup_step("installation", prepare)
+            _startup_step("runtime", run_runtime)
+            _startup_step(
+                "SearchBar",
+                load_vendor,
+                "SearchBar",
+                os.path.join(ADDON_ROOT, "bundled-addons", "SearchBar"),
+            )
+            _startup_step(
+                "FreeCAD Ribbon",
+                load_vendor,
+                "FreeCAD_Ribbon",
+                os.path.join(ADDON_ROOT, "bundled-addons", "FreeCAD-Ribbon"),
+            )
+            _startup_step("UI mode synchronization", defer_ui_mode_sync)
+            _startup_step("enabled UI validation", validate_enabled_ui)
+        else:
+            _startup_step(
+                "SearchBar",
+                load_vendor,
+                "SearchBar",
+                os.path.join(ADDON_ROOT, "bundled-addons", "SearchBar"),
+            )
+            _startup_step(
+                "FreeCAD Ribbon",
+                load_vendor,
+                "FreeCAD_Ribbon",
+                os.path.join(ADDON_ROOT, "bundled-addons", "FreeCAD-Ribbon"),
+            )
+            _startup_step("native UI restoration", restore_disabled_native_ui)
+    except BaseException as error:
+        App.Console.PrintError("FusionMyFreeCAD startup failed: {}\n".format(error))
+        diagnostics.diagnostic_exception("startup", "top level", error)
+        diagnostics.set_status("degraded", failedStep="top level", error=str(error))
+    finally:
+        diagnostics.flush_diagnostics()
