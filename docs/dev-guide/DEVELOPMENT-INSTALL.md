@@ -69,9 +69,9 @@ That command:
 3. extracts the newly built archive directly into `<ModDir>`;
 4. checks that `<ModDir>/FusionMyFreeCAD/InitGui.py` exists.
 
-Restart FreeCAD after the script reports a successful installation. Run **Verify UI** from an
-**INSPECT** panel. If the ribbon still reflects an older layout, run **Reapply UI** and restart once
-more; Reapply intentionally clears ribbon personalisation.
+Restart FreeCAD after the script reports a successful installation. Run **Verify FusionMyFreeCAD** from an
+**INSPECT** panel. If the ribbon still reflects an older layout, run **Reset FusionMyFreeCAD** and
+restart once more; Reset intentionally clears ribbon personalisation.
 
 ## Useful options
 
@@ -103,6 +103,7 @@ a known-good archive. `-NoBuild` is suitable only when that archive is already t
 ZIP under `dist/`; the script has no option for selecting a particular ZIP. Keep only one installed
 FusionMyFreeCAD directory.
 
-**Restore UI** serves a different purpose: it removes FusionMyFreeCAD's interface changes and
-returns to the first-run baseline. Do not use it merely to switch between development builds.
+**Disable FusionMyFreeCAD** serves a different purpose: it removes FusionMyFreeCAD's interface
+changes, returns to the first-run baseline, and remains disabled across restarts. Do not use it
+merely to switch between development builds.
 

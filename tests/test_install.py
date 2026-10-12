@@ -15,6 +15,34 @@ def test_first_install_generates_a_valid_ribbon(env, bootstrap):
     assert Path(bootstrap.RIBBON_PATH).is_file()
 
 
+def test_owned_mode_generates_only_fmf_authoritative_workbenches(env, bootstrap):
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+
+    bootstrap.prepare()
+
+    ribbon = json.loads(Path(bootstrap.RIBBON_PATH).read_text("utf-8"))
+    owned = set(bootstrap.OWNED_TO_NATIVE_WORKBENCH)
+    native = set(bootstrap.OWNED_TO_NATIVE_WORKBENCH.values())
+    assert set(ribbon["authoritativeWorkbenches"]) == owned
+    assert owned <= set(ribbon["workbenches"])
+    assert not native & set(ribbon["authoritativeWorkbenches"])
+
+
+def test_owned_mode_migrates_saved_native_customization(env, bootstrap):
+    bootstrap.prepare()
+    ribbon = json.loads(Path(bootstrap.RIBBON_PATH).read_text("utf-8"))
+    panel = ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]["FMF Create_newPanel"]
+    panel["order"] = list(reversed(panel["order"]))
+    bootstrap.record_customization(ribbon)
+
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+    generated, _version = bootstrap._merge_layout()
+    migrated = generated["workbenches"]["FMFDesignWorkbench"]["toolbars"][
+        "FMF Create_newPanel"
+    ]
+    assert migrated["order"] == panel["order"]
+
+
 def test_repeated_startup_is_a_no_op(installed):
     assert installed.prepare() == "unchanged"
 
@@ -168,7 +196,7 @@ def test_update_ribbon_hash_keeps_adaptive_rewrites_from_looking_external(instal
 def test_direct_drag_order_survives_restart(installed):
     path = Path(installed.RIBBON_PATH)
     ribbon = json.loads(path.read_text("utf-8"))
-    toolbar = ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]["Fusion Create_newPanel"]
+    toolbar = ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]["FMF Create_newPanel"]
     dragged_order = list(toolbar["order"])
     dragged_order[0], dragged_order[1] = dragged_order[1], dragged_order[0]
     toolbar["order"] = dragged_order
@@ -179,7 +207,7 @@ def test_direct_drag_order_survives_restart(installed):
 
     assert installed.prepare() == "unchanged"
     restarted = json.loads(path.read_text("utf-8"))
-    actual = restarted["workbenches"]["PartDesignWorkbench"]["toolbars"]["Fusion Create_newPanel"]
+    actual = restarted["workbenches"]["PartDesignWorkbench"]["toolbars"]["FMF Create_newPanel"]
     assert actual["order"] == dragged_order
     assert actual["panelMenu"] == dragged_order
     valid, checks, problems = installed.verify()
@@ -190,8 +218,8 @@ def test_resetting_one_panel_preserves_other_panel_customization(installed):
     path = Path(installed.RIBBON_PATH)
     ribbon = json.loads(path.read_text("utf-8"))
     toolbars = ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]
-    reset_name = "Fusion Create_newPanel"
-    keep_name = "Fusion Modify_newPanel"
+    reset_name = "FMF Create_newPanel"
+    keep_name = "FMF Modify_newPanel"
     reset_order = list(reversed(toolbars[reset_name]["order"]))
     keep_order = list(reversed(toolbars[keep_name]["order"]))
     toolbars[reset_name]["order"] = reset_order
@@ -255,6 +283,17 @@ def test_restore_clears_the_applied_version_marker(env, bootstrap):
     env.param(bootstrap.PREFERENCE_ROOT).SetString("AppliedVersion", bootstrap.PACKAGE_VERSION)
     bootstrap.restore()
     assert "AppliedVersion" not in env.param(bootstrap.PREFERENCE_ROOT).GetStrings()
+    assert bootstrap.is_enabled() is False
+
+
+def test_enable_after_disable_prepares_fmf_again(env, bootstrap):
+    bootstrap.prepare()
+    bootstrap.restore()
+    assert bootstrap.is_enabled() is False
+
+    assert bootstrap.enable() in {"installed", "recovered", "updated"}
+    assert bootstrap.is_enabled() is True
+    assert Path(bootstrap.STATE_PATH).is_file()
 
 
 def test_restore_moves_machine_local_runtime_files_aside(env, bootstrap):
@@ -331,7 +370,7 @@ def test_verify_surfaces_displaced_shortcuts(installed):
 def test_verify_detects_a_tampered_panel_title(installed):
     path = Path(installed.RIBBON_PATH)
     ribbon = json.loads(path.read_text("utf-8"))
-    ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]["Fusion Create_newPanel"]["title"] = (
+    ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]["FMF Create_newPanel"]["title"] = (
         "X"
     )
     path.write_text(json.dumps(ribbon), encoding="utf-8")
@@ -339,14 +378,14 @@ def test_verify_detects_a_tampered_panel_title(installed):
     valid, checks, problems = installed.verify()
     assert not valid
     assert checks["commandLabels"] is False
-    assert any("Fusion Create_newPanel" in problem for problem in problems)
+    assert any("FMF Create_newPanel" in problem for problem in problems)
 
 
 def test_verify_detects_a_dropped_panel(installed):
     path = Path(installed.RIBBON_PATH)
     ribbon = json.loads(path.read_text("utf-8"))
     toolbars = ribbon["workbenches"]["SketcherWorkbench"]["toolbars"]
-    toolbars["order"].remove("Fusion Finish_newPanel")
+    toolbars["order"].remove("FMF Finish_newPanel")
     path.write_text(json.dumps(ribbon), encoding="utf-8")
 
     valid, checks, _problems = installed.verify()
@@ -356,24 +395,26 @@ def test_verify_detects_a_dropped_panel(installed):
 
 def test_verification_is_derived_from_the_layout_not_hardcoded(env, bootstrap, monkeypatch):
     """Renaming a panel in the spec must move the check with it."""
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
     bootstrap.prepare()
     # Rename a panel in the spec only. A hardcoded checklist would keep passing;
     # a derived one must now report the panel it no longer finds.
     spec = json.loads(Path(bootstrap.LAYOUT_SPEC).read_text("utf-8"))
-    spec["workbenches"]["PartDesignWorkbench"][0]["name"] = "Fusion Renamed_newPanel"
+    spec["workbenches"]["FMFDesignWorkbench"][0]["name"] = "FMF Renamed_newPanel"
     valid, _checks, problems = bootstrap._verify_layout(bootstrap.RIBBON_PATH, spec)
     assert not valid
-    assert any("Fusion Renamed_newPanel" in problem for problem in problems)
+    assert any("FMF Renamed_newPanel" in problem for problem in problems)
 
 
 def test_adaptive_permutation_still_verifies(installed):
     """The runtime reorders FREQUENT panels; verification must tolerate that."""
     path = Path(installed.RIBBON_PATH)
     ribbon = json.loads(path.read_text("utf-8"))
-    toolbar = ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]["Fusion Frequent_newPanel"]
+    toolbar = ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]["FMF Frequent_newPanel"]
     toolbar["order"] = list(reversed(toolbar["order"]))
-    panel = ribbon["newPanels"]["PartDesignWorkbench"]["Fusion Frequent_newPanel"]
-    ribbon["newPanels"]["PartDesignWorkbench"]["Fusion Frequent_newPanel"] = list(reversed(panel))
+    toolbar["panelMenu"] = list(toolbar["order"])
+    panel = ribbon["newPanels"]["PartDesignWorkbench"]["FMF Frequent_newPanel"]
+    ribbon["newPanels"]["PartDesignWorkbench"]["FMF Frequent_newPanel"] = list(reversed(panel))
     for entry in toolbar["commands"].values():
         entry["size"] = "small"
     path.write_text(json.dumps(ribbon), encoding="utf-8")

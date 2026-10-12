@@ -315,7 +315,7 @@ def test_status_writes_are_coalesced(env, bootstrap, runtime):
 # ---------------------------------------------------------------------------
 
 
-PART_DESIGN_FREQUENT = "Fusion Frequent_newPanel"
+PART_DESIGN_FREQUENT = "FMF Frequent_newPanel"
 
 
 def _frequent(runtime, workbench=PART_DESIGN_FREQUENT):
@@ -361,6 +361,32 @@ def test_recorded_usage_is_persisted(env, bootstrap, runtime):
     assert usage["workbenches"]["PartDesignWorkbench"]["PartDesign_Draft"]["score"] == 1.0
 
 
+def test_owned_mode_migrates_native_usage_history(env, bootstrap, runtime):
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+    Path(runtime.USAGE_PATH).parent.mkdir(parents=True, exist_ok=True)
+    Path(runtime.USAGE_PATH).write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "workbenches": {
+                    "PartDesignWorkbench": {
+                        "PartDesign_Pad": {
+                            "score": 4.0,
+                            "lastUsed": "2026-01-01T00:00:00+00:00",
+                        }
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    usage = runtime.load_usage()
+
+    assert "PartDesignWorkbench" not in usage["workbenches"]
+    assert usage["workbenches"]["FMFDesignWorkbench"]["PartDesign_Pad"]["score"] == 4.0
+
+
 def test_adaptive_command_reverse_index_is_built_once(env, runtime, monkeypatch):
     real_groups = runtime.adaptive_groups
     calls = {"count": 0}
@@ -387,7 +413,7 @@ def test_refresh_rewrites_the_frequent_panel_and_records_the_new_digest(env, boo
 
     assert runtime.refresh_adaptive_panel("PartDesignWorkbench") is True
     ribbon = json.loads(Path(bootstrap.RIBBON_PATH).read_text("utf-8"))
-    panel = ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]["Fusion Frequent_newPanel"]
+    panel = ribbon["workbenches"]["PartDesignWorkbench"]["toolbars"]["FMF Frequent_newPanel"]
     assert panel["order"][0] == "PartDesign_Draft"
 
     after = json.loads(Path(bootstrap.STATE_PATH).read_text("utf-8"))["ribbonSha256"]
@@ -407,7 +433,7 @@ def test_sketcher_slot_swap_keeps_non_candidates_in_place(env, bootstrap, runtim
     path = Path(bootstrap.RIBBON_PATH)
     before = json.loads(path.read_text("utf-8"))
     toolbar = before["workbenches"]["SketcherWorkbench"]["toolbars"][
-        "Fusion Sketch Create_newPanel"
+        "FMF Sketch Create_newPanel"
     ]
     fixed = [
         c
@@ -421,7 +447,7 @@ def test_sketcher_slot_swap_keeps_non_candidates_in_place(env, bootstrap, runtim
     assert runtime.refresh_adaptive_panel("SketcherWorkbench") is True
 
     after = json.loads(path.read_text("utf-8"))
-    toolbar = after["workbenches"]["SketcherWorkbench"]["toolbars"]["Fusion Sketch Create_newPanel"]
+    toolbar = after["workbenches"]["SketcherWorkbench"]["toolbars"]["FMF Sketch Create_newPanel"]
     assert [c for c in toolbar["order"] if c in fixed] == fixed
     assert toolbar["commands"]["Sketcher_CreateBSpline"]["size"] == "large"
     assert toolbar["commands"]["Sketcher_CreatePolyline"]["size"] == "small"
@@ -432,7 +458,7 @@ def test_sketcher_slot_swap_keeps_non_candidates_in_place(env, bootstrap, runtim
 # ---------------------------------------------------------------------------
 
 
-FREQUENT = "Fusion Frequent_newPanel"
+FREQUENT = "FMF Frequent_newPanel"
 
 
 def _frequent_panel(bootstrap, workbench="PartDesignWorkbench", panel=FREQUENT):
@@ -543,9 +569,9 @@ def test_sketcher_has_a_frequent_section_alongside_its_slot_swaps(env, bootstrap
     }
     assert runtime.refresh_adaptive_panel("SketcherWorkbench") is True
 
-    create = _frequent_panel(bootstrap, "SketcherWorkbench", "Fusion Sketch Create_newPanel")
+    create = _frequent_panel(bootstrap, "SketcherWorkbench", "FMF Sketch Create_newPanel")
     assert create["commands"]["Sketcher_CreateBSpline"]["size"] == "large"
-    frequent = _frequent_panel(bootstrap, "SketcherWorkbench", "Fusion Sketch Frequent_newPanel")
+    frequent = _frequent_panel(bootstrap, "SketcherWorkbench", "FMF Sketch Frequent_newPanel")
     assert frequent["order"][0] == "Sketcher_ConstrainTangent"
 
 
@@ -553,7 +579,7 @@ def test_a_ribbon_missing_source_data_is_reported_not_crashed(env, bootstrap, ru
     bootstrap.prepare()
     path = Path(bootstrap.RIBBON_PATH)
     ribbon = json.loads(path.read_text("utf-8"))
-    ribbon["newPanels"]["SketcherWorkbench"]["Fusion Sketch Create_newPanel"] = []
+    ribbon["newPanels"]["SketcherWorkbench"]["FMF Sketch Create_newPanel"] = []
     path.write_text(json.dumps(ribbon), encoding="utf-8")
 
     runtime.load_usage()["workbenches"]["SketcherWorkbench"] = {
@@ -649,6 +675,34 @@ def test_install_connects_the_signal_only_once(env, bootstrap, runtime):
     runtime.install()
     FakeTimer.pump()
     assert len(env.main_window.workbenchActivated.handlers) == 1
+
+
+def test_disabled_runtime_ignores_late_workbench_and_usage_callbacks(
+    env, bootstrap, runtime, monkeypatch
+):
+    runtime.install()
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("Enabled", False)
+    refreshes = []
+    monkeypatch.setattr(runtime, "refresh_adaptive_panel", refreshes.append)
+
+    runtime.after_workbench_activation("PartDesignWorkbench")
+    runtime.record_usage("PartDesign_Draft")
+
+    assert refreshes == []
+    assert runtime.load_usage()["workbenches"] == {}
+
+
+def test_runtime_uninstall_disconnects_live_services(env, runtime):
+    runtime.install()
+    FakeTimer.pump()
+    assert env.main_window._fusion_my_freecad_connected is True
+    assert runtime._task_accept_filter is not None
+
+    runtime.uninstall()
+
+    assert env.main_window._fusion_my_freecad_connected is False
+    assert env.main_window.workbenchActivated.handlers == []
+    assert runtime._task_accept_filter is None
 
 
 def test_every_action_is_asked_for_its_shortcut_once(env, runtime):

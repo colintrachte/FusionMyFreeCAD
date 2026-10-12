@@ -16,6 +16,12 @@ from fake_freecad import ROOT, Environment, FakeTimer
 @pytest.fixture
 def env(tmp_path):
     environment = Environment(tmp_path / "FreeCAD").install()
+    # Most existing tests exercise the pre-migration compatibility projection.
+    # Owned-workbench tests opt into the new default explicitly so each behavior
+    # remains independently covered.
+    environment.param("User parameter:BaseApp/Preferences/Mod/FusionMyFreeCAD").SetBool(
+        "UseOwnedWorkbenches", False
+    )
     yield environment
     FakeTimer.reset()
     for name in [

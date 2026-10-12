@@ -50,9 +50,9 @@
     ]
   },
   "workbenches": {
-    "PartDesignWorkbench": [
+    "FMFDesignWorkbench": [
       {
-        "name": "Fusion Sketch Entry_newPanel",
+        "name": "FMF Sketch Entry_newPanel",
         "title": "SKETCH",
         "commands": [
           [
@@ -116,7 +116,7 @@
         ]
       },
       {
-        "name": "Fusion Create_newPanel",
+        "name": "FMF Create_newPanel",
         "title": "CREATE",
         "commands": [
           [
@@ -236,7 +236,7 @@
         ]
       },
       {
-        "name": "Fusion Modify_newPanel",
+        "name": "FMF Modify_newPanel",
         "title": "MODIFY",
         "commands": [
           [
@@ -286,7 +286,7 @@
         ]
       },
       {
-        "name": "Fusion Construct_newPanel",
+        "name": "FMF Construct_newPanel",
         "title": "CONSTRUCT",
         "commands": [
           [
@@ -343,7 +343,7 @@
         ]
       },
       {
-        "name": "Fusion Parameters_newPanel",
+        "name": "FMF Parameters_newPanel",
         "title": "PARAMETERS",
         "commands": [
           [
@@ -364,7 +364,7 @@
         "overflow": []
       },
       {
-        "name": "Fusion Frequent_newPanel",
+        "name": "FMF Frequent_newPanel",
         "title": "FREQUENT",
         "commands": [
           [
@@ -399,7 +399,7 @@
         "overflow": []
       },
       {
-        "name": "Fusion Inspect_newPanel",
+        "name": "FMF Inspect_newPanel",
         "title": "INSPECT",
         "commands": [
           [
@@ -434,14 +434,14 @@
             "FusionMyFreeCAD_Reapply",
             "General",
             "small",
-            "Reapply UI",
+            "Reset FusionMyFreeCAD",
             "Std_DlgParameter"
           ],
           [
             "FusionMyFreeCAD_Restore",
             "General",
             "small",
-            "Restore UI",
+            "Disable FusionMyFreeCAD",
             "applications-accessories"
           ],
           [
@@ -455,7 +455,7 @@
         "overflow": []
       },
       {
-        "name": "Fusion Utilities_newPanel",
+        "name": "FMF Utilities_newPanel",
         "title": "UTILITIES",
         "commands": [
           [
@@ -512,7 +512,7 @@
         ]
       },
       {
-        "name": "Fusion Output_newPanel",
+        "name": "FMF Output_newPanel",
         "title": "EXPORT",
         "commands": [
           [
@@ -555,9 +555,9 @@
         ]
       }
     ],
-    "PartWorkbench": [
+    "FMFPartWorkbench": [
       {
-        "name": "Fusion Part Create_newPanel",
+        "name": "FMF Part Create_newPanel",
         "title": "CREATE / IMPORT",
         "commands": [
           [
@@ -691,7 +691,7 @@
         ]
       },
       {
-        "name": "Fusion Part Boolean_newPanel",
+        "name": "FMF Part Boolean_newPanel",
         "title": "BOOLEAN",
         "commands": [
           [
@@ -741,7 +741,7 @@
         ]
       },
       {
-        "name": "Fusion Part Split_newPanel",
+        "name": "FMF Part Split_newPanel",
         "title": "SPLIT",
         "commands": [
           [
@@ -798,7 +798,7 @@
         ]
       },
       {
-        "name": "Fusion Part Repair_newPanel",
+        "name": "FMF Part Repair_newPanel",
         "title": "REPAIR",
         "commands": [
           [
@@ -925,7 +925,7 @@
         ]
       },
       {
-        "name": "Fusion Part Frequent_newPanel",
+        "name": "FMF Part Frequent_newPanel",
         "title": "FREQUENT",
         "commands": [
           [
@@ -960,7 +960,7 @@
         "overflow": []
       },
       {
-        "name": "Fusion Part Inspect_newPanel",
+        "name": "FMF Part Inspect_newPanel",
         "title": "INSPECT",
         "commands": [
           [
@@ -988,7 +988,7 @@
         "overflow": []
       },
       {
-        "name": "Fusion Part Utilities_newPanel",
+        "name": "FMF Part Utilities_newPanel",
         "title": "UTILITIES",
         "commands": [
           [
@@ -1045,7 +1045,7 @@
         ]
       },
       {
-        "name": "Fusion Part Output_newPanel",
+        "name": "FMF Part Output_newPanel",
         "title": "EXPORT",
         "commands": [
           [
@@ -1088,9 +1088,9 @@
         ]
       }
     ],
-    "SketcherWorkbench": [
+    "FMFSketchWorkbench": [
       {
-        "name": "Fusion Sketch Create_newPanel",
+        "name": "FMF Sketch Create_newPanel",
         "title": "CREATE",
         "commands": [
           [
@@ -1225,7 +1225,7 @@
         }
       },
       {
-        "name": "Fusion Sketch Modify_newPanel",
+        "name": "FMF Sketch Modify_newPanel",
         "title": "MODIFY",
         "commands": [
           [
@@ -1418,7 +1418,7 @@
         }
       },
       {
-        "name": "Fusion Sketch Constraints_newPanel",
+        "name": "FMF Sketch Constraints_newPanel",
         "title": "CONSTRAINTS",
         "commands": [
           [
@@ -1530,7 +1530,7 @@
         }
       },
       {
-        "name": "Fusion Sketch Configure_newPanel",
+        "name": "FMF Sketch Configure_newPanel",
         "title": "CONFIGURE",
         "commands": [
           [
@@ -1579,7 +1579,7 @@
         }
       },
       {
-        "name": "Fusion Sketch Frequent_newPanel",
+        "name": "FMF Sketch Frequent_newPanel",
         "title": "FREQUENT",
         "commands": [
           [
@@ -1614,7 +1614,7 @@
         "overflow": []
       },
       {
-        "name": "Fusion Sketch Inspect_newPanel",
+        "name": "FMF Sketch Inspect_newPanel",
         "title": "INSPECT",
         "commands": [
           [
@@ -1661,7 +1661,7 @@
         }
       },
       {
-        "name": "Fusion Sketch Insert_newPanel",
+        "name": "FMF Sketch Insert_newPanel",
         "title": "INSERT",
         "commands": [
           [
@@ -1693,7 +1693,7 @@
         }
       },
       {
-        "name": "Fusion Sketch Select_newPanel",
+        "name": "FMF Sketch Select_newPanel",
         "title": "SELECT",
         "commands": [
           [
@@ -1741,7 +1741,7 @@
         }
       },
       {
-        "name": "Fusion Finish_newPanel",
+        "name": "FMF Finish_newPanel",
         "title": "SKETCH",
         "commands": [
           [
@@ -1766,7 +1766,7 @@
         }
       },
       {
-        "name": "Fusion Sketch Utilities_newPanel",
+        "name": "FMF Sketch Utilities_newPanel",
         "title": "UTILITIES",
         "commands": [
           [
@@ -1823,9 +1823,9 @@
         ]
       }
     ],
-    "SurfaceWorkbench": [
+    "FMFSurfaceWorkbench": [
       {
-        "name": "Fusion Surface Create_newPanel",
+        "name": "FMF Surface Create_newPanel",
         "title": "CREATE",
         "commands": [
           [
@@ -1867,7 +1867,7 @@
         "overflow": []
       },
       {
-        "name": "Fusion Surface Modify_newPanel",
+        "name": "FMF Surface Modify_newPanel",
         "title": "MODIFY",
         "commands": [
           [
@@ -1881,7 +1881,7 @@
         "overflow": []
       },
       {
-        "name": "Fusion Surface Frequent_newPanel",
+        "name": "FMF Surface Frequent_newPanel",
         "title": "FREQUENT",
         "commands": [
           [
@@ -1916,7 +1916,7 @@
         "overflow": []
       },
       {
-        "name": "Fusion Surface Inspect_newPanel",
+        "name": "FMF Surface Inspect_newPanel",
         "title": "INSPECT",
         "commands": [
           [
@@ -1944,21 +1944,21 @@
             "FusionMyFreeCAD_Reapply",
             "General",
             "small",
-            "Reapply UI",
+            "Reset FusionMyFreeCAD",
             "Std_DlgParameter"
           ],
           [
             "FusionMyFreeCAD_Restore",
             "General",
             "small",
-            "Restore UI",
+            "Disable FusionMyFreeCAD",
             "applications-accessories"
           ]
         ],
         "overflow": []
       },
       {
-        "name": "Fusion Surface Utilities_newPanel",
+        "name": "FMF Surface Utilities_newPanel",
         "title": "UTILITIES",
         "commands": [
           [
@@ -2015,7 +2015,7 @@
         ]
       },
       {
-        "name": "Fusion Surface Output_newPanel",
+        "name": "FMF Surface Output_newPanel",
         "title": "EXPORT",
         "commands": [
           [

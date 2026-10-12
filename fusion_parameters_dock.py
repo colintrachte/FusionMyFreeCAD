@@ -440,6 +440,34 @@ def toggle_parameters_dock():
     return show_parameters_dock()
 
 
+def close_parameters_dock():
+    """Remove the FMF Parameters dock and detach its document observer."""
+    global _active_parameters_dock
+    dock = _active_parameters_dock
+    if dock is None:
+        return
+
+    observer = getattr(dock, "_observer", None)
+    if observer is not None and hasattr(App, "removeDocumentObserver"):
+        try:
+            App.removeDocumentObserver(observer)
+        except Exception as error:
+            log_swallowed("remove Parameters dock observer", error)
+    dock._observer = None
+
+    try:
+        dock.hide()
+        main_window = Gui.getMainWindow() if hasattr(Gui, "getMainWindow") else None
+        if main_window is not None and hasattr(main_window, "removeDockWidget"):
+            main_window.removeDockWidget(dock)
+        if hasattr(dock, "deleteLater"):
+            dock.deleteLater()
+    except Exception as error:
+        log_swallowed("close Parameters dock", error)
+    finally:
+        _active_parameters_dock = None
+
+
 class ParameterDockCommand:
     """``FusionMyFreeCAD_ParameterDock`` ribbon command."""
 

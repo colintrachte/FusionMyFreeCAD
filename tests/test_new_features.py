@@ -503,6 +503,8 @@ def test_fusion_common_primitives(env):
     assert cmd.IsActive() is False  # Not in SketcherWorkbench
     env.active_workbench = "SketcherWorkbench"
     assert cmd.IsActive() is True
+    env.active_workbench = "FMFSketchWorkbench"
+    assert cmd.IsActive() is True
 
 
 def test_parameters_dock_observer_and_gap_handling(env):
@@ -516,6 +518,7 @@ def test_parameters_dock_observer_and_gap_handling(env):
     dock = fusion_parameters_dock.show_parameters_dock()
     assert dock is not None
     assert dock._bound_doc_name == "Doc2"
+    assert dock._observer in env.document_observers
 
     # Switch active document to Doc1
     env.app.ActiveDocument = doc1
@@ -541,6 +544,12 @@ def test_parameters_dock_observer_and_gap_handling(env):
     dock.table.setCurrentCell(0, 0)
     dock.on_delete_parameter()
     assert sheet1.get("A2") == ""
+
+    observer = dock._observer
+    fusion_parameters_dock.close_parameters_dock()
+    assert observer not in env.document_observers
+    assert fusion_parameters_dock._active_parameters_dock is None
+    assert dock.isVisible() is False
     assert sheet1.get("B2") == ""
 
     # Close document

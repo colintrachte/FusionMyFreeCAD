@@ -127,7 +127,7 @@ The following is an engineering estimate, not a measured benchmark:
 2. Install FreeCAD-Ribbon through Addon Manager and verify Part Design and Sketcher commands on FreeCAD 1.1.1.
 3. Install SearchBar; bind/retain `S`; disable its 3D preview during initial testing.
 4. Apply OpenLight/OpenDark or a current first-party modern theme.
-5. Build the Fusion Design ribbon through Ribbon's layout editor.
+5. Build the FMF Design ribbon through Ribbon's layout editor.
 6. Apply shortcuts and Revit navigation.
 7. Model the mounting-plate validation part from the setup guide.
 8. Export/copy the ribbon JSON and record all preference files.

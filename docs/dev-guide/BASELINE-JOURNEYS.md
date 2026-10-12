@@ -3,7 +3,7 @@
 Run these journeys before and after each owned-workbench migration slice. Record FreeCAD build,
 OS, display scale, clean/custom profile, elapsed time, errors, assistance, and recovery result.
 
-1. Install, restart, verify four layouts, and run **Verify UI**.
+1. Install, restart, verify four layouts, and run **Verify FusionMyFreeCAD**.
 2. Create a document/body/sketch from Part Design, select an origin plane, finish, and return.
 3. Create constrained geometry using Coincident, Smart Dimension, Midpoint, and Smart Slot.
 4. Mirror attached and free geometry with **Mirror + Constraints** and Pad multiple regions.
@@ -70,8 +70,9 @@ short note for each item; attach screenshots for items 1, 3, 5, and 9.
    confirm each file is created and non-empty.
 8. Search and adaptation: find one command using Fusion terminology and one using its FreeCAD name;
    invoke a FREQUENT candidate repeatedly, restart, and confirm only FREQUENT changes.
-9. Recovery: run Verify UI, note the result, run Reapply UI, restart, then run Restore UI and confirm
-   native menus/toolbars and the pre-FMF workbench appearance return.
+9. Lifecycle: run Verify FusionMyFreeCAD, note the result, run Reset FusionMyFreeCAD and restart, then disable
+   FusionMyFreeCAD. Restart again and confirm native menus/toolbars and the pre-FMF workbench
+   appearance remain active. Re-enable FMF in Preferences and restart to confirm it returns.
 
 Report the FreeCAD version, Windows display scale, whether the profile was already customized, and
 rough cold-start time. Any failure keeps this gate open; do not work around it merely to obtain a

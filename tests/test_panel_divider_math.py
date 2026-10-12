@@ -249,13 +249,13 @@ def _width_bar(stored=None, model="current"):
         toolbar["minWidth"] = stored
         if model is not None:
             toolbar["widthModel"] = model
-    return _bar({"Fusion Create_newPanel": toolbar})
+    return _bar({"FMF Create_newPanel": toolbar})
 
 
 def test_a_section_never_dragged_has_no_stored_width(math_module):
     """It must then size itself exactly as upstream does."""
     got = math_module.stored_panel_width(
-        _width_bar(), "PartDesignWorkbench", "Fusion Create_newPanel"
+        _width_bar(), "PartDesignWorkbench", "FMF Create_newPanel"
     )
     assert got is None
 
@@ -263,7 +263,7 @@ def test_a_section_never_dragged_has_no_stored_width(math_module):
 def test_a_dragged_section_remembers_its_width(math_module):
     bar = _width_bar(412, model=math_module.WIDTH_MODEL)
     assert (
-        math_module.stored_panel_width(bar, "PartDesignWorkbench", "Fusion Create_newPanel") == 412
+        math_module.stored_panel_width(bar, "PartDesignWorkbench", "FMF Create_newPanel") == 412
     )
 
 
@@ -276,7 +276,7 @@ def test_a_width_from_an_earlier_measurement_is_retired(math_module):
     """
     for stale in (None, 1, "v1"):
         bar = _width_bar(412, model=stale)
-        got = math_module.stored_panel_width(bar, "PartDesignWorkbench", "Fusion Create_newPanel")
+        got = math_module.stored_panel_width(bar, "PartDesignWorkbench", "FMF Create_newPanel")
         assert got is None, stale
 
 
@@ -286,15 +286,15 @@ def test_a_width_is_not_derived_from_the_column_budget(math_module):
     Turning that budget into a width claimed 282px for a single button, which
     is why some sections started far wider than their contents needed.
     """
-    bar = _bar({"Fusion Output_newPanel": {"order": ["a"], "maxColumns": 3}})
-    got = math_module.stored_panel_width(bar, "PartDesignWorkbench", "Fusion Output_newPanel")
+    bar = _bar({"FMF Output_newPanel": {"order": ["a"], "maxColumns": 3}})
+    got = math_module.stored_panel_width(bar, "PartDesignWorkbench", "FMF Output_newPanel")
     assert got is None
 
 
 @pytest.mark.parametrize("stored", ["wide", 0, -5])
 def test_an_unusable_stored_width_reads_as_unset(math_module, stored):
-    bar = _bar({"Fusion Create_newPanel": {"order": ["a"], "minWidth": stored}})
-    got = math_module.stored_panel_width(bar, "PartDesignWorkbench", "Fusion Create_newPanel")
+    bar = _bar({"FMF Create_newPanel": {"order": ["a"], "minWidth": stored}})
+    got = math_module.stored_panel_width(bar, "PartDesignWorkbench", "FMF Create_newPanel")
     assert got is None
 
 

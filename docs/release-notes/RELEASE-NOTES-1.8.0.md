@@ -1,5 +1,10 @@
 # FusionMyFreeCAD 1.8.0
 
+- Added bounded structured startup diagnostics, session health states, vendor-load timing, UI
+  snapshots, and menu commands for copying a support summary or opening the diagnostics folder.
+- FMF no longer reports activation healthy until the Ribbon is visibly usable; failed activation
+  is logged and automatically rolls back to the native interface.
+
 Arrange the ribbon around the way you work, keep complex sketches responsive,
 and recover more quickly when changes leave downstream features out of date.
 
@@ -128,7 +133,7 @@ broken input as a separate failure in every dependent feature.
 ## Reliability safeguards
 
 Failures while rebuilding selectable sketch regions or assigning a selected
-region to a Pad are now shown by **Verify UI** instead of being silently
+region to a Pad are now shown by **Verify FusionMyFreeCAD** instead of being silently
 ignored. If a Pad assignment fails, its previous profile and the sketch's
 visibility are restored.
 
@@ -155,5 +160,13 @@ upgrade, check any Pad that uses a specific region such as `InternalFace2`; it
 may need its profile selected once. After that, ordinary sketch edits retain the
 new deterministic ordering.
 
-**Restore UI** still returns the profile to how it was before FusionMyFreeCAD
-first ran.
+FMF now owns separate FMF Design, FMF Part, FMF Sketch, and FMF Surface
+workbenches. Its ribbon no longer replaces the layouts of the stock
+workbenches. **Disable FusionMyFreeCAD** switches back to the corresponding
+stock workbench, restores managed preferences and shortcuts, disconnects its
+runtime callbacks and observers, closes its Parameters dock, and hides the FMF
+workbenches without deleting their saved layout or personalization. Restarting
+FreeCAD after the switch refreshes the workbench selector.
+**Enable FusionMyFreeCAD** exposes them again. Hiding the corresponding stock
+workbenches is a separate reversible preference. **Reset FusionMyFreeCAD**
+restores FMF's shipped defaults without disabling it.

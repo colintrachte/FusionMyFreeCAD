@@ -18,7 +18,7 @@ catalog publication remains separate work.
 ## Install
 
 Download `FusionMyFreeCAD-1.8.0.zip` from the
-[1.8.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.4.0), extract its
+[1.8.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.8.0), extract its
 top-level `FusionMyFreeCAD` folder into FreeCAD's user `Mod` directory, and restart FreeCAD. Full
 platform-by-platform steps, verification, update, and removal instructions are in
 [`docs/user-guide/INSTALL-FREECAD-ADDON.md`](docs/user-guide/INSTALL-FREECAD-ADDON.md).
@@ -63,7 +63,7 @@ Sketcher ribbon only after the selected plane has opened the sketch for editing.
 
 Each panel's dropdown ends with **Reset this panel**. It restores only that panel's shipped order
 and pinned commands, leaving every other panel alone. There is deliberately no top-level reset
-button. **Reapply UI** remains the explicit whole-interface reset and clears all ribbon
+button. **Reset FusionMyFreeCAD** remains the explicit whole-interface reset and clears all ribbon
 personalisation along with restoring the other shipped defaults.
 
 ## Modelling and workflow enhancements
@@ -100,19 +100,21 @@ FusionMyFreeCAD adds several streamlined tools designed for speed and parity wit
 - **Parameters Dock**: In-canvas sidebar widget for quickly adding, inspecting, and editing spreadsheet parameters and aliases without navigating to the Spreadsheet workbench. Includes document-safe binding and gap tolerance.
 - **Studio Viewport & Modern Zinc Theme**: Clean visual viewport styling and dark theme mode (`Resources/Themes/modern_zinc.qss`).
 
-## The three UI commands
+## Interface state commands
 
 Each lives in an **INSPECT** panel:
 
 | Command | What it does |
 |---|---|
-| **Verify UI** | Checks the installed layout, the restore point, the bundled payload, and any startup or runtime failure, and reports what to do next |
-| **Reapply UI** | Returns the whole ribbon, managed preferences, and shortcuts to the shipped defaults; this clears all panel personalisation |
-| **Restore UI** | Undoes everything FusionMyFreeCAD changed, using the first-run baseline |
+| **Verify FusionMyFreeCAD** | Checks the installed layout, the restore point, the bundled payload, and any startup or runtime failure, and reports what to do next |
+| **Reset FusionMyFreeCAD** | Returns the whole ribbon, managed preferences, and shortcuts to the shipped defaults; this clears all panel personalisation |
+| **Disable FusionMyFreeCAD** | Switches an active FMF workbench to its stock counterpart, restores managed preferences and shortcuts, disconnects FMF runtime services, hides FMF workbenches, and keeps FMF disabled across restarts |
+| **Enable FusionMyFreeCAD** | Re-enables and exposes the FMF-owned Design, Part, Sketch, and Surface workbenches without rewriting stock workbench layouts |
 
-Run **Restore UI** *before* removing FusionMyFreeCAD in Addon Manager. If you have already removed
-it, [`tools/RestoreFusionMyFreeCAD.FCMacro`](tools/RestoreFusionMyFreeCAD.FCMacro) does the same job
-as a standalone macro.
+Restart FreeCAD after enabling or disabling so the workbench selector reflects the saved state.
+Run **Disable FusionMyFreeCAD** before removing it in Addon Manager. If you have already removed it,
+[`tools/RestoreFusionMyFreeCAD.FCMacro`](tools/RestoreFusionMyFreeCAD.FCMacro) performs the same
+profile recovery as a standalone macro.
 
 ## Settings
 
@@ -120,7 +122,9 @@ as a standalone macro.
 
 | Setting | Default | Effect |
 |---|---|---|
-| Start in the Part Design workbench | on | Sets Part Design as the autoload workbench |
+| Enable FusionMyFreeCAD | on | Loads the FMF interface and behavior after restart |
+| Hide corresponding stock workbenches | off | Hides the four stock equivalents while FMF is enabled; their prior visibility is restored on disable |
+| Start in the FMF Design workbench | on | Sets FMF Design as the autoload workbench |
 | Use Fusion-style navigation and the navigation cube | on | Revit navigation style, navigation cube top-right |
 | Apply Fusion keyboard shortcuts | on | `L` `R` `C` `D` `E` `H` `T` `O` `P` `X` and friends |
 | Open a starter design on launch | off | Creates an empty document and body at every start |

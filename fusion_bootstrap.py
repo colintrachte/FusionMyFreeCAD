@@ -37,8 +37,23 @@ BACKUP_ROOT = os.path.join(USER_ROOT, "FusionMyFreeCAD-Backups")
 # never cause FusionMyFreeCAD's own settings to be captured as the "previous UI".
 BASELINE_PATH = os.path.join(BACKUP_ROOT, "baseline.json")
 PREFERENCE_ROOT = "User parameter:BaseApp/Preferences/Mod/FusionMyFreeCAD"
+WORKBENCH_PREFERENCE_ROOT = "User parameter:BaseApp/Preferences/Workbenches"
 
 STATE_SCHEMA = 2
+
+OWNED_TO_NATIVE_WORKBENCH = {
+    "FMFDesignWorkbench": "PartDesignWorkbench",
+    "FMFPartWorkbench": "PartWorkbench",
+    "FMFSketchWorkbench": "SketcherWorkbench",
+    "FMFSurfaceWorkbench": "SurfaceWorkbench",
+}
+NATIVE_TO_OWNED_WORKBENCH = {native: owned for owned, native in OWNED_TO_NATIVE_WORKBENCH.items()}
+LEGACY_OWNED_WORKBENCH = {
+    "FusionDesignWorkbench": "FMFDesignWorkbench",
+    "FusionPartWorkbench": "FMFPartWorkbench",
+    "FusionSketchWorkbench": "FMFSketchWorkbench",
+    "FusionSurfaceWorkbench": "FMFSurfaceWorkbench",
+}
 
 
 def _read_package_version():
@@ -134,6 +149,41 @@ def _sha256(path):
 def _load_json(path):
     with open(path, encoding="utf-8") as stream:
         return json.load(stream)
+
+
+def _layout_spec():
+    """Return the owned-workbench layout or its temporary legacy projection."""
+    spec = _load_json(LAYOUT_SPEC)
+    if owned_workbenches_enabled():
+        return spec
+    spec["workbenches"] = {
+        OWNED_TO_NATIVE_WORKBENCH.get(workbench, workbench): panels
+        for workbench, panels in spec["workbenches"].items()
+    }
+    return spec
+
+
+def _layout_manifest():
+    """Keep adaptive and order metadata on the same identity set as the layout."""
+    manifest = _load_json(MANIFEST)
+    if owned_workbenches_enabled():
+        return manifest
+    for key in ("workbenchPanelOrder", "adaptivePins"):
+        manifest[key] = {
+            OWNED_TO_NATIVE_WORKBENCH.get(workbench, workbench): value
+            for workbench, value in manifest.get(key, {}).items()
+        }
+    return manifest
+
+
+def layout_spec():
+    """Return layout data for the currently selected workbench identity mode."""
+    return _layout_spec()
+
+
+def layout_manifest():
+    """Return manifest data for the currently selected workbench identity mode."""
+    return _layout_manifest()
 
 
 def _load_json_or_quarantine(path):
@@ -275,7 +325,26 @@ def _read_customization():
     if not isinstance(customization, dict) or customization.get("schemaVersion") != 1:
         return {}
     workbenches = customization.get("workbenches")
-    return customization if isinstance(workbenches, dict) else {}
+    if not isinstance(workbenches, dict):
+        return {}
+    for legacy, canonical in LEGACY_OWNED_WORKBENCH.items():
+        if canonical not in workbenches and legacy in workbenches:
+            workbenches[canonical] = workbenches.pop(legacy)
+    for saved_workbench in workbenches.values():
+        panels = saved_workbench.get("panels", {})
+        saved_workbench["panels"] = {
+            _canonical_panel_name(name): value for name, value in panels.items()
+        }
+        saved_workbench["panelOrder"] = [
+            _canonical_panel_name(name) for name in saved_workbench.get("panelOrder", [])
+        ]
+    return customization
+
+
+def _canonical_panel_name(name):
+    if isinstance(name, str) and name.startswith("Fusion ") and name.endswith("_newPanel"):
+        return "FMF " + name[len("Fusion ") :]
+    return name
 
 
 def _reconcile_order(preferred, shipped):
@@ -298,7 +367,10 @@ def _apply_customization(ribbon, spec, customization=None):
     # only the order between sections is taken from the new layout.
     order_is_current = customization.get("layoutVersion") == spec["layoutVersion"]
     for workbench, panels in spec["workbenches"].items():
-        saved_workbench = customized.get(workbench, {})
+        alternate = OWNED_TO_NATIVE_WORKBENCH.get(workbench)
+        if alternate is None:
+            alternate = NATIVE_TO_OWNED_WORKBENCH.get(workbench)
+        saved_workbench = customized.get(workbench) or customized.get(alternate, {})
         toolbar_root = ribbon["workbenches"][workbench]["toolbars"]
         shipped_panel_order = [panel["name"] for panel in panels]
         saved_order = saved_workbench.get("panelOrder", []) if order_is_current else []
@@ -343,7 +415,7 @@ def _apply_customization(ribbon, spec, customization=None):
 
 def _merge_layout(apply_customization=True):
     ribbon = _load_json(BASE_LAYOUT)
-    spec = _load_json(LAYOUT_SPEC)
+    spec = _layout_spec()
     ribbon.setdefault("dropdownButtons", {}).update(spec["dropdownButtons"])
     all_new_panels = ribbon.setdefault("newPanels", {})
     all_workbenches = ribbon.setdefault("workbenches", {})
@@ -398,7 +470,7 @@ def _merge_layout(apply_customization=True):
 
 def record_customization(ribbon):
     """Persist safe user-owned layout choices after direct ribbon dragging."""
-    spec = _load_json(LAYOUT_SPEC)
+    spec = _layout_spec()
     result = {
         "schemaVersion": 1,
         "layoutVersion": spec["layoutVersion"],
@@ -473,7 +545,7 @@ def adaptive_candidates(manifest=None):
     Verification has to tolerate the runtime's adaptive edits, so it needs to know
     exactly which commands are allowed to move or change size.
     """
-    manifest = manifest if manifest is not None else _load_json(MANIFEST)
+    manifest = manifest if manifest is not None else _layout_manifest()
     result = {}
     for workbench, config in manifest.get("adaptivePins", {}).items():
         panels = {}
@@ -495,7 +567,7 @@ def _verify_layout(path, spec=None, candidates=None):
     """
     problems = []
     try:
-        spec = spec if spec is not None else _load_json(LAYOUT_SPEC)
+        spec = spec if spec is not None else _layout_spec()
         candidates = candidates if candidates is not None else adaptive_candidates()
         ribbon = _load_json(path)
         expected_ribbon, _layout_version = _merge_layout()
@@ -599,7 +671,14 @@ def _verify_layout(path, spec=None, candidates=None):
                             workbench, name, command, sources.get(command), source
                         )
                     )
-            for key in ("panelMenu", "overflow", "responsive", "pinCount"):
+            if movable and toolbar.get("panelMenu") != actual_order:
+                checks["panelContents"] = False
+                problems.append(
+                    "{}/{}: panelMenu is {!r} but adaptive order is {!r}".format(
+                        workbench, name, toolbar.get("panelMenu"), actual_order
+                    )
+                )
+            for key in ("overflow", "responsive", "pinCount"):
                 if toolbar.get(key) != expected_toolbars[name].get(key):
                     checks["panelContents"] = False
                     problems.append(
@@ -724,7 +803,7 @@ def prepare():
         if not os.path.isfile(required):
             raise RuntimeError("FusionMyFreeCAD package is incomplete: {}".format(required))
 
-    spec = _load_json(LAYOUT_SPEC)
+    spec = _layout_spec()
     candidates = adaptive_candidates()
     state = read_state()
     if state is not None and not state.get("backupRoot"):
@@ -824,9 +903,8 @@ def verify():
     checks["restorePointPresent"] = _read_baseline() is not None
     if not checks["restorePointPresent"]:
         problems.append(
-            "No restore baseline at {}. Restore UI cannot recover the original profile.".format(
-                BASELINE_PATH
-            )
+            "No restore baseline at {}. Disable FusionMyFreeCAD cannot recover the "
+            "original profile.".format(BASELINE_PATH)
         )
     for label, relative in (
         ("bundledRibbon", ("bundled-addons", "FreeCAD-Ribbon", "InitGui.py")),
@@ -873,6 +951,11 @@ def restore():
                 BASELINE_PATH, STATE_PATH
             )
         )
+    # This marker is deliberately outside the baseline-owned preference list.
+    # Restoring the old profile must not let the next startup silently enable
+    # FusionMyFreeCAD again while the add-on remains installed.
+    App.ParamGet(PREFERENCE_ROOT).SetBool("Enabled", False)
+    App.saveParameter()
     backup_root = source.get("backupRoot") or BACKUP_ROOT
     removed = os.path.join(backup_root, "removed-" + _timestamp())
     os.makedirs(removed, exist_ok=True)
@@ -917,12 +1000,205 @@ def restore():
         main_window.menuBar().show()
         from PySide import QtWidgets
 
+        ribbon = main_window.findChild(QtWidgets.QDockWidget, "Ribbon")
+        if ribbon is not None:
+            ribbon.hide()
         for toolbar in main_window.findChildren(QtWidgets.QToolBar):
-            toolbar.show()
+            name = toolbar.objectName() if hasattr(toolbar, "objectName") else ""
+            if name in {"SearchBar", "SearchBarAtMouse"}:
+                toolbar.hide()
+            else:
+                toolbar.show()
     except Exception as error:  # pragma: no cover - needs a live Qt main window
         problems.append("Native toolbars: {}".format(error))
 
     return removed, problems
+
+
+def is_enabled():
+    """Whether FMF should load its managed UI and runtime services."""
+    return App.ParamGet(PREFERENCE_ROOT).GetBool("Enabled", True)
+
+
+def owned_workbenches_enabled():
+    """Whether the migration pilot should expose FMF-owned workbench identities."""
+    return App.ParamGet(PREFERENCE_ROOT).GetBool("UseOwnedWorkbenches", True)
+
+
+def register_owned_workbenches():
+    """Register namespaced FMF workbenches without replacing native workbenches."""
+    if not owned_workbenches_enabled():
+        return False
+    _migrate_owned_identity_preferences()
+    import fusion_workbenches
+
+    fusion_workbenches.register()
+    set_owned_workbench_visibility(True)
+    return True
+
+
+def _workbench_list(value):
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _write_workbench_list(group, name, values):
+    group.SetString(name, ",".join(dict.fromkeys(values)))
+
+
+def _migrate_owned_identity_preferences():
+    """Move persisted 1.8-development workbench IDs to their FMF names."""
+    general = App.ParamGet("User parameter:BaseApp/Preferences/General")
+    autoload = general.GetString("AutoloadModule", "")
+    if autoload in LEGACY_OWNED_WORKBENCH:
+        general.SetString("AutoloadModule", LEGACY_OWNED_WORKBENCH[autoload])
+
+    workbenches = App.ParamGet(WORKBENCH_PREFERENCE_ROOT)
+    for key in ("Disabled", "Ordered"):
+        values = _workbench_list(workbenches.GetString(key, ""))
+        migrated = [LEGACY_OWNED_WORKBENCH.get(value, value) for value in values]
+        if migrated != values:
+            _write_workbench_list(workbenches, key, migrated)
+    App.saveParameter()
+
+
+def set_owned_workbench_visibility(enabled):
+    """Expose exactly the workbench family used by FMF without losing user choices."""
+    group = App.ParamGet(WORKBENCH_PREFERENCE_ROOT)
+    preferences = App.ParamGet(PREFERENCE_ROOT)
+    disabled = _workbench_list(group.GetString("Disabled", ""))
+    owned = tuple(OWNED_TO_NATIVE_WORKBENCH)
+    native = tuple(OWNED_TO_NATIVE_WORKBENCH.values())
+    hidden_by_fmf = set(_workbench_list(preferences.GetString("NativeHiddenByFMF", "")))
+
+    if enabled:
+        disabled = [workbench for workbench in disabled if workbench not in owned]
+        newly_hidden = [
+            workbench
+            for workbench in native
+            if workbench in hidden_by_fmf and workbench in disabled
+        ]
+        if preferences.GetBool("HideNativeWorkbenches", False):
+            for workbench in native:
+                if workbench not in disabled:
+                    disabled.append(workbench)
+                    newly_hidden.append(workbench)
+        _write_workbench_list(preferences, "NativeHiddenByFMF", newly_hidden)
+    else:
+        for workbench in owned:
+            if workbench not in disabled:
+                disabled.append(workbench)
+        disabled = [workbench for workbench in disabled if workbench not in hidden_by_fmf]
+        preferences.RemString("NativeHiddenByFMF")
+
+    _write_workbench_list(group, "Disabled", disabled)
+    App.saveParameter()
+
+
+def active_workbench_name():
+    try:
+        return Gui.activeWorkbench().name()
+    except Exception:
+        return ""
+
+
+def fmf_workbench_for(native_workbench):
+    """Return the matching FMF identity when the owned interface is active."""
+    if is_enabled() and owned_workbenches_enabled():
+        return NATIVE_TO_OWNED_WORKBENCH.get(native_workbench, native_workbench)
+    return native_workbench
+
+
+# Compatibility for third-party macros written against the 1.8.0 development builds.
+fusion_workbench_for = fmf_workbench_for
+
+
+def activate_owned_workbench(workbench):
+    """Apply FMF chrome only while an FMF-owned workbench is active."""
+    if not is_enabled() or not owned_workbenches_enabled():
+        return
+    from PySide import QtWidgets
+
+    main_window = Gui.getMainWindow()
+    ribbon = main_window.findChild(QtWidgets.QDockWidget, "Ribbon")
+    if ribbon is not None:
+        ribbon.show()
+        ribbon_widget = ribbon.widget() if hasattr(ribbon, "widget") else None
+        if ribbon_widget is not None and hasattr(ribbon_widget, "hideClassicToolbars"):
+            ribbon_widget.hideClassicToolbars()
+    main_window.menuBar().hide()
+
+
+def sync_ui_mode_to_active_workbench():
+    """Select FMF or native chrome from the active workbench identity."""
+    import fusion_workbenches
+
+    try:
+        active = Gui.activeWorkbench().name()
+    except Exception:
+        return
+    if is_enabled() and owned_workbenches_enabled() and active in fusion_workbenches.FMF_TO_NATIVE:
+        activate_owned_workbench(active)
+    else:
+        _restore_native_ui_now()
+
+
+def defer_ui_mode_sync():
+    """Wait for FreeCAD to finish switching workbenches before changing chrome."""
+    from PySide import QtCore
+
+    QtCore.QTimer.singleShot(0, sync_ui_mode_to_active_workbench)
+
+
+def enable():
+    """Enable FMF persistently and prepare its state for the next launch."""
+    App.ParamGet(PREFERENCE_ROOT).SetBool("Enabled", True)
+    App.saveParameter()
+    register_owned_workbenches()
+    outcome = prepare()
+    active = active_workbench_name()
+    replacement = NATIVE_TO_OWNED_WORKBENCH.get(active)
+    if replacement:
+        Gui.activateWorkbench(replacement)
+    defer_ui_mode_sync()
+    return outcome
+
+
+def disable():
+    """Disable owned FMF workbenches without dismantling FreeCAD's native UI."""
+    if not owned_workbenches_enabled():
+        return restore()
+    active = active_workbench_name()
+    replacement = OWNED_TO_NATIVE_WORKBENCH.get(active)
+    baseline = _read_baseline()
+    problems = (
+        _restore_preferences(baseline.get("preferences", []))
+        if baseline is not None
+        else ["Original preference baseline is unavailable; managed preferences were not restored."]
+    )
+    preferences = App.ParamGet(PREFERENCE_ROOT)
+    preferences.RemString("AppliedVersion")
+    preferences.SetBool("Enabled", False)
+    set_owned_workbench_visibility(False)
+    runtime = sys.modules.get("_fusion_my_freecad_runtime")
+    if runtime is not None and hasattr(runtime, "uninstall"):
+        try:
+            runtime.uninstall()
+        except Exception as error:
+            problems.append("Runtime teardown: {}".format(error))
+    unregister_feature_observers()
+    try:
+        import fusion_viewport
+
+        fusion_viewport.restore_all_appearance()
+    except Exception as error:
+        problems.append("Appearance restoration: {}".format(error))
+    if replacement:
+        Gui.activateWorkbench(replacement)
+    _restore_native_ui_now()
+    install_lifecycle_menu()
+    return "FusionMyFreeCAD is disabled. FMF settings remain available at {}.".format(
+        BASELINE_PATH
+    ), problems
 
 
 # ---------------------------------------------------------------------------
@@ -967,8 +1243,8 @@ class VerifyCommand:
             lines.extend(
                 [
                     "",
-                    "Suggested next step: run Reapply FusionMyFreeCAD, then restart FreeCAD.",
-                    "If that does not help, run Restore UI and reinstall the add-on.",
+                    "Suggested next step: run Reset FusionMyFreeCAD, then restart FreeCAD.",
+                    "If that does not help, disable FusionMyFreeCAD and reinstall the add-on.",
                 ]
             )
         _message("FusionMyFreeCAD verification", "\n".join(lines), not valid)
@@ -985,20 +1261,20 @@ class ReapplyCommand:
     def GetResources(self):
         return {
             "Pixmap": "Std_DlgParameter",
-            "MenuText": "Reapply FusionMyFreeCAD",
-            "ToolTip": "Restore FusionMyFreeCAD's own ribbon layout, preferences, and shortcuts",
+            "MenuText": "Reset FusionMyFreeCAD",
+            "ToolTip": "Reset FusionMyFreeCAD's layout, preferences, and shortcuts to its defaults",
         }
 
     def IsActive(self):
-        return True
+        return is_enabled()
 
     def Activated(self):
         from PySide import QtWidgets
 
         answer = QtWidgets.QMessageBox.question(
             Gui.getMainWindow(),
-            "Reapply FusionMyFreeCAD",
-            "Reapply FusionMyFreeCAD's ribbon layout, managed preferences, and shortcuts?\n\n"
+            "Reset FusionMyFreeCAD",
+            "Reset FusionMyFreeCAD's ribbon layout, managed preferences, and shortcuts?\n\n"
             "Your own changes to those settings will be replaced.",
         )
         if answer != QtWidgets.QMessageBox.Yes:
@@ -1028,42 +1304,64 @@ def reapply():
     )
 
 
-class RestoreCommand:
+class DisableCommand:
     def GetResources(self):
         return {
             "Pixmap": "Std_DlgCustomize",
-            "MenuText": "Restore Previous UI",
-            "ToolTip": "Restore the UI from before FusionMyFreeCAD",
+            "MenuText": "Disable FusionMyFreeCAD",
+            "ToolTip": "Disable FusionMyFreeCAD and return to the previous FreeCAD UI",
         }
 
     def IsActive(self):
-        return True
+        return is_enabled()
 
     def Activated(self):
         from PySide import QtWidgets
 
         answer = QtWidgets.QMessageBox.question(
             Gui.getMainWindow(),
-            "Restore Previous UI",
-            "Restore the UI settings from before FusionMyFreeCAD was installed?",
+            "Disable FusionMyFreeCAD",
+            "Disable FusionMyFreeCAD and return to the UI settings from before it was enabled?",
         )
         if answer != QtWidgets.QMessageBox.Yes:
             return
         try:
-            location, problems = restore()
+            location, problems = disable()
             text = [
-                "Previous UI restored. Remove FusionMyFreeCAD in Addon Manager, "
-                "then restart FreeCAD.",
-                "",
-                "The removed configuration remains recoverable at:",
+                "FusionMyFreeCAD is disabled. The standard FreeCAD workbenches are active.",
                 location,
+                "Restart FreeCAD to refresh the workbench selector and finish teardown.",
             ]
             if problems:
                 text.extend(["", "Some items could not be restored:"])
                 text.extend("- {}".format(problem) for problem in problems)
-            _message("FusionMyFreeCAD restored", "\n".join(text), bool(problems))
+            _message("FusionMyFreeCAD disabled", "\n".join(text), bool(problems))
         except Exception as error:
-            _message("FusionMyFreeCAD restoration failed", str(error), True)
+            _message("Could not disable FusionMyFreeCAD", str(error), True)
+
+
+class EnableCommand:
+    def GetResources(self):
+        return {
+            "Pixmap": "Std_DlgParameter",
+            "MenuText": "Enable FusionMyFreeCAD",
+            "ToolTip": "Enable FusionMyFreeCAD and prepare its interface for the next launch",
+        }
+
+    def IsActive(self):
+        return not is_enabled()
+
+    def Activated(self):
+        try:
+            outcome = enable()
+            _message(
+                "FusionMyFreeCAD enabled",
+                "FusionMyFreeCAD is enabled ({}). Restart FreeCAD to load its interface.".format(
+                    outcome
+                ),
+            )
+        except Exception as error:
+            _message("Could not enable FusionMyFreeCAD", str(error), True)
 
 
 class CreateSketchCommand:
@@ -1087,7 +1385,7 @@ class CreateSketchCommand:
             document.addObject("PartDesign::Body", "Body")
             document.recompute()
         had_selection = bool(getattr(Gui, "Selection", None) and Gui.Selection.getSelection())
-        Gui.activateWorkbench("PartDesignWorkbench")
+        Gui.activateWorkbench(fmf_workbench_for("PartDesignWorkbench"))
         Gui.runCommand("PartDesign_NewSketch")
         # Keep Part Design active while FreeCAD's attachment task displays its
         # selectable origin planes. Switching workbenches here destroys the
@@ -1187,6 +1485,7 @@ class _SketchEditWorkbenchObserver:
         obj = getattr(view_provider, "Object", None)
         if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
             return
+        self._return_workbench = active_workbench_name()
         # Switch after setEdit returns, not from inside this callback. Activating
         # a workbench rebuilds the ribbon and polls every command's IsActive();
         # doing that while FreeCAD is still mid-setEdit re-enters a half-built
@@ -1200,7 +1499,7 @@ class _SketchEditWorkbenchObserver:
             self._on_sketch_in_edit(obj)
 
     def _on_sketch_in_edit(self, sketch_obj):
-        Gui.activateWorkbench("SketcherWorkbench")
+        Gui.activateWorkbench(fmf_workbench_for("SketcherWorkbench"))
         # If this is a newly created sketch (no geometry yet), ensure its view
         # is cleanly centered on the sketch plane origin with ~100x100mm range,
         # preventing off-center pan and extreme zoom.
@@ -1228,6 +1527,14 @@ class _SketchEditWorkbenchObserver:
         obj = getattr(view_provider, "Object", None)
         if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
             return
+        return_workbench = getattr(self, "_return_workbench", "")
+        if return_workbench and return_workbench != active_workbench_name():
+            try:
+                from PySide import QtCore
+
+                QtCore.QTimer.singleShot(0, lambda: Gui.activateWorkbench(return_workbench))
+            except ImportError:
+                Gui.activateWorkbench(return_workbench)
         try:
             import fusion_sketch_tools
 
@@ -1441,13 +1748,219 @@ class _PadSelectionObserver:
         pass
 
 
-def register_commands():
-    global _sketch_edit_observer, _sketch_repair_observer, _pad_selection_observer
-    Gui.addCommand("FusionMyFreeCAD_CreateSketch", CreateSketchCommand())
-    Gui.addCommand("FusionMyFreeCAD_ParameterTable", ParameterTableCommand())
+_lifecycle_commands_registered = False
+_feature_commands_registered = False
+
+
+def register_lifecycle_commands():
+    global _lifecycle_commands_registered
+    if _lifecycle_commands_registered:
+        return
     Gui.addCommand("FusionMyFreeCAD_Verify", VerifyCommand())
     Gui.addCommand("FusionMyFreeCAD_Reapply", ReapplyCommand())
-    Gui.addCommand("FusionMyFreeCAD_Restore", RestoreCommand())
+    # Keep the historical command ID so saved toolbar/menu customizations continue
+    # to resolve, but expose unambiguous enable/disable wording to users.
+    Gui.addCommand("FusionMyFreeCAD_Restore", DisableCommand())
+    Gui.addCommand("FusionMyFreeCAD_Enable", EnableCommand())
+    Gui.addCommand("FusionMyFreeCAD_OpenDiagnostics", OpenDiagnosticsCommand())
+    Gui.addCommand("FusionMyFreeCAD_CopyDiagnostics", CopyDiagnosticsCommand())
+    _lifecycle_commands_registered = True
+
+
+def install_lifecycle_menu():
+    """Keep FMF activation controls discoverable when its ribbon is disabled."""
+    from PySide import QtGui, QtWidgets
+
+    main_window = Gui.getMainWindow()
+    menu_bar = main_window.menuBar()
+    if not hasattr(menu_bar, "addMenu"):
+        return None
+    menu = main_window.findChild(QtWidgets.QMenu, "FusionMyFreeCAD_LifecycleMenu")
+    if menu is None:
+        menu = menu_bar.addMenu("FusionMyFreeCAD")
+        menu.setObjectName("FusionMyFreeCAD_LifecycleMenu")
+    else:
+        menu.clear()
+
+    commands = (
+        (("Enable FusionMyFreeCAD", "FusionMyFreeCAD_Enable"),)
+        if not is_enabled()
+        else (
+            ("Verify FusionMyFreeCAD", "FusionMyFreeCAD_Verify"),
+            ("Reset FusionMyFreeCAD", "FusionMyFreeCAD_Reapply"),
+            ("Disable FusionMyFreeCAD", "FusionMyFreeCAD_Restore"),
+        )
+    )
+    commands = (
+        *commands,
+        ("Copy Diagnostic Summary", "FusionMyFreeCAD_CopyDiagnostics"),
+        ("Open Diagnostics Folder", "FusionMyFreeCAD_OpenDiagnostics"),
+    )
+    for label, command in commands:
+        action = QtGui.QAction(label, menu)
+        action.setObjectName(command + "_MenuAction")
+        action.triggered.connect(
+            lambda checked=False, command_name=command: Gui.runCommand(command_name)
+        )
+        menu.addAction(action)
+    return menu
+
+
+def _restore_native_ui_now():
+    from PySide import QtCore, QtWidgets
+
+    main_window = Gui.getMainWindow()
+    was_maximized = main_window.isMaximized()
+    flags = QtCore.Qt.WindowType
+    main_window.setWindowFlag(flags.CustomizeWindowHint, False)
+    for flag in (
+        flags.WindowTitleHint,
+        flags.WindowSystemMenuHint,
+        flags.WindowMinimizeButtonHint,
+        flags.WindowMaximizeButtonHint,
+        flags.WindowCloseButtonHint,
+    ):
+        main_window.setWindowFlag(flag, True)
+
+    main_window.menuBar().show()
+    central_widget = main_window.centralWidget()
+    if central_widget is not None:
+        central_widget.show()
+    ribbon = main_window.findChild(QtWidgets.QDockWidget, "Ribbon")
+    if ribbon is not None:
+        ribbon.hide()
+    for toolbar in main_window.findChildren(QtWidgets.QToolBar):
+        name = toolbar.objectName() if hasattr(toolbar, "objectName") else ""
+        if name in {"SearchBar", "SearchBarAtMouse"}:
+            toolbar.hide()
+    if was_maximized:
+        main_window.showMaximized()
+    else:
+        main_window.show()
+
+
+def restore_disabled_native_ui():
+    """Make FreeCAD's native chrome usable after Ribbon-owned state is restored."""
+    from PySide import QtCore
+
+    # FreeCAD applies its persisted QMainWindow state after add-on InitGui files.
+    # Run once the event loop starts so the native UI wins that ordering race.
+    def restore_and_record():
+        import fusion_common as diagnostics
+
+        if owned_workbenches_enabled():
+            set_owned_workbench_visibility(False)
+        _restore_native_ui_now()
+        diagnostics.event("info", "ui", "disabled restoration", "healthy")
+        diagnostics.set_status("healthy", enabled=False, nativeUiRestored=True)
+
+    QtCore.QTimer.singleShot(0, restore_and_record)
+
+
+def validate_enabled_ui():
+    """Validate the chrome appropriate to the active owned or native workbench."""
+    from PySide import QtCore, QtWidgets
+
+    def validate():
+        import fusion_common as diagnostics
+
+        main_window = Gui.getMainWindow()
+        ribbon = main_window.findChild(QtWidgets.QDockWidget, "Ribbon")
+
+        def safe(function, default=None):
+            try:
+                return function()
+            except Exception:
+                return default
+
+        active_workbench = safe(lambda: Gui.activeWorkbench().name(), "unknown")
+        central_widget = safe(lambda: main_window.centralWidget())
+        snapshot = {
+            "activeWorkbench": active_workbench,
+            "windowFlags": safe(lambda: int(main_window.windowFlags())),
+            "menuVisible": safe(lambda: main_window.menuBar().isVisible()),
+            "centralWidgetVisible": bool(
+                central_widget and safe(lambda: central_widget.isVisible(), False)
+            ),
+            "ribbonPresent": ribbon is not None,
+            "ribbonVisible": bool(ribbon and safe(lambda: ribbon.isVisible(), False)),
+            "ribbonHeight": safe(lambda: ribbon.height()) if ribbon is not None else None,
+            "visibleToolbars": [
+                safe(lambda toolbar=toolbar: toolbar.objectName(), "unknown")
+                for toolbar in main_window.findChildren(QtWidgets.QToolBar)
+                if safe(lambda toolbar=toolbar: toolbar.isVisible(), False)
+            ],
+        }
+        owned_active = active_workbench in OWNED_TO_NATIVE_WORKBENCH
+        ribbon_usable = bool(
+            ribbon
+            and safe(lambda: ribbon.isVisible(), False)
+            and (safe(lambda: ribbon.height(), 0) or 0) > 0
+        )
+        native_usable = bool(
+            not owned_active
+            and safe(lambda: main_window.menuBar().isVisible(), False)
+            and central_widget
+            and safe(lambda: central_widget.isVisible(), False)
+        )
+        if (owned_active and ribbon_usable) or native_usable:
+            failures = startup_failures()
+            state = "degraded" if failures else "healthy"
+            diagnostics.event("info", "ui", "enabled validation", state, **snapshot)
+            diagnostics.set_status(state, startupFailures=failures, **snapshot)
+            return
+
+        message = (
+            "The active workbench did not produce usable application chrome; "
+            "activation was rolled back"
+        )
+        App.Console.PrintError("FusionMyFreeCAD: {}.\n".format(message))
+        record_startup_failure("enabled UI validation", RuntimeError(message))
+        App.ParamGet(PREFERENCE_ROOT).SetBool("Enabled", False)
+        App.saveParameter()
+        diagnostics.event("error", "ui", "enabled validation", "rolled_back", **snapshot)
+        diagnostics.set_status("activation_rolled_back", reason=message, **snapshot)
+        _restore_native_ui_now()
+        install_lifecycle_menu()
+
+    # Ribbon construction is synchronous during InitGui, but FreeCAD applies
+    # final visibility only when the event loop begins.
+    QtCore.QTimer.singleShot(0, validate)
+
+
+class OpenDiagnosticsCommand:
+    def GetResources(self):
+        return {"MenuText": "Open Diagnostics Folder", "ToolTip": "Open FMF diagnostic files"}
+
+    def Activated(self):
+        from PySide import QtCore, QtGui
+
+        import fusion_common as diagnostics
+
+        os.makedirs(diagnostics.DIAGNOSTICS_DIR, exist_ok=True)
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(diagnostics.DIAGNOSTICS_DIR))
+
+
+class CopyDiagnosticsCommand:
+    def GetResources(self):
+        return {"MenuText": "Copy Diagnostic Summary", "ToolTip": "Copy FMF health summary"}
+
+    def Activated(self):
+        from PySide import QtWidgets
+
+        import fusion_common as diagnostics
+
+        QtWidgets.QApplication.clipboard().setText(diagnostics.diagnostic_summary())
+
+
+def register_commands():
+    global _feature_commands_registered
+    global _sketch_edit_observer, _sketch_repair_observer, _pad_selection_observer
+    register_lifecycle_commands()
+    if _feature_commands_registered:
+        return
+    Gui.addCommand("FusionMyFreeCAD_CreateSketch", CreateSketchCommand())
+    Gui.addCommand("FusionMyFreeCAD_ParameterTable", ParameterTableCommand())
 
     if _sketch_edit_observer is None and hasattr(Gui, "addDocumentObserver"):
         _sketch_edit_observer = _SketchEditWorkbenchObserver()
@@ -1478,6 +1991,46 @@ def register_commands():
     fusion_parameters_dock.register()
     fusion_repair_tools.register()
     fusion_viewport.register()
+    _feature_commands_registered = True
+
+
+def unregister_feature_observers():
+    """Detach FMF observers and filters when disabling within a live session."""
+    global _sketch_edit_observer, _sketch_repair_observer, _pad_selection_observer
+    if _sketch_edit_observer is not None and hasattr(Gui, "removeDocumentObserver"):
+        try:
+            Gui.removeDocumentObserver(_sketch_edit_observer)
+        except Exception:
+            pass
+        _sketch_edit_observer = None
+    if _sketch_repair_observer is not None and hasattr(App, "removeDocumentObserver"):
+        try:
+            App.removeDocumentObserver(_sketch_repair_observer)
+        except Exception:
+            pass
+        _sketch_repair_observer = None
+    if (
+        _pad_selection_observer is not None
+        and hasattr(Gui, "Selection")
+        and hasattr(Gui.Selection, "removeObserver")
+    ):
+        try:
+            Gui.Selection.removeObserver(_pad_selection_observer)
+        except Exception:
+            pass
+        _pad_selection_observer = None
+    try:
+        import fusion_dressup_tools
+
+        fusion_dressup_tools.uninstall_dressup_enhancers()
+    except Exception:
+        pass
+    try:
+        import fusion_parameters_dock
+
+        fusion_parameters_dock.close_parameters_dock()
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -1525,16 +2078,32 @@ def run_runtime():
 
 
 def load_vendor(name, directory):
+    import fusion_common as diagnostics
+
+    started = datetime.now(UTC)
     if name in _loaded:
         return
     if any(module in sys.modules for module in VENDOR_SENTINELS.get(name, ())):
         _loaded.add(name)
         App.Console.PrintMessage("FusionMyFreeCAD is using the already active {}.\n".format(name))
+        diagnostics.event("info", "vendor", name, "reused")
         return
     init_gui = os.path.join(directory, "InitGui.py")
     if not os.path.isfile(init_gui):
         raise RuntimeError("FusionMyFreeCAD vendor payload is incomplete: {}".format(init_gui))
     if directory not in sys.path:
         sys.path.insert(0, directory)
-    _execute_module("_fusion_vendor_{}".format(name), init_gui)
+    try:
+        _execute_module("_fusion_vendor_{}".format(name), init_gui)
+    except BaseException as error:
+        diagnostics.diagnostic_exception("vendor", name, error, initGui=init_gui)
+        raise
     _loaded.add(name)
+    diagnostics.event(
+        "info",
+        "vendor",
+        name,
+        "loaded",
+        durationMs=round((datetime.now(UTC) - started).total_seconds() * 1000, 2),
+        sentinels={module: module in sys.modules for module in VENDOR_SENTINELS.get(name, ())},
+    )

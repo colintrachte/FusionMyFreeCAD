@@ -447,6 +447,40 @@ FCBINDING_OVERFLOW_PATCH = (
     ),
 )
 
+SEARCH_BOX_FMF_PATCH = (
+    (
+        ")\n\nfrom SearchBoxLight import SearchBoxLight\n",
+        ")\n\n\n"
+        "def fmfSearchableText(group):\n"
+        '    """Return visible and native command vocabulary for a cached result."""\n'
+        '    return "{} {}".format(group["text"], group.get("toolTip", ""))\n'
+        "\n\n"
+        "def fmfResultText(group):\n"
+        '    """Disambiguate FMF\'s shared Fusion-style Extrude caption."""\n'
+        '    tooltip = group.get("toolTip", "")\n'
+        '    if "PartDesign_Pad" in tooltip:\n'
+        '        return "Pad / Extrude (Part Design)"\n'
+        '    if "Part_Extrude" in tooltip:\n'
+        '        return "Extrude (Part)"\n'
+        '    return group["text"]\n'
+        "\n"
+        "from SearchBoxLight import SearchBoxLight\n",
+    ),
+    (
+        '            if matches(group["text"]):\n',
+        "            if matches(fmfSearchableText(group)):\n",
+        1,
+    ),
+    (
+        '                if len(subitems) > 0 or matches(group["text"]):\n',
+        "                if len(subitems) > 0 or matches(fmfSearchableText(group)):\n",
+    ),
+    (
+        '                        QStandardItem(group["icon"] or genericToolIcon, group["text"]),\n',
+        '                        QStandardItem(group["icon"] or genericToolIcon, fmfResultText(group)),\n',
+    ),
+)
+
 
 FCBINDING_DIVIDER_PATCH = (
     (
@@ -1580,6 +1614,10 @@ FCBINDING_INTEGRATION_PATCH = (
 # run first, because the hooks below were written against a tree that already had
 # them and anchor on lines they restore.
 LOCAL_PATCHES = (
+    (
+        ("SearchBar", "SearchBox.py"),
+        SEARCH_BOX_FMF_PATCH,
+    ),
     (
         ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "panel.py"),
         PANEL_NUMPY_PATCH + PANEL_TITLE_DRAWER_PATCH + PANEL_DIVIDER_PATCH,

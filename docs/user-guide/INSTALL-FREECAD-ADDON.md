@@ -54,18 +54,18 @@ After startup:
 
 1. Open Part Design, Part, Sketcher, or Surface.
 2. Confirm the Fusion-style Ribbon panels appear.
-3. In an **INSPECT** panel, choose **Verify UI**.
+3. In an **INSPECT** panel, choose **Verify FusionMyFreeCAD**.
 4. Exercise command search and one harmless command such as **Fit All**.
 
 For a focused Sketcher check, select two endpoints and click **Coincident**. The unified control
 adds point-to-point Coincident for two endpoints and Point-on-Object when the second selection is
 an edge.
 
-**Verify UI** reports each check as OK or FAILED, lists the detail behind any failure, and names the
+**Verify FusionMyFreeCAD** reports each check as OK or FAILED, lists the detail behind any failure, and names the
 next step to try. It also lists every keyboard shortcut FusionMyFreeCAD took from another command,
 so nothing about the rebinding is hidden.
 
-If a check fails, try **Reapply UI** in the same panel and restart FreeCAD. Reapply rebuilds the
+If a check fails, try **Reset FusionMyFreeCAD** in the same panel and restart FreeCAD. Reset rebuilds the
 ribbon layout, clears all panel personalization, and rewrites the managed preferences and shortcuts
 to the shipped defaults.
 
@@ -77,16 +77,17 @@ system drag threshold to reorder it within the panel; there is no separate arran
 order is saved automatically.
 
 Choose **Reset this panel** at the bottom of a panel dropdown to restore only that panel. Other
-panels retain their order and pinned commands. Use **Reapply UI** only when you intend to reset the
+panels retain their order and pinned commands. Use **Reset FusionMyFreeCAD** only when you intend to reset the
 whole FusionMyFreeCAD interface.
 
 ## Settings
 
-**Edit -> Preferences -> FusionMyFreeCAD** exposes four switches: start workbench, Fusion navigation
-and navigation cube, Fusion keyboard shortcuts, and the optional starter design (off by default).
+**Edit -> Preferences -> FusionMyFreeCAD** exposes activation plus four behavior switches: start
+workbench, Fusion navigation and navigation cube, Fusion keyboard shortcuts, and the optional
+starter design (off by default).
 
 Managed preferences are applied once per installed version, not at every launch, so a change you make
-afterwards in FreeCAD's own preferences dialog is preserved. Use **Reapply UI** to return to the
+afterwards in FreeCAD's own preferences dialog is preserved. Use **Reset FusionMyFreeCAD** to return to the
 shipped defaults deliberately.
 
 The bundled FreeCAD-Ribbon and SearchBar code is already inside this add-on. Separate installations
@@ -96,11 +97,11 @@ you want to test the exact bundled versions.
 
 ## Update
 
-1. Close FreeCAD. Updating from an earlier FusionMyFreeCAD add-on does not require **Restore UI**;
+1. Close FreeCAD. Updating from an earlier FusionMyFreeCAD add-on does not require disabling FMF;
    saved panel arrangements are reconciled with the new layout.
 2. Replace the entire `Mod/FusionMyFreeCAD` folder with the folder from the newer archive. Do not
    merge old and new files, because removed runtime files could otherwise remain installed.
-3. Start FreeCAD and run **Verify UI**.
+3. Start FreeCAD and run **Verify FusionMyFreeCAD**.
 
 Version 1.2.0 replaces the retired Windows installer with the normal cross-platform add-on archive.
 If an older installer-based copy exists elsewhere, remove that obsolete copy after confirming the
@@ -108,16 +109,18 @@ active `Mod/FusionMyFreeCAD` folder is the release archive described above.
 
 ## Remove
 
-1. While the add-on is still installed, choose **Restore UI** to restore the Ribbon layout and
-   preferences saved before FusionMyFreeCAD was first applied.
-2. Close FreeCAD.
+1. While the add-on is still installed, choose **Disable FusionMyFreeCAD**. This switches to the
+   corresponding stock workbench, restores managed preferences and shortcuts, and hides FMF's
+   workbenches without deleting their saved layout or personalization. It also disconnects FMF's
+   live callbacks and closes its Parameters dock.
+2. Restart FreeCAD so the workbench selector reloads the saved visibility state, then close FreeCAD.
 3. Remove only the `Mod/FusionMyFreeCAD` directory.
 4. Start FreeCAD and confirm the prior UI is active.
 
 ### If you already removed the add-on
 
-Removing `Mod/FusionMyFreeCAD` takes **Restore UI** with it but leaves the ribbon layout and managed
-preferences in place. Recover with the standalone macro:
+Removing `Mod/FusionMyFreeCAD` before disabling takes **Disable FusionMyFreeCAD** with it and can
+leave managed preferences in place. Recover with the standalone macro:
 
 1. Copy `tools/RestoreFusionMyFreeCAD.FCMacro` from the release archive into your FreeCAD macro
    directory (**Macro -> Macros...** shows its location).

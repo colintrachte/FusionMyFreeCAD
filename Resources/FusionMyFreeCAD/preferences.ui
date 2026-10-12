@@ -17,11 +17,58 @@
    <item>
     <widget class="QLabel" name="introLabel">
      <property name="text">
-      <string>These settings take effect the next time FusionMyFreeCAD applies its defaults. Use &lt;b&gt;Reapply UI&lt;/b&gt; in an INSPECT panel to apply them now, or &lt;b&gt;Restore UI&lt;/b&gt; to undo FusionMyFreeCAD entirely.</string>
+      <string>Enable or disable FusionMyFreeCAD here, then restart FreeCAD. Use &lt;b&gt;Reset FusionMyFreeCAD&lt;/b&gt; in an INSPECT panel only when you want to discard FMF interface customizations.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
      </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="activationGroup">
+     <property name="title">
+      <string>Activation</string>
+     </property>
+     <layout class="QVBoxLayout" name="activationLayout">
+      <item>
+       <widget class="Gui::PrefCheckBox" name="enabled">
+        <property name="toolTip">
+         <string>When disabled, FusionMyFreeCAD leaves the standard FreeCAD interface active on the next launch.</string>
+        </property>
+        <property name="text">
+         <string>Enable FusionMyFreeCAD</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+        <property name="prefEntry" stdset="0">
+         <cstring>Enabled</cstring>
+        </property>
+        <property name="prefPath" stdset="0">
+         <cstring>Mod/FusionMyFreeCAD</cstring>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="Gui::PrefCheckBox" name="hideNativeWorkbenches">
+        <property name="toolTip">
+         <string>Hide the four corresponding stock workbenches while FusionMyFreeCAD is enabled. Their prior visibility is restored when FusionMyFreeCAD is disabled.</string>
+        </property>
+        <property name="text">
+         <string>Hide corresponding stock workbenches</string>
+        </property>
+        <property name="checked">
+         <bool>false</bool>
+        </property>
+        <property name="prefEntry" stdset="0">
+         <cstring>HideNativeWorkbenches</cstring>
+        </property>
+        <property name="prefPath" stdset="0">
+         <cstring>Mod/FusionMyFreeCAD</cstring>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>
@@ -33,10 +80,10 @@
       <item>
        <widget class="Gui::PrefCheckBox" name="setStartWorkbench">
         <property name="toolTip">
-         <string>Open FreeCAD in Part Design, matching Fusion's Design workspace.</string>
+         <string>Open FreeCAD in FMF Design.</string>
         </property>
         <property name="text">
-         <string>Start in the Part Design workbench</string>
+         <string>Start in the FMF Design workbench</string>
         </property>
         <property name="checked">
          <bool>true</bool>

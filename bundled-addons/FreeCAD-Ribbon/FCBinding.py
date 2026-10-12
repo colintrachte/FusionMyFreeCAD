@@ -3573,6 +3573,25 @@ class ModernMenu(RibbonBar):
         mw.workbenchActivated.disconnect(self.onWbActivated)
         return
 
+    def _fmfAuthoritativeWorkbenchActive(self):
+        enabled = App.ParamGet(
+            "User parameter:BaseApp/Preferences/Mod/FusionMyFreeCAD"
+        ).GetBool("Enabled", True)
+        if not enabled:
+            return False
+        try:
+            active = Gui.activeWorkbench().name()
+        except Exception:
+            return False
+        return active in self.ribbonStructure.get("authoritativeWorkbenches", [])
+
+    def _setFmfChromeVisible(self, visible):
+        """Keep the vendored ribbon scoped to FMF-owned workbenches."""
+        dock = mw.findChild(QDockWidget, "Ribbon")
+        if dock is not None:
+            dock.setVisible(visible)
+        mw.menuBar().setVisible(not visible)
+
     def onUserChangedWorkbench(self, tabActivated=True):
         """
         Import selected workbench toolbars to ModernMenu section.
@@ -3609,6 +3628,10 @@ class ModernMenu(RibbonBar):
         return
 
     def onWbActivated(self):        
+        if not self._fmfAuthoritativeWorkbenchActive():
+            self._setFmfChromeVisible(False)
+            return
+        self._setFmfChromeVisible(True)
         if len(mw.findChildren(QDockWidget, "Ribbon")) > 0:
             if Parameters.AUTOHIDE_RIBBON is False:
                 self.UnfoldRibbon()

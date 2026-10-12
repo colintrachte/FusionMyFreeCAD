@@ -47,7 +47,7 @@ Create a toolbar named **Fusion Core** under the Part Design workbench. Put comm
 | Solid creation | Pad; Pocket; Hole |
 | Feature repetition | Mirror; Linear Pattern; Polar Pattern |
 
-The two Mirror entries are different commands. Rename is not necessary; their icons and active context distinguish them. If the toolbar becomes crowded, split it into **Fusion Sketch** and **Fusion Solid**, on adjacent rows.
+The two Mirror entries are different commands. Rename is not necessary; their icons and active context distinguish them. If the toolbar becomes crowded, split it into **FMF Sketch** and **FMF Solid**, on adjacent rows.
 
 Keep the Combo View or Tree View docked on the left. Hide panels that do not serve the core modeling loop using **View → Panels**. Leave the Tasks area available because FreeCAD uses it for active command parameters.
 

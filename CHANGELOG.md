@@ -6,6 +6,13 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
 
 ### Regression hardening
 
+- Disabling FMF in a running session now disconnects its workbench callback, event filter, feature
+  observers, dress-up enhancer, and Parameters dock. The bundled Ribbon also checks FMF's enabled
+  state before showing itself, preventing late callbacks from taking native chrome back over.
+- Native workbench activation is now considered healthy when the native menu and central view are
+  usable; it no longer fails merely because FMF intentionally hid its Ribbon outside an FMF-owned
+  workbench.
+- FMF sketch commands remain active in the owned FMF Sketch workbench as well as stock Sketcher.
 - Failures while rebuilding selectable sketch regions or assigning a selected region to a Pad are
   now recorded for **Verify UI** instead of being silently ignored. A failed Pad assignment also
   restores the previous profile and sketch visibility.

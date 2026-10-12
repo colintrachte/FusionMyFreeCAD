@@ -44,6 +44,21 @@ from PySide.QtGui import (
     QStandardItem,
 )
 
+
+def fmfSearchableText(group):
+    """Return visible and native command vocabulary for a cached result."""
+    return "{} {}".format(group["text"], group.get("toolTip", ""))
+
+
+def fmfResultText(group):
+    """Disambiguate FMF's shared Fusion-style Extrude caption."""
+    tooltip = group.get("toolTip", "")
+    if "PartDesign_Pad" in tooltip:
+        return "Pad / Extrude (Part Design)"
+    if "Part_Extrude" in tooltip:
+        return "Extrude (Part)"
+    return group["text"]
+
 from SearchBoxLight import SearchBoxLight
 import Parameters_SearchBar as Parameters
 
@@ -417,14 +432,14 @@ class SearchBox(QLineEdit):
             if Parameters.FILTER_DOCUMENTS is False and "document" in group["action"]["handler"]:
                 return
             
-            if matches(group["text"]):
+            if matches(fmfSearchableText(group)):
                 # If a group matches, include the entire subtree (might need to disable this if it causes too much noise)
                 return group
             else:
                 subitems = filterGroups(group["subitems"])
                 # if len(subitems) == 0:
                 #     self.index = 0
-                if len(subitems) > 0 or matches(group["text"]):
+                if len(subitems) > 0 or matches(fmfSearchableText(group)):
                     return {
                         "id": group["id"],
                         "text": group["text"],
@@ -448,7 +463,7 @@ class SearchBox(QLineEdit):
                 # TODO: this is not very clean, we should memorize the index from the original itemgroups
                 self.mdl.appendRow(
                     [
-                        QStandardItem(group["icon"] or genericToolIcon, group["text"]),
+                        QStandardItem(group["icon"] or genericToolIcon, fmfResultText(group)),
                         QStandardItem(str(depth)),
                         QStandardItem(str(group["id"])),
                         QStandardItem(str(group["action"])),

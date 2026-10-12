@@ -662,6 +662,9 @@ class Signal:
     def connect(self, handler):
         self.handlers.append(handler)
 
+    def disconnect(self, handler):
+        self.handlers.remove(handler)
+
     def emit(self, *arguments):
         for handler in list(self.handlers):
             handler(*arguments)
@@ -766,6 +769,13 @@ class FakeDock:
 
     def closeEvent(self, event):
         pass
+
+    def close(self):
+        self.closeEvent(None)
+        self.hide()
+
+    def deleteLater(self):
+        self.visible = False
 
 
 class FakeTabWidget:
@@ -1176,6 +1186,8 @@ class FakeMainWindow:
         self._menu_shown = False
         self.status_messages = []
         self._stylesheet = ""
+        self._maximized = False
+        self._central_widget = FakeQtWidget()
 
     def styleSheet(self):
         return self._stylesheet
@@ -1190,7 +1202,34 @@ class FakeMainWindow:
             def show(self):
                 window._menu_shown = True
 
+            def hide(self):
+                window._menu_shown = False
+
+            def setVisible(self, visible):
+                window._menu_shown = bool(visible)
+
+            def isVisible(self):
+                return window._menu_shown
+
         return MenuBar()
+
+    def centralWidget(self):
+        return self._central_widget
+
+    def isMaximized(self):
+        return self._maximized
+
+    def windowFlags(self):
+        return 0
+
+    def setWindowFlag(self, *_args):
+        pass
+
+    def show(self):
+        pass
+
+    def showMaximized(self):
+        self._maximized = True
 
     def findChildren(self, kind):
         matches = [w for w in self.widgets if isinstance(w, kind)]
@@ -1255,6 +1294,14 @@ def _qt_modules():
         "Key_Delete": "delete",
         "UserRole": 0x0100,
         "ItemIsEditable": 1,
+        "WindowType": types.SimpleNamespace(
+            CustomizeWindowHint="customize",
+            WindowTitleHint="title",
+            WindowSystemMenuHint="system-menu",
+            WindowMinimizeButtonHint="minimize",
+            WindowMaximizeButtonHint="maximize",
+            WindowCloseButtonHint="close",
+        ),
     }
     for i in range(10):
         qt_dict[f"Key_{i}"] = f"key_{i}"
@@ -1332,6 +1379,7 @@ class Environment:
         app = types.ModuleType("FreeCAD")
         app.Version = lambda: version
         app.getUserAppDataDir = lambda: str(self.user_root) + "/"
+        app.getResourceDir = lambda: str(self.user_root / "Resources") + "/"
         app.ParamGet = lambda path: self.groups.setdefault(path, ParameterGroup())
         app.saveParameter = self._save_parameter
         app.Console = self.console
@@ -1350,11 +1398,25 @@ class Environment:
         self.app = app
 
         gui = types.ModuleType("FreeCADGui")
+
+        class Workbench:
+            pass
+
+        self.workbenches = {}
+        gui.Workbench = Workbench
+        gui.addWorkbench = lambda workbench: self.workbenches.__setitem__(
+            workbench.__class__.__name__, workbench
+        )
+        gui.listWorkbenches = lambda: dict(self.workbenches)
+        gui.getWorkbench = lambda name: self.workbenches[name]
         gui.getMainWindow = lambda: self.main_window
         gui.addCommand = lambda name, command: self.commands.__setitem__(name, command)
         self.preference_pages = []
         gui.addPreferencePage = lambda path, group: self.preference_pages.append((path, group))
         gui.addDocumentObserver = self.document_observers.append
+        gui.removeDocumentObserver = lambda obs: (
+            self.document_observers.remove(obs) if obs in self.document_observers else None
+        )
         gui.activateWorkbench = self._activate_workbench
         gui.runCommand = self._run_command
         gui.listCommands = lambda: list(self.registered_commands)

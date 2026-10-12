@@ -18,7 +18,7 @@ def _toolbar(bootstrap, workbench, panel):
 
 
 def _first_panel(bootstrap):
-    spec = bootstrap._load_json(bootstrap.LAYOUT_SPEC)
+    spec = bootstrap.layout_spec()
     workbench = "PartDesignWorkbench"
     return workbench, spec["workbenches"][workbench][0]["name"]
 
@@ -129,7 +129,7 @@ def test_a_saved_panel_order_from_an_older_layout_is_not_replayed(installed):
     changes reached nobody that way.
     """
     workbench, _panel = _first_panel(installed)
-    spec = installed._load_json(installed.LAYOUT_SPEC)
+    spec = installed.layout_spec()
     shipped = [panel["name"] for panel in spec["workbenches"][workbench]]
 
     stale = {

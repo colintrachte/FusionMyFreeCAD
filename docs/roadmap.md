@@ -51,7 +51,7 @@ never required for FMF operation.
 - [ ] **Score 5 🥇 · Class 2 — Register four namespaced FMF workbench shells**
 
   **ID:** task_b2010000000000000000000000000001
-  **Status:** Blocked — preservation foundation incomplete
+  **Status:** Implementation complete — deterministic verification passed; live FreeCAD verification pending
   **Outcome:** Register FMF Design, Part, Sketch, and Surface workbenches behind a feature flag while leaving current production behavior available.
   **Work mode:** Forge + Steward
   **Execution size:** Large
@@ -70,7 +70,7 @@ never required for FMF operation.
 - [ ] **Score 5 🥇 · Class 2 — Project all curated layouts into owned workbenches**
 
   **ID:** task_b2020000000000000000000000000002
-  **Status:** Blocked — shells required
+  **Status:** Implementation complete — owned layout projection and legacy-state migration tests passed; live parity pending
   **Outcome:** Preserve every pinned, overflow, dropdown, responsive, adaptive, personalization, label, icon, and size behavior inside the corresponding FMF-owned workbench.
   **Work mode:** Steward
   **Execution size:** Large
@@ -88,7 +88,7 @@ never required for FMF operation.
 - [ ] **Score 5 🥇 · Class 2 — Preserve sketch-edit context transitions**
 
   **ID:** task_b2030000000000000000000000000003
-  **Status:** Blocked — layouts required
+  **Status:** Implementation complete — owned/native transition tests passed; live edit-mode journey pending
   **Outcome:** Enter and leave sketch editing through FMF Design and Sketch without losing origin-plane selection, body context, tree state, shortcuts, or return context.
   **Work mode:** Forge + Steward
   **Execution size:** Large
@@ -124,7 +124,7 @@ never required for FMF operation.
 - [ ] **Score 5 🥇 · Class 2 — Add reversible stock-workbench visibility controls**
 
   **ID:** task_b2050000000000000000000000000005
-  **Status:** Blocked — activation required
+  **Status:** Implementation complete — reversible visibility-state tests passed; live selector refresh pending
   **Outcome:** Offer a separate action that names stock workbenches to hide, records exact prior visibility, and provides one-action reversal.
   **Work mode:** Steward
   **Execution size:** Medium
@@ -161,7 +161,8 @@ never required for FMF operation.
 - [ ] **Score 4 🥇 · Class 2 — Consolidate personalization and scope runtime observers**
 
   **ID:** task_b2070000000000000000000000000007
-  **Status:** Blocked — owned contexts required
+  **Status:** In progress — owned contexts and deterministic teardown are implemented; live timing
+  and repeated enable/disable verification remain
   **Outcome:** Give stable-ID personalization one owner and activate expensive scans, filters, observers, and adaptive rewrites only in their owning FMF contexts.
   **Work mode:** Forge + Steward
   **Execution size:** Large

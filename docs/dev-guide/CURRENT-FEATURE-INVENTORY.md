@@ -107,16 +107,21 @@ Startup failures should not remove access to verification and recovery commands.
 - `fusion_bootstrap.py` records an initial baseline once and does not overwrite it during later
   updates.
 - `InitGui.py` registers recovery commands before installation and third-party runtime loading.
-- **Verify UI** checks layout, baseline, bundled payload, and startup/runtime failures.
-- **Reapply UI** restores FMF defaults and intentionally clears FMF panel personalization.
-- **Restore UI** restores the recorded pre-FMF state.
+- **Verify FusionMyFreeCAD** checks layout, baseline, bundled payload, and startup/runtime failures.
+- **Reset FusionMyFreeCAD** restores FMF defaults and intentionally clears FMF panel personalization.
+- FMF owns four separate workbench identities: FMF Design, FMF Part, FMF Sketch, and FMF Surface.
+  The curated ribbon is authoritative only in those workbenches.
+- **Disable FusionMyFreeCAD** maps the active FMF workbench to its stock counterpart, restores
+  managed preferences and shortcuts, hides FMF workbench entries, and persists across restarts.
+- **Enable FusionMyFreeCAD** exposes the owned workbenches and preserves their saved layout and
+  personalization. Stock workbench visibility is a separate reversible preference.
 - `tools/RestoreFusionMyFreeCAD.FCMacro` provides recovery after the add-on itself has been removed.
 - Startup steps fail independently and record actionable diagnostics instead of aborting the rest
   of initialization.
 
 ### Preservation requirement
 
-The baseline, degraded-start recovery, Verify, Reapply, Restore, and standalone recovery paths are
+The baseline, degraded-start recovery, Verify, Reset, Disable/Enable, and standalone recovery paths are
 release-critical features. A refactor should strengthen disable/uninstall restoration, not replace
 these protections.
 
@@ -193,7 +198,7 @@ interaction.
 `runtime.py` defines shortcuts for line, rectangles, circle, dimension, pad/extrude, pocket, hole,
 trim, offset, projection, construction geometry, and measure. It applies Revit navigation—the
 closest current FreeCAD built-in match—and places the navigation cube at the top right. Preferences
-allow opting out, and displaced shortcuts are reported by Verify UI.
+allow opting out, and displaced shortcuts are reported by Verify FusionMyFreeCAD.
 
 ### Preservation requirement
 

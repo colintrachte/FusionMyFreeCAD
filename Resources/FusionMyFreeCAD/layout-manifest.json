@@ -211,52 +211,52 @@
     "Surface_Sections"
   ],
   "workbenchPanelOrder": {
-    "PartDesignWorkbench": [
-      "Fusion Sketch Entry_newPanel",
-      "Fusion Create_newPanel",
-      "Fusion Modify_newPanel",
-      "Fusion Construct_newPanel",
-      "Fusion Parameters_newPanel",
-      "Fusion Frequent_newPanel",
-      "Fusion Inspect_newPanel",
-      "Fusion Utilities_newPanel",
-      "Fusion Output_newPanel"
+    "FMFDesignWorkbench": [
+      "FMF Sketch Entry_newPanel",
+      "FMF Create_newPanel",
+      "FMF Modify_newPanel",
+      "FMF Construct_newPanel",
+      "FMF Parameters_newPanel",
+      "FMF Frequent_newPanel",
+      "FMF Inspect_newPanel",
+      "FMF Utilities_newPanel",
+      "FMF Output_newPanel"
     ],
-    "PartWorkbench": [
-      "Fusion Part Create_newPanel",
-      "Fusion Part Boolean_newPanel",
-      "Fusion Part Split_newPanel",
-      "Fusion Part Repair_newPanel",
-      "Fusion Part Frequent_newPanel",
-      "Fusion Part Inspect_newPanel",
-      "Fusion Part Utilities_newPanel",
-      "Fusion Part Output_newPanel"
+    "FMFPartWorkbench": [
+      "FMF Part Create_newPanel",
+      "FMF Part Boolean_newPanel",
+      "FMF Part Split_newPanel",
+      "FMF Part Repair_newPanel",
+      "FMF Part Frequent_newPanel",
+      "FMF Part Inspect_newPanel",
+      "FMF Part Utilities_newPanel",
+      "FMF Part Output_newPanel"
     ],
-    "SketcherWorkbench": [
-      "Fusion Sketch Create_newPanel",
-      "Fusion Sketch Modify_newPanel",
-      "Fusion Sketch Constraints_newPanel",
-      "Fusion Sketch Configure_newPanel",
-      "Fusion Sketch Frequent_newPanel",
-      "Fusion Sketch Inspect_newPanel",
-      "Fusion Sketch Insert_newPanel",
-      "Fusion Sketch Select_newPanel",
-      "Fusion Finish_newPanel",
-      "Fusion Sketch Utilities_newPanel"
+    "FMFSketchWorkbench": [
+      "FMF Sketch Create_newPanel",
+      "FMF Sketch Modify_newPanel",
+      "FMF Sketch Constraints_newPanel",
+      "FMF Sketch Configure_newPanel",
+      "FMF Sketch Frequent_newPanel",
+      "FMF Sketch Inspect_newPanel",
+      "FMF Sketch Insert_newPanel",
+      "FMF Sketch Select_newPanel",
+      "FMF Finish_newPanel",
+      "FMF Sketch Utilities_newPanel"
     ],
-    "SurfaceWorkbench": [
-      "Fusion Surface Create_newPanel",
-      "Fusion Surface Modify_newPanel",
-      "Fusion Surface Frequent_newPanel",
-      "Fusion Surface Inspect_newPanel",
-      "Fusion Surface Utilities_newPanel",
-      "Fusion Surface Output_newPanel"
+    "FMFSurfaceWorkbench": [
+      "FMF Surface Create_newPanel",
+      "FMF Surface Modify_newPanel",
+      "FMF Surface Frequent_newPanel",
+      "FMF Surface Inspect_newPanel",
+      "FMF Surface Utilities_newPanel",
+      "FMF Surface Output_newPanel"
     ]
   },
   "adaptivePins": {
-    "PartDesignWorkbench": {
+    "FMFDesignWorkbench": {
       "panels": {
-        "Fusion Frequent_newPanel": {
+        "FMF Frequent_newPanel": {
           "whole": true,
           "capacity": 4,
           "defaults": [
@@ -515,13 +515,13 @@
             "FusionMyFreeCAD_Reapply": [
               "General",
               "small",
-              "Reapply UI",
+              "Reset FusionMyFreeCAD",
               "Std_DlgParameter"
             ],
             "FusionMyFreeCAD_Restore": [
               "General",
               "small",
-              "Restore UI",
+              "Disable FusionMyFreeCAD",
               "applications-accessories"
             ],
             "FusionMyFreeCAD_StudioViewport": [
@@ -606,9 +606,9 @@
         }
       }
     },
-    "PartWorkbench": {
+    "FMFPartWorkbench": {
       "panels": {
-        "Fusion Part Frequent_newPanel": {
+        "FMF Part Frequent_newPanel": {
           "whole": true,
           "capacity": 4,
           "defaults": [
@@ -994,9 +994,9 @@
         }
       }
     },
-    "SketcherWorkbench": {
+    "FMFSketchWorkbench": {
       "panels": {
-        "Fusion Sketch Create_newPanel": {
+        "FMF Sketch Create_newPanel": {
           "capacity": 1,
           "defaults": [
             "Sketcher_CreatePolyline"
@@ -1016,7 +1016,7 @@
             ]
           }
         },
-        "Fusion Sketch Modify_newPanel": {
+        "FMF Sketch Modify_newPanel": {
           "capacity": 1,
           "defaults": [
             "Sketcher_Translate"
@@ -1036,7 +1036,7 @@
             ]
           }
         },
-        "Fusion Sketch Frequent_newPanel": {
+        "FMF Sketch Frequent_newPanel": {
           "whole": true,
           "capacity": 4,
           "defaults": [
@@ -1542,9 +1542,9 @@
         }
       }
     },
-    "SurfaceWorkbench": {
+    "FMFSurfaceWorkbench": {
       "panels": {
-        "Fusion Surface Frequent_newPanel": {
+        "FMF Surface Frequent_newPanel": {
           "whole": true,
           "capacity": 4,
           "defaults": [
@@ -1611,13 +1611,13 @@
             "FusionMyFreeCAD_Reapply": [
               "General",
               "small",
-              "Reapply UI",
+              "Reset FusionMyFreeCAD",
               "Std_DlgParameter"
             ],
             "FusionMyFreeCAD_Restore": [
               "General",
               "small",
-              "Restore UI",
+              "Disable FusionMyFreeCAD",
               "applications-accessories"
             ],
             "FusionMyFreeCAD_UpdateModel": [

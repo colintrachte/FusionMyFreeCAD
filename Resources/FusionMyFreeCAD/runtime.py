@@ -177,7 +177,7 @@ def _apply_defaults():
     """Write FusionMyFreeCAD's opinionated defaults over the user's profile."""
     if PREFERENCES.GetBool("SetStartWorkbench", True):
         App.ParamGet("User parameter:BaseApp/Preferences/General").SetString(
-            "AutoloadModule", "PartDesignWorkbench"
+            "AutoloadModule", bootstrap.fmf_workbench_for("PartDesignWorkbench")
         )
 
     if PREFERENCES.GetBool("SetNavigation", True):
@@ -360,7 +360,7 @@ def ensure_starter_design():
         body = document.addObject("PartDesign::Body", "Body")
         body.Label = "Part"
         document.recompute()
-    Gui.activateWorkbench("PartDesignWorkbench")
+    Gui.activateWorkbench(bootstrap.fmf_workbench_for("PartDesignWorkbench"))
     return True
 
 
@@ -454,8 +454,7 @@ def install_task_accept_filter():
 def load_manifest():
     global _manifest_cache
     if _manifest_cache is None:
-        with open(os.path.join(ADDON_DIR, "layout-manifest.json"), encoding="utf-8") as stream:
-            _manifest_cache = json.load(stream)
+        _manifest_cache = bootstrap.layout_manifest()
     return _manifest_cache
 
 
@@ -490,6 +489,25 @@ def load_usage():
         _usage_cache = loaded
     except (OSError, ValueError, TypeError):
         _usage_cache = {"schemaVersion": 1, "workbenches": {}}
+    workbenches = _usage_cache["workbenches"]
+    if bootstrap.owned_workbenches_enabled():
+        for legacy, owned in bootstrap.LEGACY_OWNED_WORKBENCH.items():
+            if owned not in workbenches and legacy in workbenches:
+                workbenches[owned] = workbenches.pop(legacy)
+        for owned, native in bootstrap.OWNED_TO_NATIVE_WORKBENCH.items():
+            if owned not in workbenches and native in workbenches:
+                workbenches[owned] = workbenches.pop(native)
+        pins = _usage_cache.get("pins", {})
+        for legacy, owned in bootstrap.LEGACY_OWNED_WORKBENCH.items():
+            if owned not in pins and legacy in pins:
+                pins[owned] = pins.pop(legacy)
+        for workbench_pins in pins.values():
+            migrated = {
+                bootstrap._canonical_panel_name(name): value
+                for name, value in workbench_pins.items()
+            }
+            workbench_pins.clear()
+            workbench_pins.update(migrated)
     return _usage_cache
 
 
@@ -545,6 +563,8 @@ def schedule_usage_write():
 
 
 def record_usage(command):
+    if not bootstrap.is_enabled():
+        return
     candidates = adaptive_workbenches_by_command().get(command, ())
     if not candidates:
         return
@@ -968,7 +988,10 @@ def schedule_status_write(delay=750):
 
 def after_workbench_activation(name):
     global _last_workbench
+    if not bootstrap.is_enabled():
+        return
     _last_workbench = name
+    bootstrap.defer_ui_mode_sync()
     _run("adaptive pins", lambda: refresh_adaptive_panel(name))
     # Deferred, not immediate. Entering and leaving a sketch each activate a
     # workbench, so anything done here is done on the way in and on the way
@@ -996,6 +1019,26 @@ def install():
         "FusionMyFreeCAD {}: adaptive ribbon, smart dimensions, navigation cube, "
         "and shortcuts configured.\n".format(bootstrap.PACKAGE_VERSION)
     )
+
+
+def uninstall():
+    """Disconnect live services so disabling FMF takes effect before restart."""
+    global _task_accept_filter
+    _deferred_tokens.clear()
+    main_window = Gui.getMainWindow()
+    if main_window is not None and getattr(main_window, "_fusion_my_freecad_connected", False):
+        try:
+            main_window.workbenchActivated.disconnect(after_workbench_activation)
+        except Exception:
+            pass
+        main_window._fusion_my_freecad_connected = False
+    application = QtWidgets.QApplication.instance()
+    if application is not None and _task_accept_filter is not None:
+        try:
+            application.removeEventFilter(_task_accept_filter)
+        except Exception:
+            pass
+        _task_accept_filter = None
 
 
 # Tests import this module for its logic and drive `install()` themselves.

@@ -114,6 +114,20 @@ def test_no_nested_git_repositories_in_the_payload():
     assert list(BUNDLED.rglob(".git")) == []
 
 
+def test_bundled_ribbon_respects_live_disable_state():
+    source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    method = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "_fmfAuthoritativeWorkbenchActive"
+    )
+    method_source = ast.get_source_segment(source, method)
+    assert "FusionMyFreeCAD" in method_source
+    assert 'GetBool("Enabled", True)' in method_source
+
+
 # ---------------------------------------------------------------------------
 # Layout and manifest coherence
 # ---------------------------------------------------------------------------
@@ -250,7 +264,7 @@ def test_responsive_commands_are_real_overflow_commands(layout):
             assert set(responsive) <= overflow, "{}/{}".format(workbench, panel["name"])
             assert all(isinstance(width, int) and width >= 1024 for width in responsive.values())
 
-    sketcher = layout["workbenches"]["SketcherWorkbench"]
+    sketcher = layout["workbenches"]["FMFSketchWorkbench"]
     assert sum(len(panel.get("responsive", {})) for panel in sketcher) >= 25
 
 
@@ -314,21 +328,21 @@ def test_every_panel_has_a_complete_menu_inventory(layout):
 
 def test_validate_sketch_is_visible_after_finishing_a_sketch(layout):
     """Profile repair must not be hidden when Part Design regains control after sketch editing."""
-    panels = {panel["name"]: panel for panel in layout["workbenches"]["PartDesignWorkbench"]}
-    visible = {entry[0] for entry in panels["Fusion Sketch Entry_newPanel"]["commands"]}
+    panels = {panel["name"]: panel for panel in layout["workbenches"]["FMFDesignWorkbench"]}
+    visible = {entry[0] for entry in panels["FMF Sketch Entry_newPanel"]["commands"]}
     assert "Sketcher_ValidateSketch" in visible
 
 
 def test_create_sketch_stays_visible_in_the_sketcher_workbench(layout):
     """Finishing a sketch must not strand the user without Create Sketch."""
-    panels = {panel["name"]: panel for panel in layout["workbenches"]["SketcherWorkbench"]}
-    visible = {entry[0] for entry in panels["Fusion Sketch Create_newPanel"]["commands"]}
+    panels = {panel["name"]: panel for panel in layout["workbenches"]["FMFSketchWorkbench"]}
+    visible = {entry[0] for entry in panels["FMF Sketch Create_newPanel"]["commands"]}
     assert "FusionMyFreeCAD_CreateSketch" in visible
 
 
 def test_symmetric_constraint_is_a_top_level_movable_command(layout):
-    panels = {panel["name"]: panel for panel in layout["workbenches"]["SketcherWorkbench"]}
-    constraints = panels["Fusion Sketch Constraints_newPanel"]
+    panels = {panel["name"]: panel for panel in layout["workbenches"]["FMFSketchWorkbench"]}
+    constraints = panels["FMF Sketch Constraints_newPanel"]
     visible = {entry[0] for entry in constraints["commands"]}
     assert "Sketcher_ConstrainSymmetric" in visible
     assert "Fusion_MoreConstraints_ddb" not in visible
@@ -338,8 +352,8 @@ def test_symmetric_constraint_is_a_top_level_movable_command(layout):
 def test_mirror_with_constraints_sits_beside_the_native_mirror(layout, manifest):
     """The constraint-copying mirror is a small button in front of native Mirror,
     which keeps its 1.3.1 size so the panel wrap geometry is barely disturbed."""
-    modify = {panel["name"]: panel for panel in layout["workbenches"]["SketcherWorkbench"]}[
-        "Fusion Sketch Modify_newPanel"
+    modify = {panel["name"]: panel for panel in layout["workbenches"]["FMFSketchWorkbench"]}[
+        "FMF Sketch Modify_newPanel"
     ]
     commands = modify["commands"]
     order = [entry[0] for entry in commands]
@@ -363,8 +377,8 @@ def test_mirror_with_constraints_sits_beside_the_native_mirror(layout, manifest)
     assert "FusionMyFreeCAD_AddMidline" in manifest["primaryCommands"]
 
     constraints_panel = {
-        panel["name"]: panel for panel in layout["workbenches"]["SketcherWorkbench"]
-    }["Fusion Sketch Constraints_newPanel"]
+        panel["name"]: panel for panel in layout["workbenches"]["FMFSketchWorkbench"]
+    }["FMF Sketch Constraints_newPanel"]
     const_commands = constraints_panel["commands"]
     const_order = [entry[0] for entry in const_commands]
     const_by_name = {entry[0]: entry for entry in const_commands}
@@ -380,15 +394,15 @@ def test_mirror_with_constraints_sits_beside_the_native_mirror(layout, manifest)
     )
     assert "FusionMyFreeCAD_ConstrainMidpoint" in manifest["primaryCommands"]
 
-    frequent_panel = {panel["name"]: panel for panel in layout["workbenches"]["SketcherWorkbench"]}[
-        "Fusion Sketch Frequent_newPanel"
-    ]
+    frequent_panel = {
+        panel["name"]: panel for panel in layout["workbenches"]["FMFSketchWorkbench"]
+    }["FMF Sketch Frequent_newPanel"]
     frequent_order = [entry[0] for entry in frequent_panel["commands"]]
     assert "Sketcher_ConstrainCoincidentUnified" in frequent_order
     assert "Sketcher_ConstrainCoincident" not in frequent_order
 
-    frequent_manifest = manifest["adaptivePins"]["SketcherWorkbench"]["panels"][
-        "Fusion Sketch Frequent_newPanel"
+    frequent_manifest = manifest["adaptivePins"]["FMFSketchWorkbench"]["panels"][
+        "FMF Sketch Frequent_newPanel"
     ]
     assert "Sketcher_ConstrainCoincidentUnified" in frequent_manifest["defaults"]
     assert "Sketcher_ConstrainCoincidentUnified" in frequent_manifest["commands"]
@@ -872,6 +886,6 @@ def test_every_export_format_is_told_apart_by_its_own_icon(layout):
 
 def test_create_sketch_still_opens_the_part_design_tab(layout):
     """README promises it; the export bookend must not have displaced it."""
-    first = layout["workbenches"]["PartDesignWorkbench"][0]
+    first = layout["workbenches"]["FMFDesignWorkbench"][0]
     assert first["commands"][0][0] == "FusionMyFreeCAD_CreateSketch"
     assert first["commands"][0][2] == "large"

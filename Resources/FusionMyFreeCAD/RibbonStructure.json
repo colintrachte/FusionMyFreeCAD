@@ -294,7 +294,7 @@
             ]
         },
         "PartDesignWorkbench": {
-            "Fusion Start_newPanel": [
+            "FMF Start_newPanel": [
                 [
                     "PartDesign_Body",
                     "PartDesignWorkbench"
@@ -304,7 +304,7 @@
                     "PartDesignWorkbench"
                 ]
             ],
-            "Fusion Create_newPanel": [
+            "FMF Create_newPanel": [
                 [
                     "Fusion_Extrude_ddb",
                     "General"
@@ -318,19 +318,19 @@
                     "General"
                 ]
             ],
-            "Fusion Modify_newPanel": [
+            "FMF Modify_newPanel": [
                 [
                     "Fusion_Modify_ddb",
                     "General"
                 ]
             ],
-            "Fusion Construct_newPanel": [
+            "FMF Construct_newPanel": [
                 [
                     "Fusion_Construct_ddb",
                     "General"
                 ]
             ],
-            "Fusion Pattern_newPanel": [
+            "FMF Pattern_newPanel": [
                 [
                     "PartDesign_Mirrored",
                     "PartDesignWorkbench"
@@ -348,7 +348,7 @@
                     "PartDesignWorkbench"
                 ]
             ],
-            "Fusion Inspect_newPanel": [
+            "FMF Inspect_newPanel": [
                 [
                     "Fusion_Inspect_ddb",
                     "General"
@@ -356,13 +356,13 @@
             ]
         },
         "SketcherWorkbench": {
-            "Fusion Finish_newPanel": [
+            "FMF Finish_newPanel": [
                 [
                     "Sketcher_LeaveSketch",
                     "SketcherWorkbench"
                 ]
             ],
-            "Fusion Sketch Create_newPanel": [
+            "FMF Sketch Create_newPanel": [
                 [
                     "Sketcher_CreateLine",
                     "SketcherWorkbench"
@@ -384,7 +384,7 @@
                     "SketcherWorkbench"
                 ]
             ],
-            "Fusion Sketch Modify_newPanel": [
+            "FMF Sketch Modify_newPanel": [
                 [
                     "Fusion_SketchModify_ddb",
                     "General"
@@ -402,7 +402,7 @@
                     "SketcherWorkbench"
                 ]
             ],
-            "Fusion Sketch Constraints_newPanel": [
+            "FMF Sketch Constraints_newPanel": [
                 [
                     "Sketcher_Dimension",
                     "SketcherWorkbench"
@@ -412,7 +412,7 @@
                     "General"
                 ]
             ],
-            "Fusion Sketch Inspect_newPanel": [
+            "FMF Sketch Inspect_newPanel": [
                 [
                     "Std_Measure",
                     "Global"
@@ -427,7 +427,7 @@
     "workbenches": {
         "PartDesignWorkbench": {
             "toolbars": {
-                "Fusion Start_newPanel": {
+                "FMF Start_newPanel": {
                     "title": "START",
                     "Enabled": true,
                     "order": [
@@ -449,7 +449,7 @@
                         }
                     }
                 },
-                "Fusion Create_newPanel": {
+                "FMF Create_newPanel": {
                     "title": "CREATE",
                     "Enabled": true,
                     "order": [
@@ -478,7 +478,7 @@
                         }
                     }
                 },
-                "Fusion Modify_newPanel": {
+                "FMF Modify_newPanel": {
                     "title": "MODIFY",
                     "Enabled": true,
                     "order": [
@@ -493,7 +493,7 @@
                         }
                     }
                 },
-                "Fusion Construct_newPanel": {
+                "FMF Construct_newPanel": {
                     "title": "CONSTRUCT",
                     "Enabled": true,
                     "order": [
@@ -508,7 +508,7 @@
                         }
                     }
                 },
-                "Fusion Pattern_newPanel": {
+                "FMF Pattern_newPanel": {
                     "title": "PATTERN",
                     "Enabled": true,
                     "order": [
@@ -544,7 +544,7 @@
                         }
                     }
                 },
-                "Fusion Inspect_newPanel": {
+                "FMF Inspect_newPanel": {
                     "title": "INSPECT",
                     "Enabled": true,
                     "order": [
@@ -561,12 +561,12 @@
                 }
             },
             "order": [
-                "Fusion Start_newPanel",
-                "Fusion Create_newPanel",
-                "Fusion Modify_newPanel",
-                "Fusion Construct_newPanel",
-                "Fusion Pattern_newPanel",
-                "Fusion Inspect_newPanel"
+                "FMF Start_newPanel",
+                "FMF Create_newPanel",
+                "FMF Modify_newPanel",
+                "FMF Construct_newPanel",
+                "FMF Pattern_newPanel",
+                "FMF Inspect_newPanel"
             ]
         },
         "BIMWorkbench": {
@@ -2383,7 +2383,7 @@
         },
         "SketcherWorkbench": {
             "toolbars": {
-                "Fusion Finish_newPanel": {
+                "FMF Finish_newPanel": {
                     "title": "SKETCH",
                     "Enabled": true,
                     "order": [
@@ -2398,7 +2398,7 @@
                         }
                     }
                 },
-                "Fusion Sketch Create_newPanel": {
+                "FMF Sketch Create_newPanel": {
                     "title": "CREATE",
                     "Enabled": true,
                     "order": [
@@ -2441,7 +2441,7 @@
                         }
                     }
                 },
-                "Fusion Sketch Modify_newPanel": {
+                "FMF Sketch Modify_newPanel": {
                     "title": "MODIFY",
                     "Enabled": true,
                     "order": [
@@ -2477,7 +2477,7 @@
                         }
                     }
                 },
-                "Fusion Sketch Constraints_newPanel": {
+                "FMF Sketch Constraints_newPanel": {
                     "title": "CONSTRAINTS",
                     "Enabled": true,
                     "order": [
@@ -2499,7 +2499,7 @@
                         }
                     }
                 },
-                "Fusion Sketch Inspect_newPanel": {
+                "FMF Sketch Inspect_newPanel": {
                     "title": "INSPECT",
                     "Enabled": true,
                     "order": [
@@ -2523,11 +2523,11 @@
                 }
             },
             "order": [
-                "Fusion Finish_newPanel",
-                "Fusion Sketch Create_newPanel",
-                "Fusion Sketch Modify_newPanel",
-                "Fusion Sketch Constraints_newPanel",
-                "Fusion Sketch Inspect_newPanel"
+                "FMF Finish_newPanel",
+                "FMF Sketch Create_newPanel",
+                "FMF Sketch Modify_newPanel",
+                "FMF Sketch Constraints_newPanel",
+                "FMF Sketch Inspect_newPanel"
             ]
         },
         "SpreadsheetWorkbench": {

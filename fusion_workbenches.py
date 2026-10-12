@@ -9,17 +9,17 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 FMF_TO_NATIVE = {
-    "FusionDesignWorkbench": "PartDesignWorkbench",
-    "FusionPartWorkbench": "PartWorkbench",
-    "FusionSketchWorkbench": "SketcherWorkbench",
-    "FusionSurfaceWorkbench": "SurfaceWorkbench",
+    "FMFDesignWorkbench": "PartDesignWorkbench",
+    "FMFPartWorkbench": "PartWorkbench",
+    "FMFSketchWorkbench": "SketcherWorkbench",
+    "FMFSurfaceWorkbench": "SurfaceWorkbench",
 }
 NATIVE_TO_FMF = {native: owned for owned, native in FMF_TO_NATIVE.items()}
 
 _registered = False
 
 
-class _FusionWorkbench(Gui.Workbench):
+class _FMFWorkbench(Gui.Workbench):
     """Common identity and activation hooks for an FMF-owned workbench."""
 
     WorkbenchId = ""
@@ -40,10 +40,11 @@ class _FusionWorkbench(Gui.Workbench):
         fusion_bootstrap.defer_ui_mode_sync()
 
 
-class FusionDesignWorkbench(_FusionWorkbench):
-    WorkbenchId = "FusionDesignWorkbench"
+class FMFDesignWorkbench(_FMFWorkbench):
+    WorkbenchId = "FMFDesignWorkbench"
     NativeWorkbench = "PartDesignWorkbench"
-    MenuText = "Fusion Design"
+    NativeClassName = "PartDesignGui::Workbench"
+    MenuText = "FMF Design"
     ToolTip = "Fusion-familiar solid design workbench"
     Icon = os.path.join(
         App.getResourceDir(), "Mod", "PartDesign", "Resources", "icons", "PartDesignWorkbench.svg"
@@ -54,10 +55,11 @@ class FusionDesignWorkbench(_FusionWorkbench):
         importlib.import_module("PartDesignGui")
 
 
-class FusionPartWorkbench(_FusionWorkbench):
-    WorkbenchId = "FusionPartWorkbench"
+class FMFPartWorkbench(_FMFWorkbench):
+    WorkbenchId = "FMFPartWorkbench"
     NativeWorkbench = "PartWorkbench"
-    MenuText = "Fusion Part"
+    NativeClassName = "PartGui::Workbench"
+    MenuText = "FMF Part"
     ToolTip = "Fusion-familiar direct shape workbench"
     Icon = os.path.join(
         App.getResourceDir(), "Mod", "Part", "Resources", "icons", "PartWorkbench.svg"
@@ -85,10 +87,11 @@ class FusionPartWorkbench(_FusionWorkbench):
             )
 
 
-class FusionSketchWorkbench(_FusionWorkbench):
-    WorkbenchId = "FusionSketchWorkbench"
+class FMFSketchWorkbench(_FMFWorkbench):
+    WorkbenchId = "FMFSketchWorkbench"
     NativeWorkbench = "SketcherWorkbench"
-    MenuText = "Fusion Sketch"
+    NativeClassName = "SketcherGui::Workbench"
+    MenuText = "FMF Sketch"
     ToolTip = "Fusion-familiar sketching workbench"
     Icon = os.path.join(
         App.getResourceDir(), "Mod", "Sketcher", "Resources", "icons", "SketcherWorkbench.svg"
@@ -106,10 +109,11 @@ class FusionSketchWorkbench(_FusionWorkbench):
             )
 
 
-class FusionSurfaceWorkbench(_FusionWorkbench):
-    WorkbenchId = "FusionSurfaceWorkbench"
+class FMFSurfaceWorkbench(_FMFWorkbench):
+    WorkbenchId = "FMFSurfaceWorkbench"
     NativeWorkbench = "SurfaceWorkbench"
-    MenuText = "Fusion Surface"
+    NativeClassName = "SurfaceGui::Workbench"
+    MenuText = "FMF Surface"
     ToolTip = "Fusion-familiar surface design workbench"
     Icon = os.path.join(
         App.getResourceDir(), "Mod", "Surface", "Resources", "icons", "Surface_Workbench.svg"
@@ -121,10 +125,10 @@ class FusionSurfaceWorkbench(_FusionWorkbench):
 
 
 WORKBENCH_CLASSES = (
-    FusionDesignWorkbench,
-    FusionPartWorkbench,
-    FusionSketchWorkbench,
-    FusionSurfaceWorkbench,
+    FMFDesignWorkbench,
+    FMFPartWorkbench,
+    FMFSketchWorkbench,
+    FMFSurfaceWorkbench,
 )
 
 

@@ -11,28 +11,28 @@ from pathlib import Path
 COMMAND_CONTRACTS = {
     "coincident": {
         "command": "Sketcher_ConstrainCoincidentUnified",
-        "workbench": "SketcherWorkbench",
-        "panel": "Fusion Sketch Constraints_newPanel",
+        "workbench": "FMFSketchWorkbench",
+        "panel": "FMF Sketch Constraints_newPanel",
     },
     "mirror": {
         "command": "Sketcher_Symmetry",
-        "workbench": "SketcherWorkbench",
-        "panel": "Fusion Sketch Modify_newPanel",
+        "workbench": "FMFSketchWorkbench",
+        "panel": "FMF Sketch Modify_newPanel",
     },
     "create-sketch": {
         "command": "FusionMyFreeCAD_CreateSketch",
-        "workbench": "PartDesignWorkbench",
-        "panel": "Fusion Sketch Entry_newPanel",
+        "workbench": "FMFDesignWorkbench",
+        "panel": "FMF Sketch Entry_newPanel",
     },
     "pad": {
         "command": "PartDesign_Pad",
-        "workbench": "PartDesignWorkbench",
-        "panel": "Fusion Create_newPanel",
+        "workbench": "FMFDesignWorkbench",
+        "panel": "FMF Create_newPanel",
     },
     "pocket": {
         "command": "PartDesign_Pocket",
-        "workbench": "PartDesignWorkbench",
-        "panel": "Fusion Create_newPanel",
+        "workbench": "FMFDesignWorkbench",
+        "panel": "FMF Create_newPanel",
     },
 }
 

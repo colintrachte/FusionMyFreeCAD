@@ -7,7 +7,12 @@ and prevent single-point correction drift.
 
 from __future__ import annotations
 
+import json
+import os
+import traceback
+import uuid
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from typing import Any
 
 try:
@@ -32,7 +37,146 @@ RUNTIME_MODULES: tuple[str, ...] = (
     "fusion_repair_tools.py",
     "fusion_sketch_tools.py",
     "fusion_viewport.py",
+    "fusion_workbenches.py",
 )
+
+
+# Diagnostics live in this existing runtime module so package composition cannot
+# drift when diagnostics are added or changed. Every operation is deliberately
+# failure-safe: inability to write a log must never affect FreeCAD startup.
+USER_ROOT = App.getUserAppDataDir() if App is not None else os.getcwd()
+DIAGNOSTICS_DIR = os.path.join(USER_ROOT, "FusionMyFreeCAD-Diagnostics")
+LOG_PATH = os.path.join(DIAGNOSTICS_DIR, "events.jsonl")
+STATUS_PATH = os.path.join(DIAGNOSTICS_DIR, "session-status.json")
+MAX_LOG_BYTES = 512 * 1024
+MAX_ARCHIVES = 3
+SESSION_ID = uuid.uuid4().hex
+_BUFFERING = False
+_BUFFERED_RECORDS: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = []
+
+
+def _diagnostic_time() -> str:
+    return datetime.now(UTC).astimezone().isoformat()
+
+
+def _rotate_diagnostics() -> None:
+    if not os.path.isfile(LOG_PATH) or os.path.getsize(LOG_PATH) < MAX_LOG_BYTES:
+        return
+    oldest = f"{LOG_PATH}.{MAX_ARCHIVES}"
+    if os.path.exists(oldest):
+        os.remove(oldest)
+    for index in range(MAX_ARCHIVES - 1, 0, -1):
+        source = f"{LOG_PATH}.{index}"
+        if os.path.exists(source):
+            os.replace(source, f"{LOG_PATH}.{index + 1}")
+    os.replace(LOG_PATH, LOG_PATH + ".1")
+
+
+def _write_event(level: str, subsystem: str, operation: str, outcome: str, **details: Any) -> None:
+    try:
+        os.makedirs(DIAGNOSTICS_DIR, exist_ok=True)
+        _rotate_diagnostics()
+        record = {
+            "at": _diagnostic_time(),
+            "sessionId": SESSION_ID,
+            "level": level,
+            "subsystem": subsystem,
+            "operation": operation,
+            "outcome": outcome,
+            "packageVersion": details.pop("packageVersion", None),
+            "details": details,
+        }
+        with open(LOG_PATH, "a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, default=str, separators=(",", ":")) + "\n")
+    except Exception:
+        pass
+
+
+def event(level: str, subsystem: str, operation: str, outcome: str, **details: Any) -> None:
+    """Record one event without affecting product behavior on failure."""
+    if _BUFFERING:
+        _BUFFERED_RECORDS.append(("event", (level, subsystem, operation, outcome), details))
+        return
+    _write_event(level, subsystem, operation, outcome, **details)
+
+
+def diagnostic_exception(
+    subsystem: str, operation: str, error: BaseException, **details: Any
+) -> None:
+    trace = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+    details.update(error=str(error), traceback=trace)
+    event("error", subsystem, operation, "failed", **details)
+
+
+def _write_status(state: str, **details: Any) -> None:
+    try:
+        os.makedirs(DIAGNOSTICS_DIR, exist_ok=True)
+        payload = {
+            "state": state,
+            "sessionId": SESSION_ID,
+            "updatedAt": _diagnostic_time(),
+            "details": details,
+        }
+        temporary = STATUS_PATH + ".tmp"
+        with open(temporary, "w", encoding="utf-8") as stream:
+            json.dump(payload, stream, indent=2, default=str)
+        os.replace(temporary, STATUS_PATH)
+    except Exception:
+        pass
+
+
+def set_status(state: str, **details: Any) -> None:
+    if _BUFFERING:
+        _BUFFERED_RECORDS.append(("status", (state,), details))
+        return
+    _write_status(state, **details)
+
+
+def start_session(enabled: bool, package_version: str, freecad_version: Any) -> None:
+    global _BUFFERING
+    _BUFFERING = True
+    _BUFFERED_RECORDS.clear()
+    set_status("starting", enabled=enabled, packageVersion=package_version)
+    event(
+        "info",
+        "startup",
+        "session",
+        "started",
+        enabled=enabled,
+        packageVersion=package_version,
+        freeCADVersion=list(freecad_version),
+    )
+
+
+def flush_diagnostics() -> None:
+    """Flush startup records after UI initialization leaves the critical path."""
+    global _BUFFERING
+    records = tuple(_BUFFERED_RECORDS)
+    _BUFFERED_RECORDS.clear()
+    _BUFFERING = False
+    for kind, arguments, details in records:
+        if kind == "event":
+            _write_event(*arguments, **details)
+        else:
+            _write_status(*arguments, **details)
+
+
+def diagnostic_summary() -> str:
+    status: dict[str, Any] = {}
+    try:
+        with open(STATUS_PATH, encoding="utf-8") as stream:
+            status = json.load(stream)
+    except Exception:
+        pass
+    return "\n".join(
+        (
+            "FusionMyFreeCAD diagnostics",
+            f"State: {status.get('state', 'unknown')}",
+            f"Session: {status.get('sessionId', SESSION_ID)}",
+            f"Updated: {status.get('updatedAt', 'unknown')}",
+            f"Folder: {DIAGNOSTICS_DIR}",
+        )
+    )
 
 
 @contextmanager
@@ -90,6 +234,9 @@ class SketcherCommand:
         if App is None or getattr(App, "ActiveDocument", None) is None:
             return False
         try:
-            return Gui is not None and Gui.activeWorkbench().name() == "SketcherWorkbench"
+            return Gui is not None and Gui.activeWorkbench().name() in {
+                "SketcherWorkbench",
+                "FMFSketchWorkbench",
+            }
         except Exception:
             return False
