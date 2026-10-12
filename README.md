@@ -7,6 +7,8 @@ FusionMyFreeCAD reorganises FreeCAD's Part Design, Part, Sketcher, and Surface w
 Fusion-style ribbon, adds command search and Fusion keyboard shortcuts, and sets Fusion-like mouse
 navigation. It is a configuration layer: it does not modify FreeCAD's modelling kernel or document
 format, and everything it changes can be undone from inside FreeCAD.
+<img width="1919" height="330" alt="2026-10-10_223923" src="https://github.com/user-attachments/assets/27d2877f-ae49-4e9f-818a-f4b1a22a56ba" />
+
 
 ## Status
 
