@@ -1,4 +1,4 @@
-# Research brief: FreeCAD advantages worth surfacing in FusionMyFreeCAD
+# Research brief: FreeCAD advantages worth surfacing in FMF
 
 **Status:** Independent research pass for implementation
 **Date:** 2026-08-01

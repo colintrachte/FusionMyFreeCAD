@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "vendor"
 DESTINATION_ROOT = ROOT / "bundled-addons"
-ICON_SOURCE_MANIFEST = ROOT / "Resources" / "FusionMyFreeCAD" / "source-icons.json"
+ICON_SOURCE_MANIFEST = ROOT / "Resources" / "FMF" / "source-icons.json"
 
 RIBBON_MODULES = (
     "CacheFunctions.py",
@@ -71,8 +71,8 @@ def copy_tree(source_root: Path, destination_root: Path, relative: str | Path) -
 
 
 def configured_icon_names() -> set[str]:
-    """Every icon the shipped layout references, FusionMyFreeCAD's own included."""
-    layout_path = ROOT / "Resources" / "FusionMyFreeCAD" / "layout-v3.json"
+    """Every icon the shipped layout references, FMF's own included."""
+    layout_path = ROOT / "Resources" / "FMF" / "layout-v3.json"
     layout = json.loads(layout_path.read_text(encoding="utf-8"))
     return {
         Path(entry[4]).stem
@@ -83,7 +83,7 @@ def configured_icon_names() -> set[str]:
 
 
 def authored_icon_names() -> set[str]:
-    """The icons FusionMyFreeCAD draws itself.
+    """The icons FMF draws itself.
 
     These have no counterpart in FreeCAD's source tree, so looking for one
     fails the whole sync -- which is what stopped the icon refresh working at
@@ -91,7 +91,7 @@ def authored_icon_names() -> set[str]:
     prune in sync_layout_icons, which otherwise deletes anything it did not
     just copy from source.
     """
-    manifest_path = ROOT / "Resources" / "FusionMyFreeCAD" / "layout-manifest.json"
+    manifest_path = ROOT / "Resources" / "FMF" / "layout-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     return set(manifest.get("authoredIcons", []))
 
@@ -164,7 +164,7 @@ def sync_layout_icons(freecad_source: Path, destination: Path) -> dict[str, Path
     icon_destination = destination / "Resources" / "FreeCAD Icons"
     icon_destination.mkdir(parents=True, exist_ok=True)
     sources = freecad_icon_sources(freecad_source)
-    # Keep FusionMyFreeCAD's own icons: they are not in the source tree, so the
+    # Keep FMF's own icons: they are not in the source tree, so the
     # prune below would delete every one of them.
     keep = {"{}.svg".format(name) for name in sources} | {
         "{}.svg".format(name) for name in authored_icon_names()
@@ -264,7 +264,7 @@ def strip_python_dependencies() -> list[str]:
 
 
 # Upstream puts the panel's overflow drawer behind a small icon in the title bar.
-# FusionMyFreeCAD makes the whole title open it, which is how a Fusion section
+# FMF makes the whole title open it, which is how a Fusion section
 # header behaves. Each pair is (anchor, replacement); a missing anchor raises so an
 # upstream refactor surfaces here instead of silently dropping the behaviour.
 PANEL_TITLE_DRAWER_PATCH = (
@@ -276,7 +276,7 @@ PANEL_TITLE_DRAWER_PATCH = (
         "class RibbonPanelTitle(QLabel):\n"
         '    """Widget to display the title of a panel.\n'
         "\n"
-        "    FusionMyFreeCAD local change: the title doubles as the trigger for the\n"
+        "    FMF local change: the title doubles as the trigger for the\n"
         "    panel's overflow drawer, so the whole header reads as the dropdown it\n"
         "    already is rather than only the small icon beside it.\n"
         '    """\n'
@@ -351,7 +351,7 @@ PANEL_TITLE_DRAWER_PATCH = (
     ),
 )
 
-# Files FusionMyFreeCAD adds that upstream never ships. main() clears the whole
+# Files FMF adds that upstream never ships. main() clears the whole
 # bundled tree before copying, so these are carried across that wipe rather than
 # kept as a second tracked copy somewhere else.
 FMF_OWNED_FILES = (
@@ -373,14 +373,14 @@ PANEL_DIVIDER_PATCH = (
         "    # Panel options signal\n    panelOptionClicked = Signal(bool)\n",
         "    # Panel options signal\n"
         "    panelOptionClicked = Signal(bool)\n"
-        "    # FusionMyFreeCAD local change: emitted as (panel, pixel delta) when the user\n"
+        "    # FMF local change: emitted as (panel, pixel delta) when the user\n"
         "    # finishes dragging this panel's divider. FCBinding turns the delta into a\n"
         "    # column budget for this panel alone.\n"
         "    panelResizeRequested = Signal(object, int)\n",
     ),
     (
         "        # Add a separator\n        self._separator = RibbonVerticalSeparator(width=3)\n",
-        "        # Add a separator. FusionMyFreeCAD local change: draggable, so a panel's\n"
+        "        # Add a separator. FMF local change: draggable, so a panel's\n"
         "        # width is the user's to set rather than a single global column budget.\n"
         "        self._separator = DraggablePanelSeparator(width=3)\n"
         "        self._separator.dividerReleased.connect(\n"
@@ -411,7 +411,7 @@ FCBINDING_ACTIVATE_PATCH = (
         "        panel.addWidget(spacer, rowSpan=6)\n"
         "\n"
         "        # Enable all buttons, so you can access them with a right click.\n"
-        "        # FusionMyFreeCAD local change: honour the ActivateButtons argument,\n"
+        "        # FMF local change: honour the ActivateButtons argument,\n"
         "        # which upstream declares and then ignores. Force-enabling every button\n"
         "        # in the window is right while arranging the ribbon, where a disabled\n"
         "        # button cannot be right-clicked, but it is wrong after an ordinary\n"
@@ -439,7 +439,7 @@ FCBINDING_WORKBENCH_FAMILY_PATCH = (
         "                    replacedPanel = self.currentCategory().replacePanel(objPanel, newPanel)\n",
         "                    if newPanel is None:\n"
         "                        App.Console.PrintWarning(\n"
-        "                            \"FusionMyFreeCAD: could not expand panel '{}' for \"\n"
+        "                            \"FMF: could not expand panel '{}' for \"\n"
         '                            "customization; leaving the existing panel unchanged.\\n".format(\n'
         "                                objPanel.objectName()\n"
         "                            )\n"
@@ -456,7 +456,7 @@ FCBINDING_OVERFLOW_PATCH = (
         "                    and not responsiveVisible\n"
         "                    and ignoreColumnLimit is False\n"
         "                ):\n",
-        "                # FusionMyFreeCAD local change: once the user has sized a\n"
+        "                # FMF local change: once the user has sized a\n"
         "                # section by dragging its divider, its width is the only thing\n"
         "                # that decides what it shows. The shipped overflow list still\n"
         "                # governs every section nobody has touched.\n"
@@ -518,7 +518,7 @@ FCBINDING_DIVIDER_PATCH = (
     (
         "    def _resetOnePanel(self, panel):\n",
         "    def _onPanelResized(self, panel, deltaX: int):\n"
-        '        """FusionMyFreeCAD local change: a divider drag resizes one panel."""\n'
+        '        """FMF local change: a divider drag resizes one panel."""\n'
         "        fmf_widgets.resize_panel(self, panel, deltaX)\n"
         "\n"
         "    def _resetOnePanel(self, panel):\n",
@@ -532,7 +532,7 @@ FCBINDING_DIVIDER_PATCH = (
     ),
     (
         '        explicitPanelMenu = set(panelDefinition.get("panelMenu", []))\n',
-        "        # Set the maximum columns. FusionMyFreeCAD local change: a panel whose\n"
+        "        # Set the maximum columns. FMF local change: a panel whose\n"
         "        # divider the user has dragged carries its own budget; everything else\n"
         "        # still follows the global preference. The budget is only honoured\n"
         "        # alongside a stored width, so column budgets written by an earlier\n"
@@ -554,7 +554,7 @@ FCBINDING_DIVIDER_PATCH = (
     ),
     (
         "        # Set the font for the panel title\n        Font = QFont()\n",
-        "        # FusionMyFreeCAD local change: let this panel's divider resize it.\n"
+        "        # FMF local change: let this panel's divider resize it.\n"
         "        # setPanelProperties runs for every panel, including rebuilt ones, so the\n"
         "        # connection is guarded rather than made unconditionally. The guard reads\n"
         "        # __dict__ directly because RibbonPanel.__getattr__ raises AssertionError\n"
@@ -580,7 +580,7 @@ FCBINDING_DIVIDER_PATCH = (
 CUSTOM_WIDGETS_DRAG_PATCH = (
     (
         "import Parameters_Ribbon\n",
-        "import Parameters_Ribbon\nimport fmf_ribbon_support  # FusionMyFreeCAD local change\n",
+        "import Parameters_Ribbon\nimport fmf_ribbon_support  # FMF local change\n",
     ),
     # The deeper-indented site first: the shallower anchor below is a substring
     # of this line, so replacing that one first would corrupt this one.
@@ -1101,7 +1101,7 @@ CUSTOM_WIDGETS_DRAG_THRESHOLD_PATCH = (
 )
 
 
-# FusionMyFreeCAD's hooks into the ribbon binding itself: rebuilding width-aware
+# FMF's hooks into the ribbon binding itself: rebuilding width-aware
 # panels when the window crosses a responsive tier, recording a layout the user has
 # dragged into shape, keeping direct drag usable outside customize mode, honouring
 # an authoritative layout's explicit overflow, and offering Reset this panel.
@@ -1205,7 +1205,7 @@ FCBINDING_INTEGRATION_PATCH = (
         "            \n"
         "                    \n"
         "        # update the ribbonstructure before writing it to disk\n"
-        "        # FusionMyFreeCAD panels declare a stable number of pinned commands. In\n"
+        "        # FMF panels declare a stable number of pinned commands. In\n"
         "        # Arrange mode every menu command is shown, so the user's final order\n"
         "        # determines which commands remain on the face of the panel.\n"
         '        for workbench in self.workBenchDict.get("authoritativeWorkbenches", []):\n'
@@ -1248,11 +1248,11 @@ FCBINDING_INTEGRATION_PATCH = (
         '        with open(JsonFile, "w") as outfile:\n'
         "            json.dump(self.ribbonStructure, outfile, indent=4)\n"
         "        try:\n"
-        "            import fusion_bootstrap\n"
+        "            import fmf_bootstrap\n"
         "\n"
-        "            fusion_bootstrap.record_customization(self.ribbonStructure)\n"
+        "            fmf_bootstrap.record_customization(self.ribbonStructure)\n"
         "        except (ImportError, AttributeError):\n"
-        "            # FreeCAD-Ribbon is also usable without FusionMyFreeCAD.\n"
+        "            # FreeCAD-Ribbon is also usable without FMF.\n"
         "            pass\n"
         "                \n"
         "        # Close the temporary document\n"
@@ -1313,20 +1313,20 @@ FCBINDING_INTEGRATION_PATCH = (
         '        with open(Parameters.RIBBON_STRUCTURE_JSON, "w") as outfile:\n'
         "            json.dump(self.ribbonStructure, outfile, indent=4)\n"
         "        try:\n"
-        "            import fusion_bootstrap\n"
+        "            import fmf_bootstrap\n"
         "\n"
-        "            fusion_bootstrap.record_customization(self.ribbonStructure)\n"
+        "            fmf_bootstrap.record_customization(self.ribbonStructure)\n"
         "        except (ImportError, AttributeError):\n"
         "            pass\n"
         "\n"
         "    def _resetOnePanel(self, panel):\n"
         '        """Restore one FMF panel while retaining every other customization."""\n'
         "        try:\n"
-        "            import fusion_bootstrap\n"
+        "            import fmf_bootstrap\n"
         "\n"
         "            workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())\n"
         "            panelName = panel.objectName()\n"
-        "            ribbon = fusion_bootstrap.reset_panel_customization(workbenchName, panelName)\n"
+        "            ribbon = fmf_bootstrap.reset_panel_customization(workbenchName, panelName)\n"
         "            self.ribbonStructure.clear()\n"
         "            self.ribbonStructure.update(ribbon)\n"
         "            self.workBenchDict.clear()\n"
@@ -1346,7 +1346,7 @@ FCBINDING_INTEGRATION_PATCH = (
         "            self.currentCategory()._panels[replacement.objectName()] = replacement\n"
         "            panel.close()\n"
         "            App.Console.PrintMessage(\n"
-        '                "FusionMyFreeCAD reset the {} panel.\\n".format(replacement.title())\n'
+        '                "FMF reset the {} panel.\\n".format(replacement.title())\n'
         "            )\n"
         "        except (ImportError, AttributeError):\n"
         "            return\n"
@@ -1478,7 +1478,7 @@ FCBINDING_INTEGRATION_PATCH = (
         "\n"
         "        workbench = Gui.getWorkbench(workbenchName)\n"
         "        # Get the list of toolbars from the active workbench\n"
-        "        # FusionMyFreeCAD can provide a complete replacement for selected\n"
+        "        # FMF can provide a complete replacement for selected\n"
         "        # workbenches.  In that case do not rediscover native toolbars and\n"
         "        # append them after the configured panels.\n"
         '        if workbenchName in Dict.get("authoritativeWorkbenches", []):\n'
@@ -1677,13 +1677,13 @@ LOCAL_PATCHES = (
 
 
 def preserve_fmf_files() -> dict[tuple, bytes]:
-    """Read the files FusionMyFreeCAD owns before the bundled tree is replaced."""
+    """Read the files FMF owns before the bundled tree is replaced."""
     saved = {}
     for parts in FMF_OWNED_FILES:
         path = DESTINATION_ROOT.joinpath(*parts)
         if not path.is_file():
             raise RuntimeError(
-                "{} is missing. It is FusionMyFreeCAD's own file and cannot be "
+                "{} is missing. It is FMF's own file and cannot be "
                 "recovered from upstream; restore it from git before syncing.".format(path)
             )
         saved[parts] = path.read_bytes()
@@ -1691,7 +1691,7 @@ def preserve_fmf_files() -> dict[tuple, bytes]:
 
 
 def restore_fmf_files(saved: dict[tuple, bytes]) -> None:
-    """Put FusionMyFreeCAD's own files back after the bundled tree is replaced."""
+    """Put FMF's own files back after the bundled tree is replaced."""
     for parts, content in saved.items():
         path = DESTINATION_ROOT.joinpath(*parts)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1752,7 +1752,7 @@ def patch_is_applied(
 
 
 def apply_local_patches() -> list[str]:
-    """Re-apply every hook FusionMyFreeCAD adds to upstream's own modules.
+    """Re-apply every hook FMF adds to upstream's own modules.
 
     Each patch is skipped when it is already applied, so running the sync twice
     is harmless. A missing anchor raises rather than silently shipping a ribbon
@@ -1776,7 +1776,7 @@ def apply_local_patches() -> list[str]:
                 continue
             if text.count(anchor) != expected:
                 raise RuntimeError(
-                    "{} holds {} copies of a FusionMyFreeCAD anchor, expected {}. "
+                    "{} holds {} copies of a FMF anchor, expected {}. "
                     "Re-apply it by hand, then update LOCAL_PATCHES:\n{}".format(
                         path.name, text.count(anchor), expected, anchor
                     )

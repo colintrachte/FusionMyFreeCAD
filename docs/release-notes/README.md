@@ -1,6 +1,6 @@
-# FusionMyFreeCAD release notes
+# FMF release notes
 
-This folder contains the user-facing notes for each prepared or published FusionMyFreeCAD release.
+This folder contains the user-facing notes for each prepared or published FMF release.
 The versioned files are historical records; preserve their descriptions and links to the tagged
 repository state they accompanied.
 

@@ -4,10 +4,10 @@ Date: 2026-10-09
 
 ## Decision summary
 
-FusionMyFreeCAD should not be submitted to the official Addon Index yet. The immediate metadata
+FMF should not be submitted to the official Addon Index yet. The immediate metadata
 defects are straightforward, but the larger acceptance risk is product-level: the Index qualities
 say an add-on must not modify or hide FreeCAD's core interface or interfere with other add-ons,
-while FusionMyFreeCAD intentionally applies a global ribbon, preferences, navigation settings, and
+while FMF intentionally applies a global ribbon, preferences, navigation settings, and
 shortcuts across several core workbenches.
 
 The product's multi-workbench feature set takes precedence over Index inclusion. The recommended
@@ -65,7 +65,7 @@ forward after those behaviors were corrected.
 
 Source: [FreeCAD/Addons issue 112](https://github.com/FreeCAD/Addons/issues/112)
 
-Lesson for FusionMyFreeCAD: restoration must reproduce the exact previous state, and merely
+Lesson for FMF: restoration must reproduce the exact previous state, and merely
 reporting shortcut displacement may not be enough. Existing user bindings should be preserved by
 default or changed only through explicit, informed opt-in.
 
@@ -78,7 +78,7 @@ portable distribution before resubmitting.
 
 Source: [FreeCAD/Addons issue 143](https://github.com/FreeCAD/Addons/issues/143)
 
-Lesson for FusionMyFreeCAD: passing CI and having release artifacts do not establish Index
+Lesson for FMF: passing CI and having release artifacts do not establish Index
 readiness. A documented beta cohort, real FreeCAD usage across platforms, resolved feedback, and a
 stable maintenance interval are separate deliverables.
 
@@ -92,7 +92,7 @@ labelling, used a raw README URL, and changed the content type.
 
 Source: [FreeCAD/Addons issue 162](https://github.com/FreeCAD/Addons/issues/162)
 
-Lesson for FusionMyFreeCAD: every automatic document or profile mutation needs a narrow contract,
+Lesson for FMF: every automatic document or profile mutation needs a narrow contract,
 tests, undo/recovery behavior, and honest user-facing disclosure. Disable/uninstall behavior must
 be evaluated, not just the manual **Restore UI** command.
 
@@ -104,7 +104,7 @@ stated check. The author was asked to resubmit only after the code was genuinely
 
 Source: [FreeCAD/Addons issue 117](https://github.com/FreeCAD/Addons/issues/117)
 
-Lesson for FusionMyFreeCAD: validation must test user-visible claims and real FreeCAD behavior,
+Lesson for FMF: validation must test user-visible claims and real FreeCAD behavior,
 not merely XML shape or test-double behavior.
 
 ### Other recurring blockers
@@ -119,7 +119,7 @@ not merely XML shape or test-double behavior.
   it to distinguish itself from existing add-ons, and tutorials helped demonstrate the value.
   Source: [FreeCAD/Addons issue 152](https://github.com/FreeCAD/Addons/issues/152)
 
-## Current FusionMyFreeCAD assessment
+## Current FMF assessment
 
 ### Confirmed strengths
 
@@ -133,7 +133,7 @@ not merely XML shape or test-double behavior.
 
 ### Confirmed defects or gaps
 
-1. `package.xml` declares `<workbench>` even though FusionMyFreeCAD does not register a workbench
+1. `package.xml` declares `<workbench>` even though FMF does not register a workbench
    class. It lacks the required package icon and author, and its tags are nested inside the
    workbench item instead of being package metadata. It also lacks a dedicated README/overview URL.
 2. The repository has no GitHub topics, so the recommended `freecad` and `addon` topics are absent.
@@ -156,11 +156,11 @@ not merely XML shape or test-double behavior.
 
 ### High-risk eligibility question
 
-FusionMyFreeCAD intentionally replaces or rearranges interface elements across core Part Design,
+FMF intentionally replaces or rearranges interface elements across core Part Design,
 Part, Sketcher, and related contexts and applies global preferences and shortcuts. That appears to
 conflict with the written rule against modifying or hiding FreeCAD's core interface or interfering
 with other add-ons. This is an inference from the policy and the product behavior, not an official
-ruling on FusionMyFreeCAD.
+ruling on FMF.
 
 The right next action is a narrowly worded pre-submission question to the Addons maintainers with a
 short behavior summary and screenshots. If a global UI transformation is categorically unsuitable,
@@ -219,7 +219,7 @@ and removal simulations all preserve user data and recover prior UI state.
    expressly says an add-on must not hide FreeCAD's core interface, treat this optional convenience
    as a likely Index blocker even when the user consents; do not weaken the standalone product to
    conceal that conflict.
-6. Migrate first-party modules to `freecad/FusionMyFreeCAD/` and remove first-party `sys.path`
+6. Migrate first-party modules to `freecad/FMF/` and remove first-party `sys.path`
    manipulation. Preserve compatibility shims only where the official loader requires them.
 7. Investigate replacing bundled add-on runtimes without sacrificing the one-package installation.
    Acceptable outcomes include absorbing the necessary maintained code with provenance, using a
@@ -257,7 +257,7 @@ regression tests for every metadata failure observed in the reviewed submissions
    heavily customized profiles. Narrow platform claims if a platform is not verified.
 3. Track tester version, platform, workflows, failures, restoration results, and resolution status.
 4. Add a user-focused overview with screenshots, quick start, limitations, recovery instructions,
-   and short demonstrations of the distinct FusionMyFreeCAD workflow.
+   and short demonstrations of the distinct FMF workflow.
 5. Run Bandit and review findings; add a security-reporting path and document that normal runtime
    behavior makes no external connections if that remains true.
 6. Allow a stabilization interval with no known data-loss, profile-corruption, startup, or major
@@ -303,4 +303,4 @@ channels. That is a valid project outcome, not a failed refactor.
   user testing.
 - The current official policy creates tension between its workbench-less toolbar example and its
   broad prohibition on modifying core UI. Only the maintainers can resolve that tension for a
-  full-interface add-on like FusionMyFreeCAD.
+  full-interface add-on like FMF.

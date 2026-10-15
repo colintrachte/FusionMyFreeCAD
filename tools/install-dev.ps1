@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Build FusionMyFreeCAD and install it into a FreeCAD Mod directory.
+    Build FMF and install it into a FreeCAD Mod directory.
 
 .DESCRIPTION
     Builds a fresh release archive (unless -NoBuild), removes any existing
-    <ModDir>\FusionMyFreeCAD, then extracts the archive there so the add-on lands
-    at <ModDir>\FusionMyFreeCAD (never one level too deep). Restart FreeCAD after.
+    <ModDir>\FMF, then extracts the archive there so the add-on lands
+    at <ModDir>\FMF (never one level too deep). Restart FreeCAD after.
 
     Resolving the Mod directory, in order:
       1. -ModDir on the command line (also saved for next time).
@@ -21,7 +21,7 @@
     Saved to the config file so later runs need no arguments.
 
 .PARAMETER NoBuild
-    Install the newest existing dist\FusionMyFreeCAD-*.zip without rebuilding.
+    Install the newest existing dist\FMF-*.zip without rebuilding.
 
 .PARAMETER List
     Show the saved config and every autodetected candidate, then exit.
@@ -91,7 +91,7 @@ function Get-Candidates {
         [pscustomobject]@{
             Path     = $p
             Exists   = Test-Path $p
-            HasAddon = Test-Path (Join-Path $p 'FusionMyFreeCAD/InitGui.py')
+            HasAddon = Test-Path (Join-Path $p 'FMF/InitGui.py')
             Parented = Test-Path (Split-Path $p -Parent)
         }
     }
@@ -102,7 +102,7 @@ function Get-Candidates {
 }
 
 function Format-Tag($row) {
-    if ($row.HasAddon) { return '[has FusionMyFreeCAD]' }
+    if ($row.HasAddon) { return '[has FMF]' }
     if ($row.Exists)   { return '[exists]' }
     if ($row.Parented) { return '[would be created]' }
     return '[parent missing]'
@@ -184,13 +184,13 @@ if (-not $NoBuild) {
     if ($LASTEXITCODE -ne 0) { throw "build_addon_package.py failed" }
 }
 
-$zip = Get-ChildItem (Join-Path $repo 'dist') -Filter 'FusionMyFreeCAD-*.zip' -ErrorAction SilentlyContinue |
+$zip = Get-ChildItem (Join-Path $repo 'dist') -Filter 'FMF-*.zip' -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $zip) { throw "No dist\FusionMyFreeCAD-*.zip found. Build first (drop -NoBuild)." }
+if (-not $zip) { throw "No dist\FMF-*.zip found. Build first (drop -NoBuild)." }
 
 # --- install ---------------------------------------------------------------
 New-Item -ItemType Directory -Force -Path $ModDir | Out-Null
-$target = Join-Path $ModDir 'FusionMyFreeCAD'
+$target = Join-Path $ModDir 'FMF'
 
 if (Test-Path $target) {
     Write-Host "Removing old $target" -ForegroundColor DarkGray
@@ -203,5 +203,5 @@ Expand-Archive -Path $zip.FullName -DestinationPath $ModDir -Force
 if (-not (Test-Path (Join-Path $target 'InitGui.py'))) {
     throw "Install looks wrong: $target\InitGui.py is missing."
 }
-Write-Host "Installed FusionMyFreeCAD to $target" -ForegroundColor Green
+Write-Host "Installed FMF to $target" -ForegroundColor Green
 Write-Host "Restart FreeCAD to load it." -ForegroundColor Green

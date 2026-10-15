@@ -1,4 +1,4 @@
-# FusionMyFreeCAD 1.4.0
+# FMF 1.4.0
 
 1.4.0 is a feature release on top of 1.3.3. It adds a set of sketch and datum tools
 that apply the constraints FreeCAD normally leaves to you, an in-canvas parameters
@@ -8,34 +8,34 @@ affected by updating.
 
 ## Sketcher tools
 
-- **Smart Slot** (`FusionMyFreeCAD_CreateSlot`, Sketch Create panel, behind native
+- **Smart Slot** (`FMF_CreateSlot`, Sketch Create panel, behind native
   **Slot**) — builds a fully constrained center-to-center slot: two sides, two end
   arcs, tangent at every corner, with a construction midline and a single driving
   length and radius. Select two points or one line to lay it along existing geometry,
   or run it with nothing selected for a standard parametric slot.
-- **Smart Offset** (`FusionMyFreeCAD_SmartOffset`, Sketch Modify panel) — offsets a
+- **Smart Offset** (`FMF_SmartOffset`, Sketch Modify panel) — offsets a
   connected chain of sketch edges in the direction you pick, keeping tangency across
   the chain, for quickly growing or shrinking a profile.
-- **Add Midline** (`FusionMyFreeCAD_AddMidline`, Sketch Constrain panel) — drops a
+- **Add Midline** (`FMF_AddMidline`, Sketch Constrain panel) — drops a
   construction centerline between two parallel edges or two symmetric points in one
   click, ready to use as a mirror axis or symmetry reference.
-- **Constrain Midpoint** (`FusionMyFreeCAD_ConstrainMidpoint`, Sketch Constrain
+- **Constrain Midpoint** (`FMF_ConstrainMidpoint`, Sketch Constrain
   panel) — pins a vertex to the midpoint of an edge in a single action instead of the
   usual select-point, select-line, pick-constraint sequence.
-- **Solver Diagnostics** (`FusionMyFreeCAD_SolverDiagnostics`, Sketch Constrain
+- **Solver Diagnostics** (`FMF_SolverDiagnostics`, Sketch Constrain
   panel) — reads the solver state and reports it in plain language, naming the
   geometry involved in conflicts or redundancy, and offers one-click removal of
   redundant constraints.
 
 ## Datum tools
 
-- **Midplane** (`FusionMyFreeCAD_DatumMidplane`, Part Design Construct panel) —
+- **Midplane** (`FMF_DatumMidplane`, Part Design Construct panel) —
   selects two planar faces and creates a parametric `PartDesign::Plane` centered
   between them in one atomic, undoable step.
 
 ## Parameters dock
 
-- **Parameters Dock** (`FusionMyFreeCAD_ParameterDock`) — an in-canvas dock for
+- **Parameters Dock** (`FMF_ParameterDock`) — an in-canvas dock for
   creating, viewing, and editing document variables and their aliases without
   switching to the Spreadsheet workbench.
   - **Multi-document safe.** It follows the active document through document
@@ -46,7 +46,7 @@ affected by updating.
 
 <<<<<<< HEAD:docs/release-notes/RELEASE-NOTES-1.4.0.md
 ### 6. Shared Infrastructure & Reliability
-- **Centralized Infrastructure (`fusion_common.py`)**: Canonical `RUNTIME_MODULES` manifest, atomic `transaction(doc, label)` context manager, standard notifications, and base `SketcherCommand`.
+- **Centralized Infrastructure (`fmf_common.py`)**: Canonical `RUNTIME_MODULES` manifest, atomic `transaction(doc, label)` context manager, standard notifications, and base `SketcherCommand`.
 - **Packaging Integrity Gate**: Release builder and validator verify that all packaged runtime modules and assets are tracked in Git.
 - **Deterministic Test Suite**: Clean dynamic module eviction eliminates cross-test state pollution across all 194 unit tests.
 - **FreeCAD Core Suggestions Box**: Cleanly catalogs core-bound ideas (Heads-Up Display, Ghost Sketches, Unified Extrude) in `docs/dev-guide/freecad_core_suggestions_box.md`.
@@ -54,13 +54,13 @@ affected by updating.
 ## Studio viewport and Modern Zinc theme
 >>>>>>> b2d41d6d8d7c2e26f1247876877d657c8a6fb36b:docs/RELEASE-NOTES-1.4.0.md
 
-- **Fusion Studio Viewport** (`FusionMyFreeCAD_StudioViewport`) — a clean canvas
+- **Fusion Studio Viewport** (`FMF_StudioViewport`) — a clean canvas
   preset: three-point lighting, a radial background, and a repositioned navigation
   cube.
-- **Modern Zinc theme** (`FusionMyFreeCAD_ModernZincTheme`,
+- **Modern Zinc theme** (`FMF_ModernZincTheme`,
   `Resources/Themes/modern_zinc.qss`) — a flat dark zinc stylesheet tuned for
   FreeCAD 1.1+.
-- **Restore Viewport Defaults** (`FusionMyFreeCAD_RestoreViewport`) — puts the
+- **Restore Viewport Defaults** (`FMF_RestoreViewport`) — puts the
   viewport display, lighting, and theme back to your previous FreeCAD settings in
   one click. Both viewport commands are opt-in; nothing changes until you run them.
 
@@ -74,11 +74,11 @@ affected by updating.
 
 ## Under the hood
 
-- **Shared core (`fusion_common.py`).** One canonical `RUNTIME_MODULES` manifest, one
+- **Shared core (`fmf_common.py`).** One canonical `RUNTIME_MODULES` manifest, one
   atomic `transaction(doc, label)` context manager, one `notify()` helper, and a
   common `SketcherCommand` base, used by every command module.
 - **Packaging gate.** `tools/build_addon_package.py` and `validate_addon.py` now take
-  the module list from `fusion_common.py` and fail the build if any packaged runtime
+  the module list from `fmf_common.py` and fail the build if any packaged runtime
   module or asset is untracked in git.
 - **Deterministic tests.** Modules are evicted cleanly between tests, removing
   cross-test state leakage across the suite.
@@ -90,7 +90,7 @@ affected by updating.
 
 ## Upgrade notes
 
-- Replace the entire existing `Mod/FusionMyFreeCAD` folder; do not merge it with an
+- Replace the entire existing `Mod/FMF` folder; do not merge it with an
   older version. Restart FreeCAD after updating.
 - Your ribbon panel and command order is retained and reconciled with the 1.4.0
   layout. The new tools are added to existing panels (Sketch Create / Modify /
@@ -102,8 +102,8 @@ affected by updating.
 
 ## Install or update
 
-Download `FusionMyFreeCAD-1.4.0.zip` and `FusionMyFreeCAD-1.4.0.zip.sha256` from this
-release. Replace the entire existing `Mod/FusionMyFreeCAD` folder; do not merge it
+Download `FMF-1.4.0.zip` and `FMF-1.4.0.zip.sha256` from this
+release. Replace the entire existing `Mod/FMF` folder; do not merge it
 with an older version. Restart FreeCAD.
 
 See the [installation guide](https://github.com/colintrachte/FusionMyFreeCAD/blob/v1.4.0/docs/INSTALL-FREECAD-ADDON.md) and [full changelog](https://github.com/colintrachte/FusionMyFreeCAD/blob/v1.4.0/CHANGELOG.md).

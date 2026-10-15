@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "targetFreeCAD": "1.1.3",
   "dropdownButtons": {
-    "Fusion_Extrude_ddb": [
+    "FMF_Extrude_ddb": [
       ["PartDesign_Pad", "PartDesignWorkbench"],
       ["PartDesign_Pocket", "PartDesignWorkbench"],
       ["PartDesign_Body", "PartDesignWorkbench"]
     ],
-    "Fusion_Create_ddb": [
+    "FMF_Create_ddb": [
       ["PartDesign_NewSketch", "PartDesignWorkbench"],
       ["PartDesign_Pad", "PartDesignWorkbench"],
       ["PartDesign_Pocket", "PartDesignWorkbench"],
@@ -17,32 +17,32 @@
       ["PartDesign_AdditiveLoft", "PartDesignWorkbench"],
       ["PartDesign_CompPrimitiveAdditive", "PartDesignWorkbench"]
     ],
-    "Fusion_Modify_ddb": [
+    "FMF_Modify_ddb": [
       ["PartDesign_Fillet", "PartDesignWorkbench"],
       ["PartDesign_Chamfer", "PartDesignWorkbench"],
       ["PartDesign_Thickness", "PartDesignWorkbench"],
       ["PartDesign_Draft", "PartDesignWorkbench"],
       ["PartDesign_Boolean", "PartDesignWorkbench"]
     ],
-    "Fusion_Construct_ddb": [
+    "FMF_Construct_ddb": [
       ["PartDesign_Plane", "PartDesignWorkbench"],
       ["PartDesign_Line", "PartDesignWorkbench"],
       ["PartDesign_Point", "PartDesignWorkbench"],
       ["PartDesign_CoordinateSystem", "PartDesignWorkbench"]
     ],
-    "Fusion_Inspect_ddb": [
+    "FMF_Inspect_ddb": [
       ["Std_Measure", "Global"],
       ["Part_CheckGeometry", "PartWorkbench"],
       ["Std_ViewFitAll", "Global"]
     ],
-    "Fusion_SketchCreate_ddb": [
+    "FMF_SketchCreate_ddb": [
       ["Sketcher_CreateLine", "SketcherWorkbench"],
       ["Sketcher_CompCreateRectangles", "SketcherWorkbench"],
       ["Sketcher_CompCreateConic", "SketcherWorkbench"],
       ["Sketcher_CompCreateArc", "SketcherWorkbench"],
       ["Sketcher_CompSlot", "SketcherWorkbench"]
     ],
-    "Fusion_SketchModify_ddb": [
+    "FMF_SketchModify_ddb": [
       ["Sketcher_CompCreateFillets", "SketcherWorkbench"],
       ["Sketcher_CompCurveEdition", "SketcherWorkbench"],
       ["Sketcher_Offset", "SketcherWorkbench"],
@@ -52,7 +52,7 @@
       ["Sketcher_RectangularArray", "SketcherWorkbench"],
       ["Sketcher_CompExternal", "SketcherWorkbench"]
     ],
-    "Fusion_Constraints_ddb": [
+    "FMF_Constraints_ddb": [
       ["Sketcher_Dimension", "SketcherWorkbench"],
       ["Sketcher_CompDimensionTools", "SketcherWorkbench"],
       ["Sketcher_CompConstrainTools", "SketcherWorkbench"]
@@ -65,15 +65,15 @@
         ["PartDesign_NewSketch", "PartDesignWorkbench"]
       ],
       "Fusion Create_newPanel": [
-        ["Fusion_Extrude_ddb", "General"],
+        ["FMF_Extrude_ddb", "General"],
         ["PartDesign_Hole", "PartDesignWorkbench"],
-        ["Fusion_Create_ddb", "General"]
+        ["FMF_Create_ddb", "General"]
       ],
       "Fusion Modify_newPanel": [
-        ["Fusion_Modify_ddb", "General"]
+        ["FMF_Modify_ddb", "General"]
       ],
       "Fusion Construct_newPanel": [
-        ["Fusion_Construct_ddb", "General"]
+        ["FMF_Construct_ddb", "General"]
       ],
       "Fusion Pattern_newPanel": [
         ["PartDesign_Mirrored", "PartDesignWorkbench"],
@@ -82,7 +82,7 @@
         ["PartDesign_MultiTransform", "PartDesignWorkbench"]
       ],
       "Fusion Inspect_newPanel": [
-        ["Fusion_Inspect_ddb", "General"]
+        ["FMF_Inspect_ddb", "General"]
       ]
     },
     "SketcherWorkbench": {
@@ -93,18 +93,18 @@
         ["Sketcher_CreateLine", "SketcherWorkbench"],
         ["Sketcher_CompCreateRectangles", "SketcherWorkbench"],
         ["Sketcher_CompCreateConic", "SketcherWorkbench"],
-        ["Fusion_SketchCreate_ddb", "General"],
+        ["FMF_SketchCreate_ddb", "General"],
         ["Sketcher_ToggleConstruction", "SketcherWorkbench"]
       ],
       "Fusion Sketch Modify_newPanel": [
-        ["Fusion_SketchModify_ddb", "General"],
+        ["FMF_SketchModify_ddb", "General"],
         ["Sketcher_Symmetry", "SketcherWorkbench"],
         ["Sketcher_RectangularArray", "SketcherWorkbench"],
         ["Sketcher_CompExternal", "SketcherWorkbench"]
       ],
       "Fusion Sketch Constraints_newPanel": [
         ["Sketcher_Dimension", "SketcherWorkbench"],
-        ["Fusion_Constraints_ddb", "General"]
+        ["FMF_Constraints_ddb", "General"]
       ],
       "Fusion Sketch Inspect_newPanel": [
         ["Std_Measure", "Global"],
@@ -127,27 +127,27 @@
         "Fusion Create_newPanel": {
           "title": "CREATE",
           "Enabled": true,
-          "order": ["Fusion_Extrude_ddb", "PartDesign_Hole", "Fusion_Create_ddb"],
+          "order": ["FMF_Extrude_ddb", "PartDesign_Hole", "FMF_Create_ddb"],
           "commands": {
-            "Fusion_Extrude_ddb": {"size": "large", "text": "Extrude", "icon": "PartDesign_Pad", "IsExtra": true},
+            "FMF_Extrude_ddb": {"size": "large", "text": "Extrude", "icon": "PartDesign_Pad", "IsExtra": true},
             "PartDesign_Hole": {"size": "large", "text": "Hole", "icon": "PartDesign_Hole", "IsExtra": true},
-            "Fusion_Create_ddb": {"size": "small", "text": "More Create", "icon": "PartDesign_NewSketch", "IsExtra": true}
+            "FMF_Create_ddb": {"size": "small", "text": "More Create", "icon": "PartDesign_NewSketch", "IsExtra": true}
           }
         },
         "Fusion Modify_newPanel": {
           "title": "MODIFY",
           "Enabled": true,
-          "order": ["Fusion_Modify_ddb"],
+          "order": ["FMF_Modify_ddb"],
           "commands": {
-            "Fusion_Modify_ddb": {"size": "large", "text": "Modify", "icon": "PartDesign_Fillet", "IsExtra": true}
+            "FMF_Modify_ddb": {"size": "large", "text": "Modify", "icon": "PartDesign_Fillet", "IsExtra": true}
           }
         },
         "Fusion Construct_newPanel": {
           "title": "CONSTRUCT",
           "Enabled": true,
-          "order": ["Fusion_Construct_ddb"],
+          "order": ["FMF_Construct_ddb"],
           "commands": {
-            "Fusion_Construct_ddb": {"size": "large", "text": "Construct", "icon": "PartDesign_Plane", "IsExtra": true}
+            "FMF_Construct_ddb": {"size": "large", "text": "Construct", "icon": "PartDesign_Plane", "IsExtra": true}
           }
         },
         "Fusion Pattern_newPanel": {
@@ -164,9 +164,9 @@
         "Fusion Inspect_newPanel": {
           "title": "INSPECT",
           "Enabled": true,
-          "order": ["Fusion_Inspect_ddb"],
+          "order": ["FMF_Inspect_ddb"],
           "commands": {
-            "Fusion_Inspect_ddb": {"size": "large", "text": "Inspect", "icon": "Std_Measure", "IsExtra": true}
+            "FMF_Inspect_ddb": {"size": "large", "text": "Inspect", "icon": "Std_Measure", "IsExtra": true}
           }
         }
       },
@@ -192,21 +192,21 @@
         "Fusion Sketch Create_newPanel": {
           "title": "CREATE",
           "Enabled": true,
-          "order": ["Sketcher_CreateLine", "Sketcher_CompCreateRectangles", "Sketcher_CompCreateConic", "Fusion_SketchCreate_ddb", "Sketcher_ToggleConstruction"],
+          "order": ["Sketcher_CreateLine", "Sketcher_CompCreateRectangles", "Sketcher_CompCreateConic", "FMF_SketchCreate_ddb", "Sketcher_ToggleConstruction"],
           "commands": {
             "Sketcher_CreateLine": {"size": "large", "text": "Line", "icon": "Sketcher_CreateLine", "IsExtra": true},
             "Sketcher_CompCreateRectangles": {"size": "large", "text": "Rectangle", "icon": "Sketcher_CreateRectangle", "IsExtra": true},
             "Sketcher_CompCreateConic": {"size": "large", "text": "Circle", "icon": "Sketcher_CreateCircle", "IsExtra": true},
-            "Fusion_SketchCreate_ddb": {"size": "small", "text": "More Create", "icon": "Sketcher_CreateLine", "IsExtra": true},
+            "FMF_SketchCreate_ddb": {"size": "small", "text": "More Create", "icon": "Sketcher_CreateLine", "IsExtra": true},
             "Sketcher_ToggleConstruction": {"size": "small", "text": "Construction", "icon": "Sketcher_ToggleConstruction", "IsExtra": true}
           }
         },
         "Fusion Sketch Modify_newPanel": {
           "title": "MODIFY",
           "Enabled": true,
-          "order": ["Fusion_SketchModify_ddb", "Sketcher_Symmetry", "Sketcher_RectangularArray", "Sketcher_CompExternal"],
+          "order": ["FMF_SketchModify_ddb", "Sketcher_Symmetry", "Sketcher_RectangularArray", "Sketcher_CompExternal"],
           "commands": {
-            "Fusion_SketchModify_ddb": {"size": "large", "text": "Modify", "icon": "Sketcher_CompCurveEdition", "IsExtra": true},
+            "FMF_SketchModify_ddb": {"size": "large", "text": "Modify", "icon": "Sketcher_CompCurveEdition", "IsExtra": true},
             "Sketcher_Symmetry": {"size": "small", "text": "Mirror", "icon": "Sketcher_Symmetry", "IsExtra": true},
             "Sketcher_RectangularArray": {"size": "small", "text": "Rectangular Pattern", "icon": "Sketcher_RectangularArray", "IsExtra": true},
             "Sketcher_CompExternal": {"size": "small", "text": "Project / Include", "icon": "Sketcher_Projection", "IsExtra": true}
@@ -215,10 +215,10 @@
         "Fusion Sketch Constraints_newPanel": {
           "title": "CONSTRAINTS",
           "Enabled": true,
-          "order": ["Sketcher_Dimension", "Fusion_Constraints_ddb"],
+          "order": ["Sketcher_Dimension", "FMF_Constraints_ddb"],
           "commands": {
             "Sketcher_Dimension": {"size": "large", "text": "Dimension", "icon": "Sketcher_Dimension", "IsExtra": true},
-            "Fusion_Constraints_ddb": {"size": "large", "text": "Constraints", "icon": "Sketcher_CompConstrainTools", "IsExtra": true}
+            "FMF_Constraints_ddb": {"size": "large", "text": "Constraints", "icon": "Sketcher_CompConstrainTools", "IsExtra": true}
           }
         },
         "Fusion Sketch Inspect_newPanel": {

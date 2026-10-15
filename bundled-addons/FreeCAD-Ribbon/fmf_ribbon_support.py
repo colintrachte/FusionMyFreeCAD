@@ -1,4 +1,4 @@
-"""FusionMyFreeCAD helpers for the vendored FreeCAD-Ribbon modules.
+"""FMF helpers for the vendored FreeCAD-Ribbon modules.
 
 Not part of upstream FreeCAD-Ribbon. Keeping the bodies here means
 `tools/sync_bundled_addons.py` has only one-line hooks to re-apply in upstream's
@@ -36,11 +36,11 @@ def report_drag_failure(error):
     """Say once why a drag did nothing, rather than printing into the void."""
     global _dragFailureReported
     if _dragFailureReported:
-        App.Console.PrintLog("FusionMyFreeCAD: a ribbon drag failed: {}\n".format(error))
+        App.Console.PrintLog("FMF: a ribbon drag failed: {}\n".format(error))
         return
     _dragFailureReported = True
     App.Console.PrintWarning(
-        "FusionMyFreeCAD could not start a ribbon drag: {}. "
+        "FMF could not start a ribbon drag: {}. "
         "Rearranging ribbon icons will not work until this is resolved; "
         "further occurrences go to the log only.\n".format(error)
     )

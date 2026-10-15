@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary & Why Upstream Matters
 
-While interface and intent wrappers can be prototyped rapidly in Python add-ons (such as FusionMyFreeCAD), the core limitations of FreeCAD compared to Autodesk Fusion 360 stem from foundational C++ systems:
+While interface and intent wrappers can be prototyped rapidly in Python add-ons (such as FMF), the core limitations of FreeCAD compared to Autodesk Fusion 360 stem from foundational C++ systems:
 1. **PlanGCS Constraint Solver**: Operates on flat scalar equation matrices rather than semantic feature entities.
 2. **OpenCASCADE B-Rep API Wrappers**: Atomic failure modes in filleting, sweeping, and shelling.
 3. **Data Storage & Document Architecture**: Monolithic zip containers that prevent version control.

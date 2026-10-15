@@ -1,4 +1,4 @@
-# FusionMyFreeCAD AI harness — multi-model routing and fusion
+# FMF AI harness — multi-model routing and fusion
 
 > This doc pairs with `REVIEW_TIERS.template.md` (defines the project's top review tier,
 > referenced below as "your top tier") and `ROADMAP.template.md` (the task-list format

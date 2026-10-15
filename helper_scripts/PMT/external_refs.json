@@ -1,5 +1,5 @@
 {
   "_comment": "Read-only external references for roadmap context packs; machine-local paths are not project facts.",
-  "fmf-study": "FusionMyFreeCAD Study in the workspace Upstream Reference collection: architecture, benchmarks, reviews, and pinned source snapshots. Read only.",
+  "fmf-study": "FMF Study in the workspace Upstream Reference collection: architecture, benchmarks, reviews, and pinned source snapshots. Read only.",
   "freecad": "Official FreeCAD source checkout in the workspace Upstream Reference collection. Read only."
 }

@@ -1,4 +1,4 @@
-# Research brief: Fusion UI replication for FusionMyFreeCAD
+# Research brief: Fusion UI replication for FMF
 
 **Status:** Independent research pass used to revise the add-on payload
 **Date:** 2026-08-01  

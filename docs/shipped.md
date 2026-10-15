@@ -23,7 +23,7 @@
   **Acceptance:** Every current stock and FMF command ID has a verified disposition; omissions have rationale and an alternate path.
   **Expected evidence:** Four reviewed matrices and an automated completeness check.
   **Implement:** `docs/dev-guide/workbench-parity.md` · `tools/check_workbench_parity.py`
-  **Context:** `Resources/FusionMyFreeCAD/layout-v3.json` · `command-map.md` · `docs/dev-guide/CURRENT-FEATURE-INVENTORY.md`
+  **Context:** `Resources/FMF/layout-v3.json` · `command-map.md` · `docs/dev-guide/CURRENT-FEATURE-INVENTORY.md`
   **Read:** `<freecad>/src/Mod/PartDesign/Gui/Workbench.cpp` · `<freecad>/src/Mod/Part/Gui/Workbench.cpp` · `<freecad>/src/Mod/Sketcher/Gui/Workbench.cpp` · `<freecad>/src/Mod/Surface/Gui/Workbench.cpp`
 
 - [x] **Score 5 🥇 · Class 2 — Specify the activation and restoration state machine**
@@ -38,7 +38,7 @@
   **Acceptance:** Transitions are idempotent, partial failure yields usable classic UI, native toolbars remain discoverable, and prior workbench visibility restores exactly.
   **Expected evidence:** State diagram, transition table, failure-injection tests, and GUI checklist.
   **Implement:** `docs/dev-guide/ACTIVATION-AND-RESTORATION.md` · `tests/test_lifecycle.py`
-  **Context:** `fusion_bootstrap.py` · `Resources/FusionMyFreeCAD/runtime.py` · `tests/test_install.py`
+  **Context:** `fmf_bootstrap.py` · `Resources/FMF/runtime.py` · `tests/test_install.py`
   **Read:** `<fmf-study>/ANALYTICAL_FOUNDATIONS_AND_BENCHMARKS.md` · `<fmf-study>/upstream_repos/NeoRibbon/InitGui.py`
   **Prefer after:** task_a1020000000000000000000000000002
 
@@ -53,7 +53,7 @@
   **Protected behavior:** Existing command invocation, usage tracking, and layout declarations retain their semantics.
   **Acceptance:** A checkable action synchronizes through ribbon, menu, shortcut, and native code; missing/destroyed actions degrade safely.
   **Expected evidence:** Unit fixtures and a real-FreeCAD demonstration.
-  **Implement:** `fusion_actions.py` · `Resources/FusionMyFreeCAD/runtime.py`
-  **Context:** `fusion_common.py` · `fusion_bootstrap.py`
+  **Implement:** `fmf_actions.py` · `Resources/FMF/runtime.py`
+  **Context:** `fmf_common.py` · `fmf_bootstrap.py`
   **Read:** `<fmf-study>/THE_IDEAL_ARCHITECTURE.md` · `<fmf-study>/research/NEORIBBON_TECHNICAL_REVIEW.md`
   **Blocked by:** task_a1020000000000000000000000000002 · task_a1030000000000000000000000000003

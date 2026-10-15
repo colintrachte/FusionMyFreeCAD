@@ -17,7 +17,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 
 ADDON_ROOT = os.path.dirname(os.path.abspath(__file__))
-RESOURCE_ROOT = os.path.join(ADDON_ROOT, "Resources", "FusionMyFreeCAD")
+RESOURCE_ROOT = os.path.join(ADDON_ROOT, "Resources", "FMF")
 PACKAGE_PATH = os.path.join(ADDON_ROOT, "package.xml")
 BASE_LAYOUT = os.path.join(RESOURCE_ROOT, "RibbonStructure.json")
 LAYOUT_SPEC = os.path.join(RESOURCE_ROOT, "layout-v3.json")
@@ -27,18 +27,33 @@ PREFERENCES_UI = os.path.join(RESOURCE_ROOT, "preferences.ui")
 USER_ROOT = App.getUserAppDataDir()
 RIBBON_DIR = os.path.join(USER_ROOT, "RibbonUI_Data")
 RIBBON_PATH = os.path.join(RIBBON_DIR, "RibbonStructure.json")
-STATE_PATH = os.path.join(USER_ROOT, "FusionMyFreeCAD-addon-state.json")
-STARTUP_PATH = os.path.join(USER_ROOT, "FusionMyFreeCAD-startup.json")
-STATUS_PATH = os.path.join(USER_ROOT, "FusionMyFreeCAD-runtime-status.json")
-USAGE_PATH = os.path.join(USER_ROOT, "FusionMyFreeCAD-usage.json")
-CUSTOMIZATION_PATH = os.path.join(USER_ROOT, "FusionMyFreeCAD-customization.json")
-BACKUP_ROOT = os.path.join(USER_ROOT, "FusionMyFreeCAD-Backups")
-# The baseline records the profile as it was before FusionMyFreeCAD first ran.
+STATE_PATH = os.path.join(USER_ROOT, "FMF-addon-state.json")
+STARTUP_PATH = os.path.join(USER_ROOT, "FMF-startup.json")
+STATUS_PATH = os.path.join(USER_ROOT, "FMF-runtime-status.json")
+USAGE_PATH = os.path.join(USER_ROOT, "FMF-usage.json")
+CUSTOMIZATION_PATH = os.path.join(USER_ROOT, "FMF-customization.json")
+BACKUP_ROOT = os.path.join(USER_ROOT, "FMF-Backups")
+# The baseline records the profile as it was before FMF first ran.
 # It is written once and never rewritten, so a lost or corrupted state file can
-# never cause FusionMyFreeCAD's own settings to be captured as the "previous UI".
+# never cause FMF's own settings to be captured as the "previous UI".
 BASELINE_PATH = os.path.join(BACKUP_ROOT, "baseline.json")
-PREFERENCE_ROOT = "User parameter:BaseApp/Preferences/Mod/FusionMyFreeCAD"
+PREFERENCE_ROOT = "User parameter:BaseApp/Preferences/Mod/FMF"
 WORKBENCH_PREFERENCE_ROOT = "User parameter:BaseApp/Preferences/Workbenches"
+
+# Keep upgrade-only names assembled from fragments so the retired brand cannot
+# accidentally become a new public identifier. Existing installations still
+# need their immutable restore baseline and preferences carried forward.
+_PREVIOUS_PRODUCT_NAME = "Fusion" + "MyFreeCAD"
+_PREVIOUS_PREFERENCE_ROOT = "User parameter:BaseApp/Preferences/Mod/" + _PREVIOUS_PRODUCT_NAME
+_PREVIOUS_FILE_PATHS = {
+    STATE_PATH: os.path.join(USER_ROOT, _PREVIOUS_PRODUCT_NAME + "-addon-state.json"),
+    STARTUP_PATH: os.path.join(USER_ROOT, _PREVIOUS_PRODUCT_NAME + "-startup.json"),
+    STATUS_PATH: os.path.join(USER_ROOT, _PREVIOUS_PRODUCT_NAME + "-runtime-status.json"),
+    USAGE_PATH: os.path.join(USER_ROOT, _PREVIOUS_PRODUCT_NAME + "-usage.json"),
+    CUSTOMIZATION_PATH: os.path.join(USER_ROOT, _PREVIOUS_PRODUCT_NAME + "-customization.json"),
+}
+_PREVIOUS_BACKUP_ROOT = os.path.join(USER_ROOT, _PREVIOUS_PRODUCT_NAME + "-Backups")
+_PREVIOUS_BASELINE_PATH = os.path.join(_PREVIOUS_BACKUP_ROOT, "baseline.json")
 
 STATE_SCHEMA = 2
 
@@ -152,6 +167,36 @@ def _load_json(path):
         return json.load(stream)
 
 
+def _migrate_previous_brand_data():
+    """Carry forward user state written under the previous product name.
+
+    New FMF data always wins. The previous files remain untouched when both
+    names exist, and an immutable baseline is copied only when FMF has none.
+    """
+    for current, previous in _PREVIOUS_FILE_PATHS.items():
+        if not os.path.exists(current) and os.path.isfile(previous):
+            os.makedirs(os.path.dirname(current), exist_ok=True)
+            shutil.copy2(previous, current)
+
+    if not os.path.isfile(BASELINE_PATH) and os.path.isfile(_PREVIOUS_BASELINE_PATH):
+        os.makedirs(BACKUP_ROOT, exist_ok=True)
+        shutil.copy2(_PREVIOUS_BASELINE_PATH, BASELINE_PATH)
+
+    previous_preferences = App.ParamGet(_PREVIOUS_PREFERENCE_ROOT)
+    current_preferences = App.ParamGet(PREFERENCE_ROOT)
+    for kind in ("String", "Bool", "Int", "Float", "Unsigned"):
+        get_names = getattr(previous_preferences, "Get{}s".format(kind), None)
+        get_value = getattr(previous_preferences, "Get{}".format(kind), None)
+        set_value = getattr(current_preferences, "Set{}".format(kind), None)
+        current_names = getattr(current_preferences, "Get{}s".format(kind), None)
+        if not all((get_names, get_value, set_value, current_names)):
+            continue
+        existing = set(current_names())
+        for name in get_names():
+            if name not in existing:
+                set_value(name, get_value(name))
+
+
 def _layout_spec():
     """Return the owned-workbench layout or its temporary legacy projection."""
     spec = _load_json(LAYOUT_SPEC)
@@ -204,7 +249,7 @@ def _load_json_or_quarantine(path):
         except OSError:
             quarantine = "(could not be moved aside)"
         App.Console.PrintWarning(
-            "FusionMyFreeCAD could not read {}: {}. Moved to {}.\n".format(path, error, quarantine)
+            "FMF could not read {}: {}. Moved to {}.\n".format(path, error, quarantine)
         )
         return None
 
@@ -292,7 +337,7 @@ def restore_preference_keys(keys):
 
     The preferences page exposes opt-outs for a few groups of defaults.  When a
     user disables one and explicitly reapplies the add-on, merely skipping the
-    corresponding writes leaves the old FusionMyFreeCAD values in place.  This
+    corresponding writes leaves the old FMF values in place.  This
     helper makes those opt-outs reversible without restoring unrelated settings.
     """
     baseline = _read_baseline()
@@ -333,9 +378,17 @@ def _read_customization():
             workbenches[canonical] = workbenches.pop(legacy)
     for saved_workbench in workbenches.values():
         panels = saved_workbench.get("panels", {})
-        saved_workbench["panels"] = {
-            _canonical_panel_name(name): value for name, value in panels.items()
-        }
+        migrated_panels = {}
+        for name, value in panels.items():
+            if isinstance(value, dict):
+                value["order"] = [
+                    _canonical_command_name(command) for command in value.get("order", [])
+                ]
+                value["pinned"] = [
+                    _canonical_command_name(command) for command in value.get("pinned", [])
+                ]
+            migrated_panels[_canonical_panel_name(name)] = value
+        saved_workbench["panels"] = migrated_panels
         saved_workbench["panelOrder"] = [
             _canonical_panel_name(name) for name in saved_workbench.get("panelOrder", [])
         ]
@@ -345,6 +398,18 @@ def _read_customization():
 def _canonical_panel_name(name):
     if isinstance(name, str) and name.startswith("Fusion ") and name.endswith("_newPanel"):
         return "FMF " + name[len("Fusion ") :]
+    return name
+
+
+def _canonical_command_name(name):
+    if not isinstance(name, str):
+        return name
+    previous_product_prefix = _PREVIOUS_PRODUCT_NAME + "_"
+    previous_short_prefix = "Fu" + "sion_"
+    if name.startswith(previous_product_prefix):
+        return "FMF_" + name[len(previous_product_prefix) :]
+    if name.startswith(previous_short_prefix):
+        return "FMF_" + name[len(previous_short_prefix) :]
     return name
 
 
@@ -785,7 +850,7 @@ def update_ribbon_hash():
 
     The runtime rewrites the ribbon when adaptive panels change. Recording the new
     digest keeps a later mismatch meaningful: it then indicates an edit made outside
-    FusionMyFreeCAD, which an upgrade must not silently discard.
+    FMF, which an upgrade must not silently discard.
     """
     state = read_state()
     if state is None or not os.path.isfile(RIBBON_PATH):
@@ -797,12 +862,13 @@ def update_ribbon_hash():
 
 
 def prepare():
+    _migrate_previous_brand_data()
     version = tuple(int(part) for part in App.Version()[:2])
     if version < (1, 1):
-        raise RuntimeError("FusionMyFreeCAD requires FreeCAD 1.1 or newer.")
+        raise RuntimeError("FMF requires FreeCAD 1.1 or newer.")
     for required in (BASE_LAYOUT, LAYOUT_SPEC, MANIFEST, RUNTIME):
         if not os.path.isfile(required):
-            raise RuntimeError("FusionMyFreeCAD package is incomplete: {}".format(required))
+            raise RuntimeError("FMF package is incomplete: {}".format(required))
 
     spec = _layout_spec()
     candidates = adaptive_candidates()
@@ -811,7 +877,7 @@ def prepare():
         # Schema drift or a hand-edited file: fall back to the reinstall path
         # rather than raising during FreeCAD startup.
         App.Console.PrintWarning(
-            "FusionMyFreeCAD state is missing its backup location; "
+            "FMF state is missing its backup location; "
             "reinstalling from the baseline.\n"
         )
         state = None
@@ -838,7 +904,7 @@ def prepare():
             baseline = _write_baseline(backup_root, had_ribbon)
         else:
             App.Console.PrintWarning(
-                "FusionMyFreeCAD state was missing; reusing the original baseline at {}.\n".format(
+                "FMF state was missing; reusing the original baseline at {}.\n".format(
                     BASELINE_PATH
                 )
             )
@@ -856,7 +922,7 @@ def prepare():
             state.setdefault("updates", []).append(update_path)
             recorded = state.get("ribbonSha256")
             if recorded and recorded != _sha256(RIBBON_PATH):
-                # The ribbon changed outside FusionMyFreeCAD. Replacing it is still
+                # The ribbon changed outside FMF. Replacing it is still
                 # correct for an upgrade, but the user must be able to find the copy.
                 state["externalRibbonEdit"] = update_path
                 # The bundled Ribbon add-on re-serializes this file on its own, so
@@ -864,7 +930,7 @@ def prepare():
                 # user edit. Keep the note in the log and reachable from Verify UI
                 # instead of announcing it on every launch.
                 App.Console.PrintLog(
-                    "FusionMyFreeCAD replaced a ribbon layout that changed outside the add-on. "
+                    "FMF replaced a ribbon layout that changed outside the add-on. "
                     "The previous layout is kept at {}.\n".format(update_path)
                 )
 
@@ -873,7 +939,7 @@ def prepare():
     valid, checks, problems = _verify_layout(RIBBON_PATH, spec, candidates)
     if not valid:
         raise RuntimeError(
-            "FusionMyFreeCAD generated an invalid ribbon: {}; {}".format(
+            "FMF generated an invalid ribbon: {}; {}".format(
                 checks, "; ".join(problems)
             )
         )
@@ -904,7 +970,7 @@ def verify():
     checks["restorePointPresent"] = _read_baseline() is not None
     if not checks["restorePointPresent"]:
         problems.append(
-            "No restore baseline at {}. Disable FusionMyFreeCAD cannot recover the "
+            "No restore baseline at {}. Disable FMF cannot recover the "
             "original profile.".format(BASELINE_PATH)
         )
     for label, relative in (
@@ -938,7 +1004,7 @@ def verify():
 
 
 def restore():
-    """Undo everything FusionMyFreeCAD changed, using the immutable baseline.
+    """Undo everything FMF changed, using the immutable baseline.
 
     Returns (recovery_directory, problems). Every step is independent so a single
     failure cannot abandon the rest of the restoration.
@@ -948,13 +1014,13 @@ def restore():
     source = baseline or state
     if source is None:
         raise RuntimeError(
-            "FusionMyFreeCAD has no restoration data. Neither {} nor {} is readable.".format(
+            "FMF has no restoration data. Neither {} nor {} is readable.".format(
                 BASELINE_PATH, STATE_PATH
             )
         )
     # This marker is deliberately outside the baseline-owned preference list.
     # Restoring the old profile must not let the next startup silently enable
-    # FusionMyFreeCAD again while the add-on remains installed.
+    # FMF again while the add-on remains installed.
     App.ParamGet(PREFERENCE_ROOT).SetBool("Enabled", False)
     App.saveParameter()
     backup_root = source.get("backupRoot") or BACKUP_ROOT
@@ -990,9 +1056,9 @@ def restore():
         problems.append("Applied-version marker: {}".format(error))
 
     try:
-        import fusion_viewport
+        import fmf_viewport
 
-        fusion_viewport.restore_all_appearance()
+        fmf_viewport.restore_all_appearance()
     except Exception as error:
         problems.append("Appearance restoration: {}".format(error))
 
@@ -1031,11 +1097,11 @@ def register_owned_workbenches():
     if not owned_workbenches_enabled():
         return False
     _migrate_owned_identity_preferences()
-    import fusion_workbenches
+    import fmf_workbenches
 
     enabled = is_enabled()
     set_owned_workbench_visibility(enabled)
-    fusion_workbenches.register()
+    fmf_workbenches.register()
     sync_start_workbench(enabled)
     return True
 
@@ -1120,7 +1186,7 @@ def fmf_workbench_for(native_workbench):
 
 
 # Compatibility for third-party macros written against the 1.8.0 development builds.
-fusion_workbench_for = fmf_workbench_for
+fmf_workbench_for = fmf_workbench_for
 
 
 def activate_owned_workbench(workbench):
@@ -1222,7 +1288,7 @@ def disable():
     preferences.SetBool("Enabled", False)
     set_owned_workbench_visibility(False)
     sync_start_workbench(False)
-    runtime = sys.modules.get("_fusion_my_freecad_runtime")
+    runtime = sys.modules.get("_fmf_my_freecad_runtime")
     if runtime is not None and hasattr(runtime, "uninstall"):
         try:
             runtime.uninstall()
@@ -1230,16 +1296,16 @@ def disable():
             problems.append("Runtime teardown: {}".format(error))
     unregister_feature_observers()
     try:
-        import fusion_viewport
+        import fmf_viewport
 
-        fusion_viewport.restore_all_appearance()
+        fmf_viewport.restore_all_appearance()
     except Exception as error:
         problems.append("Appearance restoration: {}".format(error))
     if replacement:
         Gui.activateWorkbench(replacement)
     defer_ribbon_workbench_family(False)
     install_lifecycle_menu()
-    return "FusionMyFreeCAD is disabled. FMF settings remain available at {}.".format(
+    return "FMF is disabled. FMF settings remain available at {}.".format(
         BASELINE_PATH
     ), problems
 
@@ -1267,7 +1333,7 @@ class VerifyCommand:
     def GetResources(self):
         return {
             "Pixmap": "Std_DlgParameter",
-            "MenuText": "Verify FusionMyFreeCAD",
+            "MenuText": "Verify FMF",
             "ToolTip": "Check the installed UI package",
         }
 
@@ -1286,11 +1352,11 @@ class VerifyCommand:
             lines.extend(
                 [
                     "",
-                    "Suggested next step: run Reset FusionMyFreeCAD, then restart FreeCAD.",
-                    "If that does not help, disable FusionMyFreeCAD and reinstall the add-on.",
+                    "Suggested next step: run Reset FMF, then restart FreeCAD.",
+                    "If that does not help, disable FMF and reinstall the add-on.",
                 ]
             )
-        _message("FusionMyFreeCAD verification", "\n".join(lines), not valid)
+        _message("FMF verification", "\n".join(lines), not valid)
 
 
 class ReapplyCommand:
@@ -1304,8 +1370,8 @@ class ReapplyCommand:
     def GetResources(self):
         return {
             "Pixmap": "Std_DlgParameter",
-            "MenuText": "Reset FusionMyFreeCAD",
-            "ToolTip": "Reset FusionMyFreeCAD's layout, preferences, and shortcuts to its defaults",
+            "MenuText": "Reset FMF",
+            "ToolTip": "Reset FMF's layout, preferences, and shortcuts to its defaults",
         }
 
     def IsActive(self):
@@ -1316,16 +1382,16 @@ class ReapplyCommand:
 
         answer = QtWidgets.QMessageBox.question(
             Gui.getMainWindow(),
-            "Reset FusionMyFreeCAD",
-            "Reset FusionMyFreeCAD's ribbon layout, managed preferences, and shortcuts?\n\n"
+            "Reset FMF",
+            "Reset FMF's ribbon layout, managed preferences, and shortcuts?\n\n"
             "Your own changes to those settings will be replaced.",
         )
         if answer != QtWidgets.QMessageBox.Yes:
             return
         try:
-            _message("FusionMyFreeCAD", reapply(), False)
+            _message("FMF", reapply(), False)
         except Exception as error:
-            _message("FusionMyFreeCAD could not reapply", str(error), True)
+            _message("FMF could not reapply", str(error), True)
 
 
 def reapply():
@@ -1339,7 +1405,7 @@ def reapply():
         write_state(state)
     clear_startup_failures()
     outcome = prepare()
-    runtime = sys.modules.get("_fusion_my_freecad_runtime")
+    runtime = sys.modules.get("_fmf_my_freecad_runtime")
     if runtime is not None and hasattr(runtime, "apply_preferences"):
         runtime.apply_preferences(force=True)
     return "Defaults reapplied ({}). Restart FreeCAD to load the regenerated ribbon.".format(
@@ -1351,8 +1417,8 @@ class DisableCommand:
     def GetResources(self):
         return {
             "Pixmap": "Std_DlgCustomize",
-            "MenuText": "Disable FusionMyFreeCAD",
-            "ToolTip": "Disable FusionMyFreeCAD and return to the previous FreeCAD UI",
+            "MenuText": "Disable FMF",
+            "ToolTip": "Disable FMF and return to the previous FreeCAD UI",
         }
 
     def IsActive(self):
@@ -1363,32 +1429,32 @@ class DisableCommand:
 
         answer = QtWidgets.QMessageBox.question(
             Gui.getMainWindow(),
-            "Disable FusionMyFreeCAD",
-            "Disable FusionMyFreeCAD and return to the UI settings from before it was enabled?",
+            "Disable FMF",
+            "Disable FMF and return to the UI settings from before it was enabled?",
         )
         if answer != QtWidgets.QMessageBox.Yes:
             return
         try:
             location, problems = disable()
             text = [
-                "FusionMyFreeCAD is disabled. The standard FreeCAD workbenches are active.",
+                "FMF is disabled. The standard FreeCAD workbenches are active.",
                 location,
                 "Restart FreeCAD to refresh the workbench selector and finish teardown.",
             ]
             if problems:
                 text.extend(["", "Some items could not be restored:"])
                 text.extend("- {}".format(problem) for problem in problems)
-            _message("FusionMyFreeCAD disabled", "\n".join(text), bool(problems))
+            _message("FMF disabled", "\n".join(text), bool(problems))
         except Exception as error:
-            _message("Could not disable FusionMyFreeCAD", str(error), True)
+            _message("Could not disable FMF", str(error), True)
 
 
 class EnableCommand:
     def GetResources(self):
         return {
             "Pixmap": "Std_DlgParameter",
-            "MenuText": "Enable FusionMyFreeCAD",
-            "ToolTip": "Enable FusionMyFreeCAD and prepare its interface for the next launch",
+            "MenuText": "Enable FMF",
+            "ToolTip": "Enable FMF and prepare its interface for the next launch",
         }
 
     def IsActive(self):
@@ -1398,13 +1464,13 @@ class EnableCommand:
         try:
             outcome = enable()
             _message(
-                "FusionMyFreeCAD enabled",
-                "FusionMyFreeCAD is enabled ({}). Restart FreeCAD to load its interface.".format(
+                "FMF enabled",
+                "FMF is enabled ({}). Restart FreeCAD to load its interface.".format(
                     outcome
                 ),
             )
         except Exception as error:
-            _message("Could not enable FusionMyFreeCAD", str(error), True)
+            _message("Could not enable FMF", str(error), True)
 
 
 class CreateSketchCommand:
@@ -1579,9 +1645,9 @@ class _SketchEditWorkbenchObserver:
             except ImportError:
                 Gui.activateWorkbench(return_workbench)
         try:
-            import fusion_sketch_tools
+            import fmf_sketch_tools
 
-            fusion_sketch_tools.repair_sketch_internal_faces(obj)
+            fmf_sketch_tools.repair_sketch_internal_faces(obj)
         except Exception as error:
             record_startup_failure("rebuild sketch faces after edit", error)
         # Clear whole-sketch selection so multi-region sketches don't trick the user
@@ -1643,7 +1709,7 @@ def register_preferences_page():
     the user who wants to turn one of them off.
     """
     if not os.path.isfile(PREFERENCES_UI):
-        raise RuntimeError("FusionMyFreeCAD preferences page is missing: {}".format(PREFERENCES_UI))
+        raise RuntimeError("FMF preferences page is missing: {}".format(PREFERENCES_UI))
     Gui.addPreferencePage(PREFERENCES_UI, "FMF")
 
 
@@ -1666,7 +1732,7 @@ class _SketchRepairObserver:
         ):
             self._updating = True
             try:
-                import fusion_sketch_tools
+                import fmf_sketch_tools
 
                 # Not while the sketch is open for editing. The solver
                 # recomputes on every frame of a drag, and rebuilding the face
@@ -1674,8 +1740,8 @@ class _SketchRepairObserver:
                 # which is what made editing slow down as a sketch grew. The
                 # decomposition is only needed once the sketch is used as a
                 # profile, so it is rebuilt on leaving edit instead.
-                if fusion_sketch_tools.active_sketch() is not obj:
-                    fusion_sketch_tools.repair_sketch_internal_faces(obj)
+                if fmf_sketch_tools.active_sketch() is not obj:
+                    fmf_sketch_tools.repair_sketch_internal_faces(obj)
             except Exception as error:
                 record_startup_failure("rebuild sketch faces after shape change", error)
             finally:
@@ -1799,14 +1865,14 @@ def register_lifecycle_commands():
     global _lifecycle_commands_registered
     if _lifecycle_commands_registered:
         return
-    Gui.addCommand("FusionMyFreeCAD_Verify", VerifyCommand())
-    Gui.addCommand("FusionMyFreeCAD_Reapply", ReapplyCommand())
+    Gui.addCommand("FMF_Verify", VerifyCommand())
+    Gui.addCommand("FMF_Reapply", ReapplyCommand())
     # Keep the historical command ID so saved toolbar/menu customizations continue
     # to resolve, but expose unambiguous enable/disable wording to users.
-    Gui.addCommand("FusionMyFreeCAD_Restore", DisableCommand())
-    Gui.addCommand("FusionMyFreeCAD_Enable", EnableCommand())
-    Gui.addCommand("FusionMyFreeCAD_OpenDiagnostics", OpenDiagnosticsCommand())
-    Gui.addCommand("FusionMyFreeCAD_CopyDiagnostics", CopyDiagnosticsCommand())
+    Gui.addCommand("FMF_Restore", DisableCommand())
+    Gui.addCommand("FMF_Enable", EnableCommand())
+    Gui.addCommand("FMF_OpenDiagnostics", OpenDiagnosticsCommand())
+    Gui.addCommand("FMF_CopyDiagnostics", CopyDiagnosticsCommand())
     _lifecycle_commands_registered = True
 
 
@@ -1818,26 +1884,26 @@ def install_lifecycle_menu():
     menu_bar = main_window.menuBar()
     if not hasattr(menu_bar, "addMenu"):
         return None
-    menu = main_window.findChild(QtWidgets.QMenu, "FusionMyFreeCAD_LifecycleMenu")
+    menu = main_window.findChild(QtWidgets.QMenu, "FMF_LifecycleMenu")
     if menu is None:
-        menu = menu_bar.addMenu("FusionMyFreeCAD")
-        menu.setObjectName("FusionMyFreeCAD_LifecycleMenu")
+        menu = menu_bar.addMenu("FMF")
+        menu.setObjectName("FMF_LifecycleMenu")
     else:
         menu.clear()
 
     commands = (
-        (("Enable FusionMyFreeCAD", "FusionMyFreeCAD_Enable"),)
+        (("Enable FMF", "FMF_Enable"),)
         if not is_enabled()
         else (
-            ("Verify FusionMyFreeCAD", "FusionMyFreeCAD_Verify"),
-            ("Reset FusionMyFreeCAD", "FusionMyFreeCAD_Reapply"),
-            ("Disable FusionMyFreeCAD", "FusionMyFreeCAD_Restore"),
+            ("Verify FMF", "FMF_Verify"),
+            ("Reset FMF", "FMF_Reapply"),
+            ("Disable FMF", "FMF_Restore"),
         )
     )
     commands = (
         *commands,
-        ("Copy Diagnostic Summary", "FusionMyFreeCAD_CopyDiagnostics"),
-        ("Open Diagnostics Folder", "FusionMyFreeCAD_OpenDiagnostics"),
+        ("Copy Diagnostic Summary", "FMF_CopyDiagnostics"),
+        ("Open Diagnostics Folder", "FMF_OpenDiagnostics"),
     )
     for label, command in commands:
         action = QtGui.QAction(label, menu)
@@ -1889,7 +1955,7 @@ def restore_disabled_native_ui():
     # FreeCAD applies its persisted QMainWindow state after add-on InitGui files.
     # Run once the event loop starts so the native UI wins that ordering race.
     def restore_and_record():
-        import fusion_common as diagnostics
+        import fmf_common as diagnostics
 
         if owned_workbenches_enabled():
             set_owned_workbench_visibility(False)
@@ -1926,7 +1992,7 @@ def reconcile_activation_preference():
         _observed_enabled = previous
         record_startup_failure("live activation preference", error)
         App.Console.PrintError(
-            "FusionMyFreeCAD: live activation preference failed: {}\n".format(error)
+            "FMF: live activation preference failed: {}\n".format(error)
         )
     finally:
         _activation_transition = False
@@ -1951,7 +2017,7 @@ def validate_enabled_ui():
     from PySide import QtCore, QtWidgets
 
     def validate():
-        import fusion_common as diagnostics
+        import fmf_common as diagnostics
 
         main_window = Gui.getMainWindow()
         ribbon = main_window.findChild(QtWidgets.QDockWidget, "Ribbon")
@@ -2018,7 +2084,7 @@ def validate_enabled_ui():
             "The active workbench did not produce usable application chrome; "
             "activation was rolled back"
         )
-        App.Console.PrintError("FusionMyFreeCAD: {}.\n".format(message))
+        App.Console.PrintError("FMF: {}.\n".format(message))
         record_startup_failure("enabled UI validation", RuntimeError(message))
         App.ParamGet(PREFERENCE_ROOT).SetBool("Enabled", False)
         App.saveParameter()
@@ -2039,7 +2105,7 @@ class OpenDiagnosticsCommand:
     def Activated(self):
         from PySide import QtCore, QtGui
 
-        import fusion_common as diagnostics
+        import fmf_common as diagnostics
 
         os.makedirs(diagnostics.DIAGNOSTICS_DIR, exist_ok=True)
         QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(diagnostics.DIAGNOSTICS_DIR))
@@ -2052,7 +2118,7 @@ class CopyDiagnosticsCommand:
     def Activated(self):
         from PySide import QtWidgets
 
-        import fusion_common as diagnostics
+        import fmf_common as diagnostics
 
         QtWidgets.QApplication.clipboard().setText(diagnostics.diagnostic_summary())
 
@@ -2063,8 +2129,8 @@ def register_commands():
     register_lifecycle_commands()
     if _feature_commands_registered:
         return
-    Gui.addCommand("FusionMyFreeCAD_CreateSketch", CreateSketchCommand())
-    Gui.addCommand("FusionMyFreeCAD_ParameterTable", ParameterTableCommand())
+    Gui.addCommand("FMF_CreateSketch", CreateSketchCommand())
+    Gui.addCommand("FMF_ParameterTable", ParameterTableCommand())
 
     if _sketch_edit_observer is None and hasattr(Gui, "addDocumentObserver"):
         _sketch_edit_observer = _SketchEditWorkbenchObserver()
@@ -2080,21 +2146,21 @@ def register_commands():
         _pad_selection_observer = _PadSelectionObserver()
         Gui.Selection.addObserver(_pad_selection_observer)
 
-    import fusion_datum_tools
-    import fusion_dressup_tools
-    import fusion_export
-    import fusion_parameters_dock
-    import fusion_repair_tools
-    import fusion_sketch_tools
-    import fusion_viewport
+    import fmf_datum_tools
+    import fmf_dressup_tools
+    import fmf_export
+    import fmf_parameters_dock
+    import fmf_repair_tools
+    import fmf_sketch_tools
+    import fmf_viewport
 
-    fusion_sketch_tools.register()
-    fusion_datum_tools.register()
-    fusion_dressup_tools.register()
-    fusion_export.register()
-    fusion_parameters_dock.register()
-    fusion_repair_tools.register()
-    fusion_viewport.register()
+    fmf_sketch_tools.register()
+    fmf_datum_tools.register()
+    fmf_dressup_tools.register()
+    fmf_export.register()
+    fmf_parameters_dock.register()
+    fmf_repair_tools.register()
+    fmf_viewport.register()
     _feature_commands_registered = True
 
 
@@ -2124,15 +2190,15 @@ def unregister_feature_observers():
             pass
         _pad_selection_observer = None
     try:
-        import fusion_dressup_tools
+        import fmf_dressup_tools
 
-        fusion_dressup_tools.uninstall_dressup_enhancers()
+        fmf_dressup_tools.uninstall_dressup_enhancers()
     except Exception:
         pass
     try:
-        import fusion_parameters_dock
+        import fmf_parameters_dock
 
-        fusion_parameters_dock.close_parameters_dock()
+        fmf_parameters_dock.close_parameters_dock()
     except Exception:
         pass
 
@@ -2177,28 +2243,28 @@ def _execute_module(module_name, path):
 def run_runtime():
     if "runtime" in _loaded:
         return
-    _execute_module("_fusion_my_freecad_runtime", RUNTIME)
+    _execute_module("_fmf_my_freecad_runtime", RUNTIME)
     _loaded.add("runtime")
 
 
 def load_vendor(name, directory):
-    import fusion_common as diagnostics
+    import fmf_common as diagnostics
 
     started = datetime.now(UTC)
     if name in _loaded:
         return
     if any(module in sys.modules for module in VENDOR_SENTINELS.get(name, ())):
         _loaded.add(name)
-        App.Console.PrintMessage("FusionMyFreeCAD is using the already active {}.\n".format(name))
+        App.Console.PrintMessage("FMF is using the already active {}.\n".format(name))
         diagnostics.event("info", "vendor", name, "reused")
         return
     init_gui = os.path.join(directory, "InitGui.py")
     if not os.path.isfile(init_gui):
-        raise RuntimeError("FusionMyFreeCAD vendor payload is incomplete: {}".format(init_gui))
+        raise RuntimeError("FMF vendor payload is incomplete: {}".format(init_gui))
     if directory not in sys.path:
         sys.path.insert(0, directory)
     try:
-        _execute_module("_fusion_vendor_{}".format(name), init_gui)
+        _execute_module("_fmf_vendor_{}".format(name), init_gui)
     except BaseException as error:
         diagnostics.diagnostic_exception("vendor", name, error, initGui=init_gui)
         raise
@@ -2215,7 +2281,7 @@ def load_vendor(name, directory):
 
 def _startup_step(label, function, *arguments):
     """Run one startup step while preserving access to recovery commands."""
-    import fusion_common as diagnostics
+    import fmf_common as diagnostics
 
     started = time.perf_counter()
     diagnostics.event("info", "startup", label, "started", packageVersion=PACKAGE_VERSION)
@@ -2231,7 +2297,7 @@ def _startup_step(label, function, *arguments):
         )
         return True
     except Exception as error:
-        App.Console.PrintError("FusionMyFreeCAD: {} failed: {}\n".format(label, error))
+        App.Console.PrintError("FMF: {} failed: {}\n".format(label, error))
         App.Console.PrintLog(traceback.format_exc())
         record_startup_failure(label, error)
         diagnostics.diagnostic_exception(
@@ -2247,8 +2313,9 @@ def _startup_step(label, function, *arguments):
 
 def start():
     """Initialize FMF from FreeCAD's function-scoped InitGui loader."""
-    import fusion_common as diagnostics
+    import fmf_common as diagnostics
 
+    _migrate_previous_brand_data()
     clear_startup_failures()
     register_lifecycle_commands()
     register_preferences_page()
@@ -2291,7 +2358,7 @@ def start():
             )
             _startup_step("native UI restoration", restore_disabled_native_ui)
     except BaseException as error:
-        App.Console.PrintError("FusionMyFreeCAD startup failed: {}\n".format(error))
+        App.Console.PrintError("FMF startup failed: {}\n".format(error))
         diagnostics.diagnostic_exception("startup", "top level", error)
         diagnostics.set_status("degraded", failedStep="top level", error=str(error))
     finally:

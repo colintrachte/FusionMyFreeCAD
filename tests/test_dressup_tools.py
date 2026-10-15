@@ -1,4 +1,4 @@
-"""Tests for fusion_dressup_tools: Zero-popup Chamfer & Fillet workflow enhancers."""
+"""Tests for fmf_dressup_tools: Zero-popup Chamfer & Fillet workflow enhancers."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fake_freecad import FakeTimer
 
-import fusion_dressup_tools as dressup
+import fmf_dressup_tools as dressup
 
 ROOT = Path(__file__).resolve().parents[1]
 

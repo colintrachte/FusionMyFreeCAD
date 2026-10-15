@@ -1,6 +1,6 @@
 """A minimal in-process stand-in for the FreeCAD, FreeCADGui, and PySide APIs.
 
-FusionMyFreeCAD cannot be imported without FreeCAD, and FreeCAD cannot be run
+FMF cannot be imported without FreeCAD, and FreeCAD cannot be run
 headlessly in CI. These fakes implement just enough of the real API surface for
 the add-on's own logic to execute unchanged, so tests assert on behaviour rather
 than on the text of the source file.
@@ -1372,7 +1372,7 @@ class Environment:
         self.saved_parameters = 0
         self.selection_ex = []
         # Wording taken from a real FreeCAD 1.1 App.getExportFilters(); the DXF
-        # entry is deliberately not the literal fusion_export falls back to, so
+        # entry is deliberately not the literal fmf_export falls back to, so
         # the tests exercise resolution rather than the hardcoded string.
         self.export_filters = [
             "STEP with colors (*.step *.stp)",
@@ -1572,32 +1572,32 @@ class Environment:
         return self
 
     def load_bootstrap(self):
-        """Import a fresh fusion_bootstrap bound to this environment."""
+        """Import a fresh fmf_bootstrap bound to this environment."""
         for name in [
             k
             for k in list(sys.modules.keys())
-            if k.startswith("fusion_") or k == "_fusion_my_freecad_runtime"
+            if k.startswith("fmf_") or k == "_fmf_my_freecad_runtime"
         ]:
             sys.modules.pop(name, None)
-        return _import_module("fusion_bootstrap", ROOT / "fusion_bootstrap.py")
+        return _import_module("fmf_bootstrap", ROOT / "fmf_bootstrap.py")
 
     def load_sketch_tools(self):
-        """Import a fresh fusion_sketch_tools bound to this environment."""
-        sys.modules.pop("fusion_sketch_tools", None)
-        return _import_module("fusion_sketch_tools", ROOT / "fusion_sketch_tools.py")
+        """Import a fresh fmf_sketch_tools bound to this environment."""
+        sys.modules.pop("fmf_sketch_tools", None)
+        return _import_module("fmf_sketch_tools", ROOT / "fmf_sketch_tools.py")
 
     def load_runtime(self):
         """Import runtime.py without letting it wire itself into the session."""
-        sys.modules.pop("_fusion_my_freecad_runtime", None)
+        sys.modules.pop("_fmf_my_freecad_runtime", None)
         import os
 
-        os.environ["FUSION_MY_FREECAD_NO_AUTOSTART"] = "1"
+        os.environ["FMF_MY_FREECAD_NO_AUTOSTART"] = "1"
         try:
             return _import_module(
-                "_fusion_my_freecad_runtime", ROOT / "Resources" / "FusionMyFreeCAD" / "runtime.py"
+                "_fmf_my_freecad_runtime", ROOT / "Resources" / "FMF" / "runtime.py"
             )
         finally:
-            os.environ.pop("FUSION_MY_FREECAD_NO_AUTOSTART", None)
+            os.environ.pop("FMF_MY_FREECAD_NO_AUTOSTART", None)
 
 
 def _import_module(name, path):

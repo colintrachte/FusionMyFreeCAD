@@ -1,4 +1,4 @@
-"""Selection-aware Export for FusionMyFreeCAD.
+"""Selection-aware Export for FMF.
 
 In Autodesk Fusion, Export is a single prominent button: it reads what you have
 selected and opens the save dialog already pointed at the format that suits it.
@@ -23,7 +23,7 @@ from typing import Any
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from fusion_common import notify
+from fmf_common import notify
 
 EXPORT_FILTER_GROUP = "User parameter:BaseApp/Preferences/General"
 EXPORT_FILTER_KEY = "FileExportFilter"
@@ -199,7 +199,7 @@ def _notify_export(text: str, error: bool = False) -> None:
 
 
 class _ExportCommand:
-    """Shared ``FusionMyFreeCAD_Export*`` ribbon command."""
+    """Shared ``FMF_Export*`` ribbon command."""
 
     def __init__(self, kind: str | None, menu_text: str, tool_tip: str):
         self._kind = kind
@@ -208,7 +208,7 @@ class _ExportCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_Export",
+            "Pixmap": "FMF_Export",
             "MenuText": self._menu_text,
             "ToolTip": self._tool_tip,
         }
@@ -245,7 +245,7 @@ class _ExportCommand:
 
 COMMANDS: tuple[tuple[str, str | None, str, str], ...] = (
     (
-        "FusionMyFreeCAD_Export",
+        "FMF_Export",
         None,
         "Export",
         "Export the selection, with the save dialog already set to the format that "
@@ -254,25 +254,25 @@ COMMANDS: tuple[tuple[str, str | None, str, str], ...] = (
         "exports as STEP.",
     ),
     (
-        "FusionMyFreeCAD_ExportSTEP",
+        "FMF_ExportSTEP",
         "step",
         "Export as STEP",
         "Export the selection as STEP, whatever it is.",
     ),
     (
-        "FusionMyFreeCAD_ExportSTL",
+        "FMF_ExportSTL",
         "stl",
         "Export as STL",
         "Export the selection as binary STL, whatever it is.",
     ),
     (
-        "FusionMyFreeCAD_Export3MF",
+        "FMF_Export3MF",
         "3mf",
         "Export as 3MF",
         "Export the selection as 3MF, whatever it is.",
     ),
     (
-        "FusionMyFreeCAD_ExportDXF",
+        "FMF_ExportDXF",
         "dxf",
         "Export as DXF",
         "Export the selection as DXF, whatever it is.",

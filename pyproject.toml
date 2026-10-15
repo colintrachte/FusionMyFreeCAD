@@ -1,5 +1,5 @@
 [project]
-name = "fusionmyfreecad"
+name = "fmf"
 description = "A self-contained, customizable Fusion-familiar adaptive ribbon for FreeCAD."
 requires-python = ">=3.11"
 dynamic = ["version"]

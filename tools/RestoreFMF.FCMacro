@@ -1,6 +1,6 @@
-"""Undo FusionMyFreeCAD from a profile where the add-on is no longer installed.
+"""Undo FMF from a profile where the add-on is no longer installed.
 
-Removing FusionMyFreeCAD in Addon Manager deletes `Mod/FusionMyFreeCAD` but leaves
+Removing FMF in Addon Manager deletes `Mod/FMF` but leaves
 the ribbon layout and the managed preferences behind, and with them the Restore UI
 command that would have undone those changes. This macro reads the same immutable
 baseline the add-on writes on first install and puts the profile back.
@@ -17,14 +17,14 @@ from datetime import datetime
 import FreeCAD as App
 
 USER_ROOT = App.getUserAppDataDir()
-BACKUP_ROOT = os.path.join(USER_ROOT, "FusionMyFreeCAD-Backups")
+BACKUP_ROOT = os.path.join(USER_ROOT, "FMF-Backups")
 BASELINE_PATH = os.path.join(BACKUP_ROOT, "baseline.json")
 RIBBON_PATH = os.path.join(USER_ROOT, "RibbonUI_Data", "RibbonStructure.json")
 LOCAL_FILES = (
-    "FusionMyFreeCAD-addon-state.json",
-    "FusionMyFreeCAD-runtime-status.json",
-    "FusionMyFreeCAD-usage.json",
-    "FusionMyFreeCAD-startup.json",
+    "FMF-addon-state.json",
+    "FMF-runtime-status.json",
+    "FMF-usage.json",
+    "FMF-startup.json",
 )
 
 
@@ -50,7 +50,7 @@ def _restore_preferences(entries):
 def main():
     if not os.path.isfile(BASELINE_PATH):
         App.Console.PrintError(
-            "No FusionMyFreeCAD baseline at {}. Nothing to restore.\n".format(BASELINE_PATH)
+            "No FMF baseline at {}. Nothing to restore.\n".format(BASELINE_PATH)
         )
         return
 
@@ -73,13 +73,13 @@ def main():
         path = os.path.join(USER_ROOT, name)
         if os.path.isfile(path):
             shutil.move(path, os.path.join(removed, name))
-    App.ParamGet("User parameter:BaseApp/Preferences/Mod/FusionMyFreeCAD").RemString(
+    App.ParamGet("User parameter:BaseApp/Preferences/Mod/FMF").RemString(
         "AppliedVersion"
     )
     App.saveParameter()
 
     App.Console.PrintMessage(
-        "FusionMyFreeCAD restored. Removed configuration kept at {}.\n"
+        "FMF restored. Removed configuration kept at {}.\n"
         "Restart FreeCAD to load the previous interface.\n".format(removed)
     )
     for problem in problems:

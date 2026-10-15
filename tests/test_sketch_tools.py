@@ -1,6 +1,6 @@
 """Constraint-aware sketch mirroring: geometry mapping, policy, and the command.
 
-These exercise the offline logic of ``fusion_sketch_tools``.  The fake implements
+These exercise the offline logic of ``fmf_sketch_tools``.  The fake implements
 the synchronous ``SketchObject.addSymmetric`` API, so what is checked here is
 the source-to-mirror mapping, the compatibility policy, redundant-copy cleanup,
 explicit-axis validation, and single-transaction wrapping.

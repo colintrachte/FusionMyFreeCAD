@@ -21,7 +21,7 @@ def _run_init_gui(env, bootstrap, monkeypatch, stub_vendors=True):
     if stub_vendors:
         monkeypatch.setattr(bootstrap, "load_vendor", lambda *_args: None)
         monkeypatch.setattr(bootstrap, "run_runtime", lambda: None)
-    return _import_module("fusion_init_gui_under_test", ROOT / "InitGui.py")
+    return _import_module("fmf_init_gui_under_test", ROOT / "InitGui.py")
 
 
 def test_init_gui_runs_from_freecads_function_scoped_exec(env, bootstrap, monkeypatch):
@@ -44,32 +44,32 @@ def test_init_gui_runs_from_freecads_function_scoped_exec(env, bootstrap, monkey
 def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
     _run_init_gui(env, bootstrap, monkeypatch)
     assert set(env.commands) == {
-        "FusionMyFreeCAD_AddMidline",
-        "FusionMyFreeCAD_ConstrainMidpoint",
-        "FusionMyFreeCAD_CopyDiagnostics",
-        "FusionMyFreeCAD_CreateSketch",
-        "FusionMyFreeCAD_CreateSlot",
-        "FusionMyFreeCAD_DatumMidplane",
-        "FusionMyFreeCAD_Export",
-        "FusionMyFreeCAD_Export3MF",
-        "FusionMyFreeCAD_ExportDXF",
-        "FusionMyFreeCAD_ExportSTEP",
-        "FusionMyFreeCAD_ExportSTL",
-        "FusionMyFreeCAD_Enable",
-        "FusionMyFreeCAD_MirrorWithConstraints",
-        "FusionMyFreeCAD_ModernZincTheme",
-        "FusionMyFreeCAD_OpenDiagnostics",
-        "FusionMyFreeCAD_ParameterDock",
-        "FusionMyFreeCAD_ParameterTable",
-        "FusionMyFreeCAD_Reapply",
-        "FusionMyFreeCAD_RepairReferences",
-        "FusionMyFreeCAD_Restore",
-        "FusionMyFreeCAD_RestoreViewport",
-        "FusionMyFreeCAD_SmartOffset",
-        "FusionMyFreeCAD_SolverDiagnostics",
-        "FusionMyFreeCAD_StudioViewport",
-        "FusionMyFreeCAD_UpdateModel",
-        "FusionMyFreeCAD_Verify",
+        "FMF_AddMidline",
+        "FMF_ConstrainMidpoint",
+        "FMF_CopyDiagnostics",
+        "FMF_CreateSketch",
+        "FMF_CreateSlot",
+        "FMF_DatumMidplane",
+        "FMF_Export",
+        "FMF_Export3MF",
+        "FMF_ExportDXF",
+        "FMF_ExportSTEP",
+        "FMF_ExportSTL",
+        "FMF_Enable",
+        "FMF_MirrorWithConstraints",
+        "FMF_ModernZincTheme",
+        "FMF_OpenDiagnostics",
+        "FMF_ParameterDock",
+        "FMF_ParameterTable",
+        "FMF_Reapply",
+        "FMF_RepairReferences",
+        "FMF_Restore",
+        "FMF_RestoreViewport",
+        "FMF_SmartOffset",
+        "FMF_SolverDiagnostics",
+        "FMF_StudioViewport",
+        "FMF_UpdateModel",
+        "FMF_Verify",
     }
     assert bootstrap.startup_failures() == []
     assert len(env.selection_observers) == 2  # _PadSelectionObserver, _DressUpSelectionObserver
@@ -91,8 +91,8 @@ def test_command_registration_is_idempotent(env, bootstrap, monkeypatch):
     bootstrap.register_commands()
 
     assert len(registrations) == len(set(registrations))
-    assert registrations.count("FusionMyFreeCAD_Verify") == 1
-    assert registrations.count("FusionMyFreeCAD_StudioViewport") == 1
+    assert registrations.count("FMF_Verify") == 1
+    assert registrations.count("FMF_StudioViewport") == 1
 
 
 def test_owned_workbenches_register_without_replacing_native_workbenches(env, bootstrap):
@@ -106,12 +106,12 @@ def test_owned_workbenches_register_without_replacing_native_workbenches(env, bo
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
 
     assert bootstrap.register_owned_workbenches() is True
-    import fusion_workbenches
+    import fmf_workbenches
 
     assert native_ids <= set(env.workbenches)
-    assert set(fusion_workbenches.FMF_TO_NATIVE) <= set(env.workbenches)
-    assert fusion_workbenches.NATIVE_TO_FMF == {
-        native: owned for owned, native in fusion_workbenches.FMF_TO_NATIVE.items()
+    assert set(fmf_workbenches.FMF_TO_NATIVE) <= set(env.workbenches)
+    assert fmf_workbenches.NATIVE_TO_FMF == {
+        native: owned for owned, native in fmf_workbenches.FMF_TO_NATIVE.items()
     }
     assert env.workbenches["FMFDesignWorkbench"].GetClassName() == "PartDesignGui::Workbench"
     assert env.workbenches["FMFPartWorkbench"].GetClassName() == "PartGui::Workbench"
@@ -343,12 +343,12 @@ def test_disabled_startup_registers_only_lifecycle_commands(env, bootstrap, monk
     _run_init_gui(env, bootstrap, monkeypatch, stub_vendors=False)
 
     assert set(env.commands) == {
-        "FusionMyFreeCAD_Enable",
-        "FusionMyFreeCAD_CopyDiagnostics",
-        "FusionMyFreeCAD_OpenDiagnostics",
-        "FusionMyFreeCAD_Reapply",
-        "FusionMyFreeCAD_Restore",
-        "FusionMyFreeCAD_Verify",
+        "FMF_Enable",
+        "FMF_CopyDiagnostics",
+        "FMF_OpenDiagnostics",
+        "FMF_Reapply",
+        "FMF_Restore",
+        "FMF_Verify",
     }
     assert calls == ["SearchBar", "FreeCAD_Ribbon"]
     assert env.selection_observers == []
@@ -431,7 +431,7 @@ def test_enabled_ui_validation_rolls_back_an_invisible_ribbon(env, bootstrap, mo
 
 
 def test_diagnostics_rotate_and_preserve_structured_events(env, bootstrap, monkeypatch, tmp_path):
-    import fusion_common as diagnostics
+    import fmf_common as diagnostics
 
     log_path = tmp_path / "events.jsonl"
     monkeypatch.setattr(diagnostics, "DIAGNOSTICS_DIR", str(tmp_path))
@@ -448,7 +448,7 @@ def test_diagnostics_rotate_and_preserve_structured_events(env, bootstrap, monke
 
 
 def test_diagnostics_write_failure_never_breaks_startup(env, bootstrap, monkeypatch):
-    import fusion_common as diagnostics
+    import fmf_common as diagnostics
 
     def fail(*_args, **_kwargs):
         raise PermissionError("read-only profile")
@@ -459,7 +459,7 @@ def test_diagnostics_write_failure_never_breaks_startup(env, bootstrap, monkeypa
 
 
 def test_startup_diagnostics_do_not_write_until_flushed(env, bootstrap, monkeypatch, tmp_path):
-    import fusion_common as diagnostics
+    import fmf_common as diagnostics
 
     log_path = tmp_path / "events.jsonl"
     status_path = tmp_path / "session-status.json"
@@ -492,7 +492,7 @@ def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher
     env.gui.ActiveDocument = types.SimpleNamespace(ActiveView=view)
     bootstrap.register_commands()
 
-    env.commands["FusionMyFreeCAD_CreateSketch"].Activated()
+    env.commands["FMF_CreateSketch"].Activated()
     FakeTimer.pump()
 
     assert env.active_workbench == "PartDesignWorkbench"
@@ -560,7 +560,7 @@ def test_create_sketch_with_preselection_skips_origin_plane_framing(env, bootstr
         )
     ]
 
-    env.commands["FusionMyFreeCAD_CreateSketch"].Activated()
+    env.commands["FMF_CreateSketch"].Activated()
     FakeTimer.pump()
 
     assert env.active_workbench == "PartDesignWorkbench"
@@ -664,8 +664,8 @@ def test_a_failing_install_still_leaves_verify_and_restore_available(env, bootst
     monkeypatch.setattr(bootstrap, "prepare", broken_prepare)
     _run_init_gui(env, bootstrap, monkeypatch)
 
-    assert "FusionMyFreeCAD_Restore" in env.commands
-    assert "FusionMyFreeCAD_Verify" in env.commands
+    assert "FMF_Restore" in env.commands
+    assert "FMF_Verify" in env.commands
     failures = bootstrap.startup_failures()
     assert [entry["step"] for entry in failures] == ["installation"]
     assert "simulated bad payload" in failures[0]["error"]
@@ -742,10 +742,10 @@ def test_failed_module_execution_does_not_leave_a_partial_module(env, bootstrap,
     path = tmp_path / "broken.py"
     path.write_text("marker = True\nraise RuntimeError('broken')\n", encoding="utf-8")
     try:
-        bootstrap._execute_module("fusion_broken_test_module", str(path))
+        bootstrap._execute_module("fmf_broken_test_module", str(path))
     except RuntimeError:
         pass
-    assert "fusion_broken_test_module" not in sys.modules
+    assert "fmf_broken_test_module" not in sys.modules
 
 
 def test_an_active_standalone_addon_is_reused(env, bootstrap, monkeypatch):
@@ -807,4 +807,4 @@ def test_the_preferences_page_covers_every_switch_the_runtime_reads(bootstrap):
         for element in tree.iter("property")
         if element.get("name") == "prefPath"
     }
-    assert paths == {"Mod/FusionMyFreeCAD"}, "every control must write to the add-on's group"
+    assert paths == {"Mod/FMF"}, "every control must write to the add-on's group"

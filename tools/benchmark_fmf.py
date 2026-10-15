@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def static_snapshot() -> dict:
-    layout = json.loads((ROOT / "Resources/FusionMyFreeCAD/layout-v3.json").read_text("utf-8"))
+    layout = json.loads((ROOT / "Resources/FMF/layout-v3.json").read_text("utf-8"))
     workbenches = {}
     for name, panels in layout["workbenches"].items():
         workbenches[name] = {

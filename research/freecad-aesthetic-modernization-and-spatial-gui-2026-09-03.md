@@ -3,7 +3,7 @@
 **Status:** Research Synthesis, Technical Architecture & Strategic Roadmap  
 **Date:** 2026-09-03  
 **Target Platform:** FreeCAD 1.1+ / Python 3.11+ / Qt 6 / Coin3D (`pivy`)  
-**Scope:** FusionMyFreeCAD Add-on, Community Theme Ecosystem, and Upstream FreeCAD Core  
+**Scope:** FMF Add-on, Community Theme Ecosystem, and Upstream FreeCAD Core
 
 ---
 
@@ -117,7 +117,7 @@ FreeCAD 1.1 (released March 2026) introduced major visual upgrades, notably nati
 
 ## 4. Tier 2: Add-On Level Architecture (QSS, PySide & Pivy)
 
-For custom add-ons like **FusionMyFreeCAD**, we can deliver a bespoke, production-ready aesthetic layer in pure Python and Qt stylesheets without modifying FreeCAD's C++ binaries.
+For custom add-ons like **FMF**, we can deliver a bespoke, production-ready aesthetic layer in pure Python and Qt stylesheets without modifying FreeCAD's C++ binaries.
 
 ### 4.1 Modern Zinc QSS Stylesheet (`modern_zinc.qss`)
 

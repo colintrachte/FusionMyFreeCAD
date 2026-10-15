@@ -106,7 +106,7 @@ def test_reapply_command_round_trip(env, bootstrap, runtime, monkeypatch):
     bootstrap.prepare()
     runtime.apply_preferences()
     env.param(VIEW_GROUP).SetString("NavigationStyle", "Gui::BlenderNavigationStyle")
-    monkeypatch.setitem(__import__("sys").modules, "_fusion_my_freecad_runtime", runtime)
+    monkeypatch.setitem(__import__("sys").modules, "_fmf_my_freecad_runtime", runtime)
 
     message = bootstrap.reapply()
     assert "reapplied" in message
@@ -140,7 +140,7 @@ def _actions(env, *pairs):
     return {action.objectName(): action for action in env.main_window.actions}
 
 
-def test_shortcuts_are_assigned_to_the_fusion_commands(env, runtime):
+def test_shortcuts_are_assigned_to_the_fmf_commands(env, runtime):
     actions = _actions(env, ("PartDesign_Pad", ""), ("Sketcher_CreateLine", ""))
     runtime.reconcile_actions(env.main_window)
     assert actions["PartDesign_Pad"].shortcut().toString() == "E"
@@ -394,10 +394,19 @@ def test_owned_mode_migrates_development_usage_and_pin_names(env, bootstrap, run
         json.dumps(
             {
                 "schemaVersion": 1,
-                "workbenches": {"FusionDesignWorkbench": {}},
+                "workbenches": {
+                    "FusionDesignWorkbench": {
+                        "FusionMyFreeCAD_AddMidline": {
+                            "score": 2.0,
+                            "lastUsed": "2026-01-01T00:00:00+00:00",
+                        }
+                    }
+                },
                 "pins": {
                     "FusionDesignWorkbench": {
-                        "Fusion Frequent_newPanel": {"kept": ["PartDesign_Pad"]}
+                        "Fusion Frequent_newPanel": {
+                            "kept": ["PartDesign_Pad", "FusionMyFreeCAD_AddMidline"]
+                        }
                     }
                 },
             }
@@ -409,8 +418,10 @@ def test_owned_mode_migrates_development_usage_and_pin_names(env, bootstrap, run
 
     assert "FusionDesignWorkbench" not in usage["workbenches"]
     assert "FMFDesignWorkbench" in usage["workbenches"]
+    assert "FMF_AddMidline" in usage["workbenches"]["FMFDesignWorkbench"]
     assert usage["pins"]["FMFDesignWorkbench"]["FMF Frequent_newPanel"]["kept"] == [
-        "PartDesign_Pad"
+        "PartDesign_Pad",
+        "FMF_AddMidline",
     ]
 
 
@@ -724,12 +735,12 @@ def test_disabled_runtime_ignores_late_workbench_and_usage_callbacks(
 def test_runtime_uninstall_disconnects_live_services(env, runtime):
     runtime.install()
     FakeTimer.pump()
-    assert env.main_window._fusion_my_freecad_connected is True
+    assert env.main_window._fmf_my_freecad_connected is True
     assert runtime._task_accept_filter is not None
 
     runtime.uninstall()
 
-    assert env.main_window._fusion_my_freecad_connected is False
+    assert env.main_window._fmf_my_freecad_connected is False
     assert env.main_window.workbenchActivated.handlers == []
     assert runtime._task_accept_filter is None
 
@@ -739,7 +750,7 @@ def test_every_action_is_asked_for_its_shortcut_once(env, runtime):
 
     Entering a sketch edit activates Sketcher and leaving activates PartDesign
     again, so a sweep that asked every action for its shortcut once per
-    shortcut FusionMyFreeCAD sets walked a tree of thousands of actions
+    shortcut FMF sets walked a tree of thousands of actions
     thirteen times over, each way. The count is the whole point of the test.
     """
     reads = {"count": 0}

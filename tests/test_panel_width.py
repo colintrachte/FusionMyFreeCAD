@@ -3,7 +3,7 @@
 The drag itself is Qt, and the pixel-to-column arithmetic lives in FCBinding
 inside the vendored ribbon. What is testable offline -- and what actually has to
 survive a FreeCAD restart and an add-on update -- is that the budget round-trips
-through FusionMyFreeCAD's own customization file and reaches the generated
+through FMF's own customization file and reaches the generated
 ribbon.
 """
 

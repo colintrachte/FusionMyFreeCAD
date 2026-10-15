@@ -1,4 +1,4 @@
-"""Pure geometry decisions behind FusionMyFreeCAD's draggable panel dividers.
+"""Pure geometry decisions behind FMF's draggable panel dividers.
 
 Not part of upstream FreeCAD-Ribbon. Deliberately free of Qt and FreeCAD
 imports: this is the arithmetic that decides how wide a drag leaves a section,

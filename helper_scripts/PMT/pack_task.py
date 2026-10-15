@@ -36,7 +36,7 @@ from pack_delivery import (
     INBOX_FILENAME_MAX as INBOX_FILENAME_MAX,
 )
 from pack_delivery import (
-    OPENROUTER_FUSION_DOC_URL,
+    OPENROUTER_FMF_DOC_URL,
     OPENROUTER_KEY_FILE,
     OPENROUTER_MODELS,
     PORTABLE_MODE,
@@ -48,7 +48,7 @@ from pack_delivery import (
     _load_saved_key,
     _save_key,
     append_inbox_response,
-    build_fusion_prompt,
+    build_fmf_prompt,
     build_repository_handoff,
     build_task_prompt,
     compact_context_body,
@@ -1342,7 +1342,7 @@ class App(tk.Tk):
         ttk.Button(inbox_btns, text="Open Inbox Folder", command=self._on_open_inbox_folder).pack(
             side="left"
         )
-        ttk.Button(inbox_btns, text="Copy for Fusion", command=self._on_copy_fusion).pack(
+        ttk.Button(inbox_btns, text="Copy for FMF", command=self._on_copy_fmf).pack(
             side="left", padx=6
         )
 
@@ -1434,7 +1434,7 @@ class App(tk.Tk):
             f"{removed} chars]"
         )
 
-    def _on_copy_fusion(self):
+    def _on_copy_fmf(self):
         """Optional helper for the fusion pass (usually done outside PMT): copy one prompt
         holding every saved response. Never prompts or blocks; feedback goes in the inbox
         status line."""
@@ -1447,7 +1447,7 @@ class App(tk.Tk):
         task = self.current_tasks[0]
         _, title = split_header(task.header)
         self.clipboard_clear()
-        self.clipboard_append(build_fusion_prompt(title, responses, prompt=task.prompt))
+        self.clipboard_append(build_fmf_prompt(title, responses, prompt=task.prompt))
         self.inbox_status_label.config(
             text=f"Copied a fusion prompt with {len(responses)} saved responses — paste it "
             "into the model you fuse with."
@@ -1942,14 +1942,14 @@ class App(tk.Tk):
                 text="Fetch free models",
                 command=self._fetch_openrouter_models,
             ).grid(row=0, column=2, sticky="e")
-            fusion_link = ttk.Label(
+            fmf_link = ttk.Label(
                 self.model_row,
                 text="What is Fusion?",
                 foreground=gui_theme.COLOR_ACCENT,
                 cursor="hand2",
             )
-            fusion_link.grid(row=1, column=1, sticky="w", padx=6, pady=(3, 0))
-            fusion_link.bind("<Button-1>", lambda _event: self._open_url(OPENROUTER_FUSION_DOC_URL))
+            fmf_link.grid(row=1, column=1, sticky="w", padx=6, pady=(3, 0))
+            fmf_link.bind("<Button-1>", lambda _event: self._open_url(OPENROUTER_FMF_DOC_URL))
         else:
             label = self.qwen_detected_model or "(auto-detected at send time)"
             ttk.Label(self.model_row, text=label, foreground=gui_theme.COLOR_MUTED).grid(

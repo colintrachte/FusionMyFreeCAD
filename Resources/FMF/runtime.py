@@ -1,4 +1,4 @@
-"""Apply and report the reversible FusionMyFreeCAD UI at FreeCAD startup."""
+"""Apply and report the reversible FMF UI at FreeCAD startup."""
 
 import json
 import math
@@ -17,14 +17,14 @@ except ImportError:  # pragma: no cover - older FreeCAD bindings
     QtWidgets = QtGui
 
 try:
-    import fusion_bootstrap as bootstrap
-    from fusion_actions import NativeActionAdapter
+    import fmf_bootstrap as bootstrap
+    from fmf_actions import NativeActionAdapter
 except ImportError:  # pragma: no cover - executed outside the add-on directory
     _ADDON_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if _ADDON_ROOT not in sys.path:
         sys.path.insert(0, _ADDON_ROOT)
-    import fusion_bootstrap as bootstrap
-    from fusion_actions import NativeActionAdapter
+    import fmf_bootstrap as bootstrap
+    from fmf_actions import NativeActionAdapter
 
 
 SHORTCUTS = {
@@ -79,7 +79,7 @@ _deferred_tokens = {}
 
 def _record_problem(text):
     """Collect a runtime failure so Verify UI can report it instead of hiding it."""
-    App.Console.PrintWarning("FusionMyFreeCAD: {}\n".format(text))
+    App.Console.PrintWarning("FMF: {}\n".format(text))
     if text not in _problems:
         _problems.append(text)
     schedule_status_write()
@@ -174,7 +174,7 @@ def _apply_structural():
 
 
 def _apply_defaults():
-    """Write FusionMyFreeCAD's opinionated defaults over the user's profile."""
+    """Write FMF's opinionated defaults over the user's profile."""
     if PREFERENCES.GetBool("SetStartWorkbench", True):
         App.ParamGet("User parameter:BaseApp/Preferences/General").SetString(
             "AutoloadModule", bootstrap.fmf_workbench_for("PartDesignWorkbench")
@@ -199,7 +199,7 @@ def _apply_defaults():
     # default. Set all three tiers explicitly so layout "large" and "small" choices
     # remain visually meaningful on existing as well as clean profiles.
     # The Ribbon add-on injects its own global "Tools" panel of Std_ commands
-    # into every workbench. FusionMyFreeCAD carries the same commands in its
+    # into every workbench. FMF carries the same commands in its
     # UTILITIES section, which belongs to the layout and so can be ordered,
     # resized and reset; leaving both on gave every tab a duplicate panel that
     # sat outside the layout and could not be resized.
@@ -236,7 +236,7 @@ def _apply_defaults():
     sketcher_tools.SetInt("OnViewParameterVisibility", 1)
 
     # The upstream first-run changelog can cover Ribbon's modal cache prompt and
-    # leave both windows impossible to operate. FusionMyFreeCAD provides its own
+    # leave both windows impossible to operate. FMF provides its own
     # release notes, so keep the bundled SearchBar startup non-interactive.
     search = App.ParamGet("User parameter:BaseApp/Preferences/Mod/SearchBar")
     search.SetBool("ShowChangeDialog", False)
@@ -267,7 +267,7 @@ def apply_preferences(force=False):
     """Apply managed defaults once per installed version.
 
     Re-applying them at every launch silently discarded any change the user made
-    in FreeCAD's own preferences dialog. Reapply FusionMyFreeCAD (or `force`) is
+    in FreeCAD's own preferences dialog. Reapply FMF (or `force`) is
     the supported way to return to the shipped defaults.
     """
     _apply_structural()
@@ -497,6 +497,15 @@ def load_usage():
         for owned, native in bootstrap.OWNED_TO_NATIVE_WORKBENCH.items():
             if owned not in workbenches and native in workbenches:
                 workbenches[owned] = workbenches.pop(native)
+        for history in workbenches.values():
+            if not isinstance(history, dict):
+                continue
+            migrated = {
+                bootstrap._canonical_command_name(command): value
+                for command, value in history.items()
+            }
+            history.clear()
+            history.update(migrated)
         pins = _usage_cache.get("pins", {})
         for legacy, owned in bootstrap.LEGACY_OWNED_WORKBENCH.items():
             if owned not in pins and legacy in pins:
@@ -508,6 +517,12 @@ def load_usage():
             }
             workbench_pins.clear()
             workbench_pins.update(migrated)
+            for record in workbench_pins.values():
+                if isinstance(record, dict):
+                    record["kept"] = [
+                        bootstrap._canonical_command_name(command)
+                        for command in record.get("kept", [])
+                    ]
     return _usage_cache
 
 
@@ -844,7 +859,7 @@ def refresh_adaptive_panel(workbench):
         bootstrap.update_ribbon_hash()
         # Housekeeping, not something the user acts on -- keep it in the log only.
         App.Console.PrintLog(
-            "FusionMyFreeCAD updated FREQUENT for {}; it appears on the next "
+            "FMF updated FREQUENT for {}; it appears on the next "
             "ribbon reload.\n".format(workbench)
         )
         return True
@@ -889,9 +904,9 @@ def reconcile_actions(main_window=None):
     }
     for command in adaptive_commands:
         action = by_name.get(command)
-        if action is None or action.property("fusionUsageConnected"):
+        if action is None or action.property("fmfUsageConnected"):
             continue
-        action.setProperty("fusionUsageConnected", True)
+        action.setProperty("fmfUsageConnected", True)
         action.triggered.connect(lambda checked=False, name=command: record_usage(name))
 
     if not PREFERENCES.GetBool("SetShortcuts", True):
@@ -918,7 +933,7 @@ def reconcile_actions(main_window=None):
                 newly_displaced.append(entry)
                 # Per-shortcut detail stays in the log; Verify UI lists them too.
                 App.Console.PrintLog(
-                    "FusionMyFreeCAD moved the {} shortcut from {} to {}.\n".format(
+                    "FMF moved the {} shortcut from {} to {}.\n".format(
                         entry["sequence"], entry["from"], entry["to"]
                     )
                 )
@@ -926,8 +941,8 @@ def reconcile_actions(main_window=None):
         target.setShortcutContext(context)
     if newly_displaced:
         App.Console.PrintMessage(
-            "FusionMyFreeCAD reassigned {} keyboard shortcut{} from other commands "
-            "(run Verify FusionMyFreeCAD to see which).\n".format(
+            "FMF reassigned {} keyboard shortcut{} from other commands "
+            "(run Verify FMF to see which).\n".format(
                 len(newly_displaced), "" if len(newly_displaced) == 1 else "s"
             )
         )
@@ -968,7 +983,7 @@ def write_runtime_status(active_workbench=None):
         os.replace(STATUS_PATH + ".tmp", STATUS_PATH)
         return True
     except Exception as error:
-        App.Console.PrintWarning("FusionMyFreeCAD status check failed: {}\n".format(error))
+        App.Console.PrintWarning("FMF status check failed: {}\n".format(error))
         return False
 
 
@@ -1006,8 +1021,8 @@ def install():
     """Wire the runtime into the running FreeCAD session."""
     _run("preferences", apply_preferences)
     main_window = Gui.getMainWindow()
-    if main_window is not None and not getattr(main_window, "_fusion_my_freecad_connected", False):
-        main_window._fusion_my_freecad_connected = True
+    if main_window is not None and not getattr(main_window, "_fmf_my_freecad_connected", False):
+        main_window._fmf_my_freecad_connected = True
         main_window.workbenchActivated.connect(after_workbench_activation)
     _defer("starter design", ensure_starter_design)
     _defer("model tree", ensure_model_tree)
@@ -1016,7 +1031,7 @@ def install():
     _defer("Enter-to-OK task handling", install_task_accept_filter)
     schedule_status_write(1500)
     App.Console.PrintMessage(
-        "FusionMyFreeCAD {}: adaptive ribbon, smart dimensions, navigation cube, "
+        "FMF {}: adaptive ribbon, smart dimensions, navigation cube, "
         "and shortcuts configured.\n".format(bootstrap.PACKAGE_VERSION)
     )
 
@@ -1026,12 +1041,12 @@ def uninstall():
     global _task_accept_filter
     _deferred_tokens.clear()
     main_window = Gui.getMainWindow()
-    if main_window is not None and getattr(main_window, "_fusion_my_freecad_connected", False):
+    if main_window is not None and getattr(main_window, "_fmf_my_freecad_connected", False):
         try:
             main_window.workbenchActivated.disconnect(after_workbench_activation)
         except Exception:
             pass
-        main_window._fusion_my_freecad_connected = False
+        main_window._fmf_my_freecad_connected = False
     application = QtWidgets.QApplication.instance()
     if application is not None and _task_accept_filter is not None:
         try:
@@ -1042,5 +1057,5 @@ def uninstall():
 
 
 # Tests import this module for its logic and drive `install()` themselves.
-if not os.environ.get("FUSION_MY_FREECAD_NO_AUTOSTART"):
+if not os.environ.get("FMF_MY_FREECAD_NO_AUTOSTART"):
     install()

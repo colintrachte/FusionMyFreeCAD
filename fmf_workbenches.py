@@ -30,14 +30,14 @@ class _FMFWorkbench(Gui.Workbench):
         return self.NativeClassName
 
     def Activated(self):
-        import fusion_bootstrap
+        import fmf_bootstrap
 
-        fusion_bootstrap.activate_owned_workbench(self.WorkbenchId)
+        fmf_bootstrap.activate_owned_workbench(self.WorkbenchId)
 
     def Deactivated(self):
-        import fusion_bootstrap
+        import fmf_bootstrap
 
-        fusion_bootstrap.defer_ui_mode_sync()
+        fmf_bootstrap.defer_ui_mode_sync()
 
 
 class FMFDesignWorkbench(_FMFWorkbench):
@@ -74,7 +74,7 @@ class FMFPartWorkbench(_FMFWorkbench):
             importlib.import_module("CompoundTools._CommandExplodeCompound")
         except ImportError as error:
             App.Console.PrintWarning(
-                "FusionMyFreeCAD: optional Part commands unavailable: {}\n".format(error)
+                "FMF: optional Part commands unavailable: {}\n".format(error)
             )
         try:
             bop = __import__("BOPTools")
@@ -83,7 +83,7 @@ class FMFPartWorkbench(_FMFWorkbench):
             part_gui.BOPTools = bop
         except Exception as error:
             App.Console.PrintWarning(
-                "FusionMyFreeCAD: optional BOP commands unavailable: {}\n".format(error)
+                "FMF: optional BOP commands unavailable: {}\n".format(error)
             )
 
 
@@ -105,7 +105,7 @@ class FMFSketchWorkbench(_FMFWorkbench):
             importlib.import_module("Profiles")
         except ImportError as error:
             App.Console.PrintWarning(
-                "FusionMyFreeCAD: optional Sketcher profiles unavailable: {}\n".format(error)
+                "FMF: optional Sketcher profiles unavailable: {}\n".format(error)
             )
 
 

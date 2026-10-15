@@ -1,4 +1,4 @@
-# FusionMyFreeCAD — Product roadmap
+# FMF — Product roadmap
 
 This roadmap protects FMF's multi-workbench product first. Official Addon Index inclusion is an
 optional outcome, not permission to remove product-defining benefits. The read-only studies under
@@ -38,10 +38,10 @@ visibility transition is reversible and never removes the stock implementations.
   **Acceptance:** Journeys cover clean/custom profiles, all four contexts, sketch entry/exit, multi-region Pad, Mirror + Constraints, dress-up input, export, Verify, Reapply, and Restore.
   **Expected evidence:** A checked-in journey specification and machine-readable baseline results repeatable after every migration slice.
   **Implement:** `docs/dev-guide/BASELINE-JOURNEYS.md` · `tests/fixtures/fmf-baseline.json` · `tools/benchmark_fmf.py`
-  **Context:** `docs/dev-guide/CURRENT-FEATURE-INVENTORY.md` · `Resources/FusionMyFreeCAD/layout-v3.json` · `fusion_bootstrap.py` · `Resources/FusionMyFreeCAD/runtime.py`
+  **Context:** `docs/dev-guide/CURRENT-FEATURE-INVENTORY.md` · `Resources/FMF/layout-v3.json` · `fmf_bootstrap.py` · `Resources/FMF/runtime.py`
   **Route:** claude
   **Context Load:** 1236
-  **Chars:** ~176,522 text total (largest: fusion_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
+  **Chars:** ~176,522 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Prefer after:** task_a1010000000000000000000000000001
 
 ---
@@ -59,7 +59,7 @@ visibility transition is reversible and never removes the stock implementations.
   **Protected behavior:** Stock workbenches remain registered and usable whenever FMF is disabled.
   **Acceptance:** Four stable IDs/classes/icons register without mutating or unregistering stock workbench definitions.
   **Evidence:** Automated registration tests passed; FreeCAD 1.1.1 displayed all four FMF workbenches and switched between FMF and stock families without restart.
-  **Implement:** `package.xml` · `InitGui.py` · `fusion_workbenches.py` · `fusion_bootstrap.py`
+  **Implement:** `package.xml` · `InitGui.py` · `fmf_workbenches.py` · `fmf_bootstrap.py`
   **Context:** `docs/dev-guide/workbench-parity.md` · `docs/dev-guide/ACTIVATION-AND-RESTORATION.md`
   **Read:** `<freecad>/src/Gui/FreeCADGuiInit.py` · `<freecad>/src/Gui/Workbench.cpp`
   **Route:** paid-ai
@@ -78,11 +78,11 @@ visibility transition is reversible and never removes the stock implementations.
   **Protected behavior:** No current layout capability disappears; adaptation remains confined to FREQUENT.
   **Acceptance:** Parity checks are complete and baseline journeys are equivalent or better in all four workbenches.
   **Expected evidence:** Layout diff, parity output, GUI captures, and benchmark comparison.
-  **Implement:** `fusion_bootstrap.py` · `Resources/FusionMyFreeCAD/runtime.py` · `Resources/FusionMyFreeCAD/layout-v3.json` · `Resources/FusionMyFreeCAD/layout-manifest.json`
-  **Context:** `freecad/FusionMyFreeCAD/workbenches.py` · `fusion_actions.py` · `tests/fixtures/fmf-baseline.json`
+  **Implement:** `fmf_bootstrap.py` · `Resources/FMF/runtime.py` · `Resources/FMF/layout-v3.json` · `Resources/FMF/layout-manifest.json`
+  **Context:** `freecad/FMF/workbenches.py` · `fmf_actions.py` · `tests/fixtures/fmf-baseline.json`
   **Route:** claude
   **Context Load:** 1430
-  **Chars:** ~204,352 text total (largest: fusion_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
+  **Chars:** ~204,352 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Blocked by:** task_b2010000000000000000000000000001
 
 - [ ] **Score 5 🥇 · Class 2 — Preserve sketch-edit context transitions**
@@ -96,29 +96,29 @@ visibility transition is reversible and never removes the stock implementations.
   **Protected behavior:** Create Sketch delegates attachment to Part Design and changes ribbon context only after the sketch opens.
   **Acceptance:** New/existing, attached/unattached, cancel, finish, close, failure, and repeated edit paths have no duplicate observers or shortcuts.
   **Expected evidence:** Observer tests and recorded real-FreeCAD journeys.
-  **Implement:** `fusion_bootstrap.py` · `Resources/FusionMyFreeCAD/runtime.py` · `freecad/FusionMyFreeCAD/workbenches.py`
+  **Implement:** `fmf_bootstrap.py` · `Resources/FMF/runtime.py` · `freecad/FMF/workbenches.py`
   **Context:** `tests/test_startup.py` · `tests/test_runtime.py` · `docs/dev-guide/BASELINE-JOURNEYS.md`
   **Route:** claude
   **Context Load:** 868
-  **Chars:** ~144,658 text total (largest: fusion_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
+  **Chars:** ~144,658 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Blocked by:** task_b2020000000000000000000000000002
 
 - [ ] **Score 5 🥇 · Class 2 — Implement atomic first-run activation**
 
   **ID:** task_b2040000000000000000000000000004
   **Status:** Blocked — lifecycle and owned contexts required
-  **Outcome:** Present a branded **Activate FusionMyFreeCAD** page that atomically applies the complete experience; decline changes nothing and activation remains available later.
+  **Outcome:** Present a branded **Activate FMF** page that atomically applies the complete experience; decline changes nothing and activation remains available later.
   **Work mode:** Forge + Steward
   **Execution size:** Medium
   **Uncertainty:** Medium
   **Protected behavior:** One package and one activation action produce the coherent experience.
   **Acceptance:** Activation completes or rolls back; interruption recovers; no version change occurs.
   **Expected evidence:** Transition tests, failure injection, and first-run walkthrough.
-  **Implement:** `freecad/FusionMyFreeCAD/activation.py` · `freecad/FusionMyFreeCAD/activation.ui` · `fusion_bootstrap.py`
+  **Implement:** `freecad/FMF/activation.py` · `freecad/FMF/activation.ui` · `fmf_bootstrap.py`
   **Context:** `docs/dev-guide/ACTIVATION-AND-RESTORATION.md` · `README.md`
   **Route:** kimi
   **Context Load:** 376
-  **Chars:** ~75,174 text total (largest: fusion_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
+  **Chars:** ~75,174 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Blocked by:** task_a1040000000000000000000000000004 · task_b2030000000000000000000000000003
 
 - [x] **Score 5 🥇 · Class 2 — Add reversible stock-workbench visibility controls**
@@ -132,11 +132,11 @@ visibility transition is reversible and never removes the stock implementations.
   **Protected behavior:** The Ribbon remains active, unrelated workbench tabs are untouched, and stock workbenches are never removed or rewritten.
   **Acceptance:** Repeated enable/disable cycles expose exactly one of the four corresponding workbench families, preserve unrelated visibility choices, avoid unregistering workbenches, and never autoload a hidden FMF workbench.
   **Evidence:** Automated lifecycle/state tests passed; live FreeCAD 1.1.1 verification confirmed immediate switching without restart and successful right-click customization while FMF was disabled.
-  **Implement:** `fusion_bootstrap.py` · `fusion_workbenches.py` · `bundled-addons/FreeCAD-Ribbon/FCBinding.py` · `Resources/FusionMyFreeCAD/preferences.ui`
+  **Implement:** `fmf_bootstrap.py` · `fmf_workbenches.py` · `bundled-addons/FreeCAD-Ribbon/FCBinding.py` · `Resources/FMF/preferences.ui`
   **Context:** `docs/dev-guide/ACTIVATION-AND-RESTORATION.md` · `tests/test_install.py` · `tests/test_runtime.py`
   **Route:** kimi
   **Context Load:** 323
-  **Chars:** ~80,629 text total (largest: fusion_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
+  **Chars:** ~80,629 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
 
 - [ ] **Score 5 🥇 · Class 2 — Make shortcut activation conflict-safe**
 
@@ -149,12 +149,12 @@ visibility transition is reversible and never removes the stock implementations.
   **Protected behavior:** The complete preset and Verify UI reporting remain available.
   **Acceptance:** Cancel changes nothing; accept applies chosen resolutions; Restore returns exact prior bindings.
   **Expected evidence:** Conflict-matrix tests and real-FreeCAD keyboard verification.
-  **Implement:** `Resources/FusionMyFreeCAD/runtime.py` · `Resources/FusionMyFreeCAD/preferences.ui` · `fusion_bootstrap.py`
+  **Implement:** `Resources/FMF/runtime.py` · `Resources/FMF/preferences.ui` · `fmf_bootstrap.py`
   **Context:** `command-map.md` · `tests/test_runtime.py` · `tests/test_install.py`
   **Read:** `<fmf-study>/upstream_repos/ToolSeek/freecad/ToolSeek/prefs.py`
   **Route:** paid-ai
   **Context Load:** 1100
-  **Chars:** ~157,169 text total (largest: fusion_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
+  **Chars:** ~157,169 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Prefer after:** task_a1040000000000000000000000000004
 
 - [ ] **Score 4 🥇 · Class 2 — Consolidate personalization and scope runtime observers**
@@ -168,11 +168,11 @@ visibility transition is reversible and never removes the stock implementations.
   **Protected behavior:** Decayed ranking, pins, order, reset, dress-up input, multi-region profiles, dock refresh, and recovery remain intact.
   **Acceptance:** State migrates without loss; installation/teardown is idempotent; no duplicate callbacks remain; startup/switching meet baseline.
   **Expected evidence:** Migration/lifecycle tests, callback counts, persistence tests, and timings.
-  **Implement:** `freecad/FusionMyFreeCAD/personalization.py` · `Resources/FusionMyFreeCAD/runtime.py` · `fusion_bootstrap.py` · `fusion_dressup_tools.py` · `fusion_parameters_dock.py`
-  **Context:** `Resources/FusionMyFreeCAD/layout-manifest.json` · `tests/test_runtime.py` · `tests/test_install.py`
+  **Implement:** `freecad/FMF/personalization.py` · `Resources/FMF/runtime.py` · `fmf_bootstrap.py` · `fmf_dressup_tools.py` · `fmf_parameters_dock.py`
+  **Context:** `Resources/FMF/layout-manifest.json` · `tests/test_runtime.py` · `tests/test_install.py`
   **Route:** claude
   **Context Load:** 1870
-  **Chars:** ~233,693 text total (largest: fusion_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
+  **Chars:** ~233,693 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Blocked by:** task_b2030000000000000000000000000003
 
 ---
@@ -208,12 +208,12 @@ visibility transition is reversible and never removes the stock implementations.
   **Protected behavior:** Repair References remains conservative; ambiguity is reported, never guessed.
   **Acceptance:** Provenance distinguishes exact/ambiguous/unavailable and direct/linked/patterned cases; diagnostic detection works without applying a fix.
   **Expected evidence:** Geometry fixtures, ambiguity cases, transaction tests, and a measured journey.
-  **Implement:** `freecad/FusionMyFreeCAD/selection_context.py` · `freecad/FusionMyFreeCAD/provenance.py` · `freecad/FusionMyFreeCAD/diagnostics.py`
-  **Context:** `fusion_repair_tools.py` · `fusion_sketch_tools.py` · `fusion_common.py`
+  **Implement:** `freecad/FMF/selection_context.py` · `freecad/FMF/provenance.py` · `freecad/FMF/diagnostics.py`
+  **Context:** `fmf_repair_tools.py` · `fmf_sketch_tools.py` · `fmf_common.py`
   **Read:** `<fmf-study>/upstream_repos/FreeCAD-Nxt/freecad/nxt/tree/` · `<fmf-study>/THE_IDEAL_ARCHITECTURE.md`
   **Route:** paid-ai
   **Context Load:** 1067
-  **Chars:** ~133,436 text total (largest: fusion_sketch_tools.py ~103,017) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
+  **Chars:** ~133,436 text total (largest: fmf_sketch_tools.py ~103,017) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Prefer after:** task_b2070000000000000000000000000007
 
 - [ ] **Score 3 🥈 · Class 2 — Prototype fixed selection-context actions**
@@ -226,8 +226,8 @@ visibility transition is reversible and never removes the stock implementations.
   **Uncertainty:** High
   **Acceptance:** Positions never rotate; negative fixtures do not misfire; measured command time improves without more errors.
   **Expected evidence:** Predicate tests and comparative journey results.
-  **Implement:** `freecad/FusionMyFreeCAD/context_actions.py`
-  **Context:** `docs/dev-guide/CURRENT-FEATURE-INVENTORY.md` · `freecad/FusionMyFreeCAD/selection_context.py` · `docs/dev-guide/BASELINE-JOURNEYS.md`
+  **Implement:** `freecad/FMF/context_actions.py`
+  **Context:** `docs/dev-guide/CURRENT-FEATURE-INVENTORY.md` · `freecad/FMF/selection_context.py` · `docs/dev-guide/BASELINE-JOURNEYS.md`
   **Read:** `<fmf-study>/upstream_repos/PieMenu/piemenu/`
   **Route:** paid-ai
   **Context Load:** 114
@@ -246,11 +246,11 @@ visibility transition is reversible and never removes the stock implementations.
   **Acceptance:** Light/dark themes preserve focus and state distinctions at 100–200% scaling.
   **Expected evidence:** Automated contrast report and human screenshot matrix.
   **Implement:** `Resources/Themes/modern_zinc.qss` · `tools/check_theme_contrast.py` · `docs/dev-guide/VISUAL-SEMANTICS.md`
-  **Context:** `fusion_viewport.py` · `tests/test_aesthetic_spatial.py`
+  **Context:** `fmf_viewport.py` · `tests/test_aesthetic_spatial.py`
   **Read:** `<fmf-study>/upstream_repos/OpenTheme/scss/`
   **Route:** paid-ai
   **Context Load:** 145
-  **Chars:** ~24,168 text total (largest: fusion_viewport.py ~13,990) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
+  **Chars:** ~24,168 text total (largest: fmf_viewport.py ~13,990) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Prefer after:** task_b2020000000000000000000000000002
 
 - [ ] **Score 5 🥇 · Class 2 — Run cross-platform beta and restoration qualification**

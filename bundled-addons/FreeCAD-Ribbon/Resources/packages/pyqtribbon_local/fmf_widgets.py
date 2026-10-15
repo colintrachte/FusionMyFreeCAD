@@ -1,7 +1,7 @@
-"""FusionMyFreeCAD additions to the vendored ribbon widgets.
+"""FMF additions to the vendored ribbon widgets.
 
 This module is not part of upstream FreeCAD-Ribbon. It exists so the bulk of
-FusionMyFreeCAD's widget-level changes live in a file `tools/sync_bundled_addons.py`
+FMF's widget-level changes live in a file `tools/sync_bundled_addons.py`
 never overwrites, leaving only a handful of one-line hooks to be re-applied by
 hand in upstream's own modules after a refresh.
 """
@@ -58,7 +58,7 @@ def popup_menu_at(menu, widget) -> bool:
 class DraggablePanelSeparator(RibbonVerticalSeparator):
     """The divider between two panels, draggable to change how wide a panel is.
 
-    FusionMyFreeCAD local change. Upstream sizes every section from its contents
+    FMF local change. Upstream sizes every section from its contents
     against one global column budget, so a section the user works in constantly
     gets the same space as one they never touch.
 
@@ -218,7 +218,7 @@ def _report(text, quiet=False):
     console = _console()
     if console is None:
         return
-    message = "FusionMyFreeCAD divider: {}\n".format(text)
+    message = "FMF divider: {}\n".format(text)
     if quiet:
         console.PrintMessage(message)
     else:

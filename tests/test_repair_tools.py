@@ -22,9 +22,9 @@ import pytest
 
 @pytest.fixture
 def repair(env):
-    import fusion_repair_tools
+    import fmf_repair_tools
 
-    return fusion_repair_tools
+    return fmf_repair_tools
 
 
 class _Vector:

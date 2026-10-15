@@ -1,4 +1,4 @@
-# FusionMyFreeCAD AI engineering guide
+# FMF AI engineering guide
 
 > **Scaling down:** a small or short-lived project doesn't need all of this. At minimum,
 > keep §0 (project context), §3 (Simplicity First), §4 (Surgical Changes), and §6 (comment
@@ -7,7 +7,7 @@
 > (architecture review) only once the project is big enough that "which file does this
 > feature pollute" is a real question.
 
-This is the AI-facing rulebook for **FusionMyFreeCAD**, a self-contained Fusion-familiar
+This is the AI-facing rulebook for **FMF**, a self-contained Fusion-familiar
 multi-workbench experience for FreeCAD users. Read the Project Context before applying the engineering rules
 below — the rules serve the project, and you cannot weigh a tradeoff well without knowing
 what the project is.

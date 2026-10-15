@@ -25,7 +25,7 @@ def main() -> int:
 
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    from fusion_common import RUNTIME_MODULES
+    from fmf_common import RUNTIME_MODULES
 
     package_files = [ROOT / name for name in RUNTIME_MODULES]
     package_files.extend(

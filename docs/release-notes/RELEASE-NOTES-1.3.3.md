@@ -1,4 +1,4 @@
-# FusionMyFreeCAD 1.3.3
+# FMF 1.3.3
 
 **1.3.3 replaces the withdrawn 1.3.2.** On FreeCAD 1.1.3, version 1.3.2 could intermittently
 freeze and then crash with an "Access violation" while the Sketcher ribbon was being built —
@@ -60,8 +60,8 @@ C++ access faulted in a way Python cannot catch.
 
 ## Install or update
 
-Download `FusionMyFreeCAD-1.3.3.zip` and `FusionMyFreeCAD-1.3.3.zip.sha256` from this release.
-Replace the entire existing `Mod/FusionMyFreeCAD` folder; do not merge it with an older version.
+Download `FMF-1.3.3.zip` and `FMF-1.3.3.zip.sha256` from this release.
+Replace the entire existing `Mod/FMF` folder; do not merge it with an older version.
 Restart FreeCAD. No sketch or document data is affected.
 
 See the [installation guide](https://github.com/colintrachte/FusionMyFreeCAD/blob/v1.3.3/docs/INSTALL-FREECAD-ADDON.md) and [full changelog](https://github.com/colintrachte/FusionMyFreeCAD/blob/v1.3.3/CHANGELOG.md).

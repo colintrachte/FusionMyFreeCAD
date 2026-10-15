@@ -1,4 +1,4 @@
-"""Unit tests for FusionMyFreeCAD aesthetic modernization features:
+"""Unit tests for FMF aesthetic modernization features:
 
 - Modern Zinc Studio Viewport preset (3-point lighting, radial zinc canvas, MSAA)
 - Viewport backup and 1-click restore
@@ -20,10 +20,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_hex_to_uint_conversion(env):
     env.install().load_bootstrap()
-    import fusion_viewport
+    import fmf_viewport
 
     # Zinc-800: #27272a
-    val = fusion_viewport.hex_to_uint("#27272a", 255)
+    val = fmf_viewport.hex_to_uint("#27272a", 255)
     r = (val >> 24) & 0xFF
     g = (val >> 16) & 0xFF
     b = (val >> 8) & 0xFF
@@ -33,11 +33,11 @@ def test_hex_to_uint_conversion(env):
 
 def test_apply_studio_viewport_and_restore(env):
     env.install()
-    import fusion_viewport
+    import fmf_viewport
 
     view_grp = env.param("User parameter:BaseApp/Preferences/View")
     nav_grp = env.param("User parameter:BaseApp/Preferences/NaviCube")
-    backup_grp = env.param("User parameter:BaseApp/Preferences/Mod/FusionMyFreeCAD/ViewportBackup")
+    backup_grp = env.param("User parameter:BaseApp/Preferences/Mod/FMF/ViewportBackup")
 
     # Set initial custom dummy values
     view_grp.SetBool("RadialGradient", False)
@@ -47,9 +47,9 @@ def test_apply_studio_viewport_and_restore(env):
     nav_grp.SetInt("InactiveOpacity", 80)
 
     # 1. Apply Studio Viewport
-    res = fusion_viewport.apply_studio_viewport(backup=True)
+    res = fmf_viewport.apply_studio_viewport(backup=True)
     assert res["status"] == "ok"
-    assert fusion_viewport.has_viewport_backup() is True
+    assert fmf_viewport.has_viewport_backup() is True
     assert backup_grp.GetBool("HasBackup") is True
     assert backup_grp.GetUnsigned("View_BackgroundColor") == 12345
     assert backup_grp.GetInt("Nav_InactiveOpacity") == 80
@@ -61,9 +61,9 @@ def test_apply_studio_viewport_and_restore(env):
     assert nav_grp.GetInt("InactiveOpacity") == 30
 
     # 2. Restore Viewport
-    res_restore = fusion_viewport.restore_default_viewport()
+    res_restore = fmf_viewport.restore_default_viewport()
     assert res_restore["status"] == "ok"
-    assert fusion_viewport.has_viewport_backup() is False
+    assert fmf_viewport.has_viewport_backup() is False
 
     # Verify original values restored
     assert view_grp.GetBool("RadialGradient") is False
@@ -75,9 +75,9 @@ def test_apply_studio_viewport_and_restore(env):
 
 def test_apply_modern_zinc_theme(env):
     env.install()
-    import fusion_viewport
+    import fmf_viewport
 
-    res = fusion_viewport.apply_modern_zinc_theme()
+    res = fmf_viewport.apply_modern_zinc_theme()
     assert res["status"] == "ok"
 
     # Verify stylesheet file was copied to user stylesheets directory
@@ -94,7 +94,7 @@ def test_apply_modern_zinc_theme(env):
 def test_viewport_restore_removes_unregistered_keys(env):
     """When preferences did not exist prior to applying, restore must delete them."""
     env.install()
-    import fusion_viewport
+    import fmf_viewport
 
     view_grp = env.param("User parameter:BaseApp/Preferences/View")
     nav_grp = env.param("User parameter:BaseApp/Preferences/NaviCube")
@@ -105,14 +105,14 @@ def test_viewport_restore_removes_unregistered_keys(env):
     assert "InactiveOpacity" not in nav_grp.GetInts()
 
     # Apply
-    res = fusion_viewport.apply_studio_viewport(backup=True)
+    res = fmf_viewport.apply_studio_viewport(backup=True)
     assert res["status"] == "ok"
     assert "RadialGradient" in view_grp.GetBools()
     assert "KeyLightIntensity" in view_grp.GetFloats()
     assert "InactiveOpacity" in nav_grp.GetInts()
 
     # Restore
-    res_restore = fusion_viewport.restore_default_viewport()
+    res_restore = fmf_viewport.restore_default_viewport()
     assert res_restore["status"] == "ok"
 
     # Nonexistent keys should have been removed, not set to fallback values
@@ -123,7 +123,7 @@ def test_viewport_restore_removes_unregistered_keys(env):
 
 def test_theme_restore_with_prior_stylesheet_and_without(env):
     env.install()
-    import fusion_viewport
+    import fmf_viewport
 
     gen_grp = env.param("User parameter:BaseApp/Preferences/General")
 
@@ -131,11 +131,11 @@ def test_theme_restore_with_prior_stylesheet_and_without(env):
     gen_grp.SetString("StyleSheet", "/custom/path/custom.qss")
     assert gen_grp.GetString("StyleSheet") == "/custom/path/custom.qss"
 
-    res_apply = fusion_viewport.apply_modern_zinc_theme(backup=True)
+    res_apply = fmf_viewport.apply_modern_zinc_theme(backup=True)
     assert res_apply["status"] == "ok"
     assert "modern_zinc.qss" in gen_grp.GetString("StyleSheet")
 
-    res_restore = fusion_viewport.restore_theme()
+    res_restore = fmf_viewport.restore_theme()
     assert res_restore["status"] == "ok"
     assert gen_grp.GetString("StyleSheet") == "/custom/path/custom.qss"
 
@@ -143,17 +143,17 @@ def test_theme_restore_with_prior_stylesheet_and_without(env):
     gen_grp.RemString("StyleSheet")
     assert "StyleSheet" not in gen_grp.GetStrings()
 
-    fusion_viewport.apply_modern_zinc_theme(backup=True)
+    fmf_viewport.apply_modern_zinc_theme(backup=True)
     assert "StyleSheet" in gen_grp.GetStrings()
 
-    fusion_viewport.restore_theme()
+    fmf_viewport.restore_theme()
     assert "StyleSheet" not in gen_grp.GetStrings()
 
 
 def test_bootstrap_restore_rolls_back_appearance(env):
-    """Calling main fusion_bootstrap.restore() must also restore viewport and theme."""
+    """Calling main fmf_bootstrap.restore() must also restore viewport and theme."""
     bootstrap = env.install().load_bootstrap()
-    import fusion_viewport
+    import fmf_viewport
 
     bootstrap.prepare()
     view_grp = env.param("User parameter:BaseApp/Preferences/View")
@@ -163,8 +163,8 @@ def test_bootstrap_restore_rolls_back_appearance(env):
     view_grp.RemBool("RadialGradient")
     gen_grp.RemString("StyleSheet")
 
-    fusion_viewport.apply_studio_viewport(backup=True)
-    fusion_viewport.apply_modern_zinc_theme(backup=True)
+    fmf_viewport.apply_studio_viewport(backup=True)
+    fmf_viewport.apply_modern_zinc_theme(backup=True)
 
     assert "RadialGradient" in view_grp.GetBools()
     assert "StyleSheet" in gen_grp.GetStrings()

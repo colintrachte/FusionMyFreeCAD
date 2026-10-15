@@ -1,7 +1,7 @@
-# FusionMyFreeCAD user guide
+# FMF user guide
 
 This folder is the home for task-oriented documentation for people installing and using
-FusionMyFreeCAD.
+FMF.
 
 Current user documentation still lives at the established paths so existing release and external
 links continue to work:

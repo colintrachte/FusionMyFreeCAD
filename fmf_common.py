@@ -1,4 +1,4 @@
-"""Shared primitives and runtime definitions for FusionMyFreeCAD.
+"""Shared primitives and runtime definitions for FMF.
 
 Centralizes runtime module declarations, transaction management, UI notifications,
 Sketcher command base classes, and non-fatal error logging to eliminate boilerplate
@@ -27,17 +27,17 @@ except ImportError:
 RUNTIME_MODULES: tuple[str, ...] = (
     "Init.py",
     "InitGui.py",
-    "fusion_actions.py",
-    "fusion_bootstrap.py",
-    "fusion_common.py",
-    "fusion_datum_tools.py",
-    "fusion_dressup_tools.py",
-    "fusion_export.py",
-    "fusion_parameters_dock.py",
-    "fusion_repair_tools.py",
-    "fusion_sketch_tools.py",
-    "fusion_viewport.py",
-    "fusion_workbenches.py",
+    "fmf_actions.py",
+    "fmf_bootstrap.py",
+    "fmf_common.py",
+    "fmf_datum_tools.py",
+    "fmf_dressup_tools.py",
+    "fmf_export.py",
+    "fmf_parameters_dock.py",
+    "fmf_repair_tools.py",
+    "fmf_sketch_tools.py",
+    "fmf_viewport.py",
+    "fmf_workbenches.py",
 )
 
 
@@ -45,7 +45,7 @@ RUNTIME_MODULES: tuple[str, ...] = (
 # drift when diagnostics are added or changed. Every operation is deliberately
 # failure-safe: inability to write a log must never affect FreeCAD startup.
 USER_ROOT = App.getUserAppDataDir() if App is not None else os.getcwd()
-DIAGNOSTICS_DIR = os.path.join(USER_ROOT, "FusionMyFreeCAD-Diagnostics")
+DIAGNOSTICS_DIR = os.path.join(USER_ROOT, "FMF-Diagnostics")
 LOG_PATH = os.path.join(DIAGNOSTICS_DIR, "events.jsonl")
 STATUS_PATH = os.path.join(DIAGNOSTICS_DIR, "session-status.json")
 MAX_LOG_BYTES = 512 * 1024
@@ -170,7 +170,7 @@ def diagnostic_summary() -> str:
         pass
     return "\n".join(
         (
-            "FusionMyFreeCAD diagnostics",
+            "FMF diagnostics",
             f"State: {status.get('state', 'unknown')}",
             f"Session: {status.get('sessionId', SESSION_ID)}",
             f"Updated: {status.get('updatedAt', 'unknown')}",
@@ -201,7 +201,7 @@ def notify(prefix: str, text: str, error: bool = False) -> None:
     """Show a non-modal result: report view line plus a transient status message."""
     if App is not None and hasattr(App, "Console"):
         printer = App.Console.PrintError if error else App.Console.PrintMessage
-        printer(f"FusionMyFreeCAD {prefix}: {text}\n")
+        printer(f"FMF {prefix}: {text}\n")
     try:
         if Gui is not None and hasattr(Gui, "getMainWindow"):
             window = Gui.getMainWindow()
@@ -214,7 +214,7 @@ def notify(prefix: str, text: str, error: bool = False) -> None:
 
 def log_swallowed(context: str, exc: Exception | None = None) -> None:
     """Log an exception that was caught and handled, preventing silent data-mutation failures."""
-    msg = f"FusionMyFreeCAD: handled failure in {context}"
+    msg = f"FMF: handled failure in {context}"
     if exc is not None:
         msg += f": {exc}"
     try:

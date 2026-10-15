@@ -1,7 +1,7 @@
 # Research & Lessons Learned: Sketch Camera Framing & AI Scratchpad Architecture
 
 **Date:** 2026-09-03  
-**Scope:** `fusion_bootstrap.py`, `tests/fake_freecad.py`, `tests/test_startup.py`, `ai_poop/`, and `~/Desktop/AI_Poop`  
+**Scope:** `fmf_bootstrap.py`, `tests/fake_freecad.py`, `tests/test_startup.py`, `ai_poop/`, and `~/Desktop/AI_Poop`
 **Status:** Completed and verified (154 tests passing; add-on hot-deployed to FreeCAD 1.1)
 
 ---
@@ -17,14 +17,14 @@ This document captures findings, root causes, and architecture established durin
 ## 2. Topic 1: Sketch Creation Camera Framing & View Shifts
 
 ### 2.1 The Symptom
-* When clicking **Create Sketch** in FusionMyFreeCAD, the 3D viewport immediately panned significantly **up and to the right**, and zoomed in excessively close.
+* When clicking **Create Sketch** in FMF, the 3D viewport immediately panned significantly **up and to the right**, and zoomed in excessively close.
 * When subsequently picking an origin plane (e.g. XY, XZ, or YZ), the camera underwent a **second jarring shift**.
 * The resulting sketch canvas was off-center and cramped (~15–20 mm visible span) instead of a standard CAD drawing canvas (~100x100 mm centered on the origin `(0, 0)`).
 
 ### 2.2 FreeCAD Shipped Baseline vs. FMF Intervention
-We audited FreeCAD 1.1's native behavior against FusionMyFreeCAD:
+We audited FreeCAD 1.1's native behavior against FMF:
 
-| Attribute | FreeCAD 1.1 Native Baseline | FusionMyFreeCAD (Prior to Fix) | FusionMyFreeCAD (Fixed) |
+| Attribute | FreeCAD 1.1 Native Baseline | FMF (Prior to Fix) | FMF (Fixed) |
 | :--- | :--- | :--- | :--- |
 | **Default Camera Scale** | `NewDocumentCameraScale = 100.0` (100 mm) | Overridden by `fitAll()` (~15 mm) | Restored to `NewDocumentCameraScale` (100 mm) |
 | **New Sketch Command** | `PartDesign_NewSketch` displays origin planes, leaves camera completely untouched. | Dispatched `_frame_origin_planes()` calling `viewAxonometric()` and `view.fitAll()`. | Orients to axonometric and centers camera directly on `(0, 0, 0)` at 100 mm scale. |
@@ -32,7 +32,7 @@ We audited FreeCAD 1.1's native behavior against FusionMyFreeCAD:
 | **Pre-selected Face** | Attaches sketch to face directly. | Ran `_frame_origin_planes()` unconditionally on a timer, knocking the view into axonometric. | Bypasses origin plane framing if geometry was already selected. |
 
 ### 2.3 The Root Cause: The OpenInventor / Coin3D Positive Octant Trap
-In `fusion_bootstrap.py`, `CreateSketchCommand` called `_frame_origin_planes()`:
+In `fmf_bootstrap.py`, `CreateSketchCommand` called `_frame_origin_planes()`:
 ```python
 def _frame_origin_planes():
     view.viewAxonometric()
@@ -81,7 +81,7 @@ AI coding agents frequently generate transient scripts, diagnostic one-liners, a
 ```
 [ Developer Environment ]
        │
-       ├── Project-Local: `FusionMyFreeCAD/ai_poop/` (Default Daily Driver)
+       ├── Project-Local: `FMF/ai_poop/` (Default Daily Driver)
        │     ├── README.md (Catalog & Header standard)
        │     ├── fc.py (FreeCAD dynamic runner)
        │     ├── dev_cycle.ps1 (Project-specific test & hot-deploy)

@@ -36,10 +36,10 @@ def main() -> int:
 
     if missing:
         App.Console.PrintError(
-            "FusionMyFreeCAD command smoke check failed:\n  " + "\n  ".join(missing) + "\n"
+            "FMF command smoke check failed:\n  " + "\n  ".join(missing) + "\n"
         )
         return 1
-    App.Console.PrintMessage("FusionMyFreeCAD command smoke check passed.\n")
+    App.Console.PrintMessage("FMF command smoke check passed.\n")
     return 0
 
 

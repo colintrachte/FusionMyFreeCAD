@@ -23,7 +23,7 @@ from validate_layout_contracts import (
 )
 
 NAMESPACE = {"p": "https://wiki.freecad.org/Package_Metadata"}
-RESOURCES = ROOT / "Resources" / "FusionMyFreeCAD"
+RESOURCES = ROOT / "Resources" / "FMF"
 BUNDLED = ROOT / "bundled-addons"
 
 
@@ -38,7 +38,7 @@ def package():
 
 
 def test_package_metadata(package):
-    assert package.findtext("p:name", namespaces=NAMESPACE) == "FusionMyFreeCAD"
+    assert package.findtext("p:name", namespaces=NAMESPACE) == "FMF"
     assert package.findtext("p:license", namespaces=NAMESPACE) == "GPL-3.0-or-later"
     assert package.findtext("p:freecadmin", namespaces=NAMESPACE) == "1.1.0"
 
@@ -59,10 +59,10 @@ def test_required_files_are_present():
     required = [
         ROOT / "Init.py",
         ROOT / "InitGui.py",
-        ROOT / "fusion_actions.py",
-        ROOT / "fusion_bootstrap.py",
-        ROOT / "fusion_workbenches.py",
-        ROOT / "fusion_sketch_tools.py",
+        ROOT / "fmf_actions.py",
+        ROOT / "fmf_bootstrap.py",
+        ROOT / "fmf_workbenches.py",
+        ROOT / "fmf_sketch_tools.py",
         ROOT / "LICENSE",
         ROOT / "THIRD_PARTY_NOTICES.md",
         RESOURCES / "RibbonStructure.json",
@@ -78,7 +78,7 @@ def test_required_files_are_present():
     assert missing == []
 
 
-def test_current_fmf_owned_names_do_not_use_fusion_prefix(layout):
+def test_current_fmf_owned_names_do_not_use_previous_prefix(layout):
     assert set(layout["workbenches"]) == {
         "FMFDesignWorkbench",
         "FMFPartWorkbench",
@@ -99,7 +99,7 @@ def test_runtime_local_imports_are_declared_for_packaging():
     """A source-checkout import must not hide a module omitted from release ZIPs."""
     import ast
 
-    from fusion_common import RUNTIME_MODULES
+    from fmf_common import RUNTIME_MODULES
 
     declared = {Path(name).stem for name in RUNTIME_MODULES}
     runtime_tree = ast.parse((RESOURCES / "runtime.py").read_text(encoding="utf-8"))
@@ -108,12 +108,12 @@ def test_runtime_local_imports_are_declared_for_packaging():
         for node in ast.walk(runtime_tree)
         if isinstance(node, ast.Import)
         for alias in node.names
-        if alias.name.startswith("fusion_")
+        if alias.name.startswith("fmf_")
     }
     imported.update(
         node.module.split(".", 1)[0]
         for node in ast.walk(runtime_tree)
-        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("fusion_")
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("fmf_")
     )
     assert imported <= declared, "Undeclared packaged runtime imports: {}".format(
         sorted(imported - declared)
@@ -126,6 +126,41 @@ def test_every_python_file_compiles():
         if skipped.intersection(path.parts):
             continue
         compile(path.read_text(encoding="utf-8-sig"), str(path), "exec")
+
+
+def test_owned_paths_and_python_identifiers_use_fmf_branding():
+    import ast
+
+    excluded = {".git", "ai_poop", "dist", "tmp", "tmp_test", "__pycache__"}
+    branded_paths = [
+        path.relative_to(ROOT).as_posix()
+        for path in ROOT.rglob("*")
+        if not excluded.intersection(path.relative_to(ROOT).parts)
+        and "fusion" in path.name.casefold()
+    ]
+    assert branded_paths == []
+
+    branded_identifiers = []
+    for path in ROOT.rglob("*.py"):
+        if excluded.intersection(path.relative_to(ROOT).parts) or "vendor" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"), str(path))
+        for node in ast.walk(tree):
+            names = []
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                names.append(node.name)
+            elif isinstance(node, ast.Name):
+                names.append(node.id)
+            elif isinstance(node, ast.Attribute):
+                names.append(node.attr)
+            elif isinstance(node, ast.alias):
+                names.append(node.asname or node.name)
+            branded_identifiers.extend(
+                "{}:{}".format(path.relative_to(ROOT).as_posix(), name)
+                for name in names
+                if "fusion" in name.casefold()
+            )
+    assert branded_identifiers == []
 
 
 def test_no_nested_git_repositories_in_the_payload():
@@ -293,14 +328,14 @@ def test_responsive_commands_are_real_overflow_commands(layout):
 
 
 def test_first_party_commands_in_the_layout_are_registered(layout, env, bootstrap):
-    """Every FusionMyFreeCAD_* button in the ribbon must have a command behind it."""
+    """Every FMF_* button in the ribbon must have a command behind it."""
     bootstrap.register_commands()
     declared = {
         entry[0]
         for panels in layout["workbenches"].values()
         for panel in panels
         for entry in panel["commands"] + panel.get("overflow", [])
-        if entry[0].startswith("FusionMyFreeCAD_")
+        if entry[0].startswith("FMF_") and not entry[0].endswith("_ddb")
     }
     assert declared <= set(env.commands), declared - set(env.commands)
 
@@ -361,7 +396,7 @@ def test_create_sketch_stays_visible_in_the_sketcher_workbench(layout):
     """Finishing a sketch must not strand the user without Create Sketch."""
     panels = {panel["name"]: panel for panel in layout["workbenches"]["FMFSketchWorkbench"]}
     visible = {entry[0] for entry in panels["FMF Sketch Create_newPanel"]["commands"]}
-    assert "FusionMyFreeCAD_CreateSketch" in visible
+    assert "FMF_CreateSketch" in visible
 
 
 def test_symmetric_constraint_is_a_top_level_movable_command(layout):
@@ -369,8 +404,8 @@ def test_symmetric_constraint_is_a_top_level_movable_command(layout):
     constraints = panels["FMF Sketch Constraints_newPanel"]
     visible = {entry[0] for entry in constraints["commands"]}
     assert "Sketcher_ConstrainSymmetric" in visible
-    assert "Fusion_MoreConstraints_ddb" not in visible
-    assert "Fusion_MoreConstraints_ddb" not in layout["dropdownButtons"]
+    assert "FMF_MoreConstraints_ddb" not in visible
+    assert "FMF_MoreConstraints_ddb" not in layout["dropdownButtons"]
 
 
 def test_mirror_with_constraints_sits_beside_the_native_mirror(layout, manifest):
@@ -381,24 +416,24 @@ def test_mirror_with_constraints_sits_beside_the_native_mirror(layout, manifest)
     ]
     commands = modify["commands"]
     order = [entry[0] for entry in commands]
-    assert "FusionMyFreeCAD_MirrorWithConstraints" in order
+    assert "FMF_MirrorWithConstraints" in order
     by_name = {entry[0]: entry for entry in commands}
-    assert by_name["FusionMyFreeCAD_MirrorWithConstraints"][2] == "small"
-    assert by_name["FusionMyFreeCAD_MirrorWithConstraints"][3] == "Mirror + Constraints"
+    assert by_name["FMF_MirrorWithConstraints"][2] == "small"
+    assert by_name["FMF_MirrorWithConstraints"][3] == "Mirror + Constraints"
     assert by_name["Sketcher_Symmetry"][2] == "large"
     assert (
-        order.index("Sketcher_Symmetry") - order.index("FusionMyFreeCAD_MirrorWithConstraints") == 1
+        order.index("Sketcher_Symmetry") - order.index("FMF_MirrorWithConstraints") == 1
     )
-    assert "FusionMyFreeCAD_MirrorWithConstraints" in manifest["primaryCommands"]
-    assert "FusionMyFreeCAD_AddMidline" in order
-    assert by_name["FusionMyFreeCAD_AddMidline"][2] == "small"
-    assert by_name["FusionMyFreeCAD_AddMidline"][3] == "Midline"
+    assert "FMF_MirrorWithConstraints" in manifest["primaryCommands"]
+    assert "FMF_AddMidline" in order
+    assert by_name["FMF_AddMidline"][2] == "small"
+    assert by_name["FMF_AddMidline"][3] == "Midline"
     assert (
-        order.index("FusionMyFreeCAD_MirrorWithConstraints")
-        - order.index("FusionMyFreeCAD_AddMidline")
+        order.index("FMF_MirrorWithConstraints")
+        - order.index("FMF_AddMidline")
         == 1
     )
-    assert "FusionMyFreeCAD_AddMidline" in manifest["primaryCommands"]
+    assert "FMF_AddMidline" in manifest["primaryCommands"]
 
     constraints_panel = {
         panel["name"]: panel for panel in layout["workbenches"]["FMFSketchWorkbench"]
@@ -406,17 +441,17 @@ def test_mirror_with_constraints_sits_beside_the_native_mirror(layout, manifest)
     const_commands = constraints_panel["commands"]
     const_order = [entry[0] for entry in const_commands]
     const_by_name = {entry[0]: entry for entry in const_commands}
-    assert "FusionMyFreeCAD_ConstrainMidpoint" in const_order
-    assert const_by_name["FusionMyFreeCAD_ConstrainMidpoint"][2] == "small"
-    assert const_by_name["FusionMyFreeCAD_ConstrainMidpoint"][3] == "Midpoint"
+    assert "FMF_ConstrainMidpoint" in const_order
+    assert const_by_name["FMF_ConstrainMidpoint"][2] == "small"
+    assert const_by_name["FMF_ConstrainMidpoint"][3] == "Midpoint"
     assert "Sketcher_ConstrainCoincidentUnified" in const_order
     assert "Sketcher_ConstrainCoincident" not in const_order
     assert (
-        const_order.index("FusionMyFreeCAD_ConstrainMidpoint")
+        const_order.index("FMF_ConstrainMidpoint")
         - const_order.index("Sketcher_ConstrainCoincidentUnified")
         == 1
     )
-    assert "FusionMyFreeCAD_ConstrainMidpoint" in manifest["primaryCommands"]
+    assert "FMF_ConstrainMidpoint" in manifest["primaryCommands"]
 
     frequent_panel = {
         panel["name"]: panel for panel in layout["workbenches"]["FMFSketchWorkbench"]
@@ -480,14 +515,14 @@ def test_ribbon_buttons_use_direct_drag_with_the_platform_threshold():
     assert "QApplication.startDragDistance()" in widgets
     assert "def _ensureDirectDragState" in binding
     assert "def _saveDirectDragState" in binding
-    assert "fusion_bootstrap.record_customization" in binding
+    assert "fmf_bootstrap.record_customization" in binding
 
 
 def test_every_fmf_panel_menu_offers_only_a_panel_scoped_reset():
     binding = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
     assert 'translate("FreeCAD Ribbon", "Reset this panel")' in binding
-    assert "fusion_bootstrap.reset_panel_customization" in binding
-    assert "FusionMyFreeCAD_ResetRibbon" not in binding
+    assert "fmf_bootstrap.reset_panel_customization" in binding
+    assert "FMF_ResetRibbon" not in binding
 
 
 def test_searchbar_startup_is_non_interactive():
@@ -597,7 +632,7 @@ def test_every_local_ui_patch_is_present_in_the_bundled_tree():
             )
 
 
-def test_the_files_fusionmyfreecad_owns_are_bundled():
+def test_the_files_fmf_owns_are_bundled():
     """A refresh wipes the tree; these have to be carried across it."""
     sync = _sync_tool()
     assert sync.FMF_OWNED_FILES
@@ -611,7 +646,7 @@ def test_no_local_hook_probes_a_ribbon_panel_with_getattr():
     It exists to synthesise addSmall*/addMedium*/addLarge* and asserts on every
     other name, so `getattr(panel, "x", default)` does not fall back -- getattr's
     default only swallows AttributeError. Reading __dict__ is the safe probe.
-    Every FusionMyFreeCAD hook that asks a panel whether an attribute exists must
+    Every FMF hook that asks a panel whether an attribute exists must
     use it; one that did not took the whole ribbon down on workbench activation.
     """
     offenders = []
@@ -666,7 +701,7 @@ def test_the_ribbon_panel_getattr_trap_still_behaves_as_assumed():
 
 
 def test_the_draggable_divider_reaches_the_panel():
-    """The widget is FusionMyFreeCAD's, but the wiring lives in upstream's panel."""
+    """The widget is FMF's, but the wiring lives in upstream's panel."""
     panel = (
         BUNDLED / "FreeCAD-Ribbon" / "Resources" / "packages" / "pyqtribbon_local" / "panel.py"
     ).read_text(encoding="utf-8")
@@ -693,20 +728,20 @@ def test_build_addon_package_produces_a_loadable_archive(package):
     version = package.findtext("p:version", namespaces=NAMESPACE)
     builder = _import_module("build_addon_package", ROOT / "tools" / "build_addon_package.py")
     builder.main()
-    archive_path = ROOT / "dist" / "FusionMyFreeCAD-{}.zip".format(version)
+    archive_path = ROOT / "dist" / "FMF-{}.zip".format(version)
     assert archive_path.is_file()
     with zipfile.ZipFile(archive_path) as archive:
         names = set(archive.namelist())
         for required in (
-            "FusionMyFreeCAD/InitGui.py",
-            "FusionMyFreeCAD/package.xml",
-            "FusionMyFreeCAD/fusion_actions.py",
-            "FusionMyFreeCAD/fusion_bootstrap.py",
-            "FusionMyFreeCAD/Resources/FusionMyFreeCAD/runtime.py",
-            "FusionMyFreeCAD/bundled-addons/FreeCAD-Ribbon/InitGui.py",
-            "FusionMyFreeCAD/bundled-addons/SearchBar/InitGui.py",
+            "FMF/InitGui.py",
+            "FMF/package.xml",
+            "FMF/fmf_actions.py",
+            "FMF/fmf_bootstrap.py",
+            "FMF/Resources/FMF/runtime.py",
+            "FMF/bundled-addons/FreeCAD-Ribbon/InitGui.py",
+            "FMF/bundled-addons/SearchBar/InitGui.py",
             # The install guide points removers at this macro inside the archive.
-            "FusionMyFreeCAD/tools/RestoreFusionMyFreeCAD.FCMacro",
+            "FMF/tools/RestoreFMF.FCMacro",
         ):
             assert required in names, required
         assert not any(name.endswith(".pyc") for name in names)
@@ -719,7 +754,7 @@ def test_build_addon_package_produces_a_loadable_archive(package):
         ]
         assert not any(b"\r" in archive.read(entry) for entry in text_entries)
         # The archive must contain exactly one top-level directory.
-        assert {name.split("/")[0] for name in names} == {"FusionMyFreeCAD"}
+        assert {name.split("/")[0] for name in names} == {"FMF"}
 
 
 def test_fresh_extracted_archive_startup(tmp_path, env, monkeypatch):
@@ -727,14 +762,14 @@ def test_fresh_extracted_archive_startup(tmp_path, env, monkeypatch):
     builder = _import_module("build_addon_package", ROOT / "tools" / "build_addon_package.py")
     builder.main()
     version = builder.package_version()
-    archive_path = ROOT / "dist" / f"FusionMyFreeCAD-{version}.zip"
+    archive_path = ROOT / "dist" / f"FMF-{version}.zip"
 
     extract_dir = tmp_path / "extracted"
     with zipfile.ZipFile(archive_path) as archive:
         archive.extractall(extract_dir)
 
-    addon_root = extract_dir / "FusionMyFreeCAD"
-    from fusion_common import RUNTIME_MODULES
+    addon_root = extract_dir / "FMF"
+    from fmf_common import RUNTIME_MODULES
 
     for mod_name in RUNTIME_MODULES:
         assert (addon_root / mod_name).is_file(), f"Missing from zip: {mod_name}"
@@ -748,28 +783,28 @@ def test_fresh_extracted_archive_startup(tmp_path, env, monkeypatch):
     for name in [
         k
         for k in list(sys.modules.keys())
-        if k.startswith("fusion_")
-        or k in ("_fusion_my_freecad_runtime", "fusion_init_gui_extracted")
+        if k.startswith("fmf_")
+        or k in ("_fmf_my_freecad_runtime", "fmf_init_gui_extracted")
     ]:
         sys.modules.pop(name, None)
 
     env.install()
     # Stub vendor loads to test add-on bootstrap & registration cleanly
-    extracted_bootstrap = _import_module("fusion_bootstrap", addon_root / "fusion_bootstrap.py")
+    extracted_bootstrap = _import_module("fmf_bootstrap", addon_root / "fmf_bootstrap.py")
     monkeypatch.setattr(extracted_bootstrap, "load_vendor", lambda *_args: None)
     monkeypatch.setattr(extracted_bootstrap, "run_runtime", lambda: None)
 
-    init_gui = _import_module("fusion_init_gui_extracted", addon_root / "InitGui.py")
+    init_gui = _import_module("fmf_init_gui_extracted", addon_root / "InitGui.py")
     assert init_gui is not None
-    assert "FusionMyFreeCAD_CreateSketch" in env.commands
-    assert "FusionMyFreeCAD_ParameterDock" in env.commands
-    assert "FusionMyFreeCAD_DatumMidplane" in env.commands
-    assert "FusionMyFreeCAD_StudioViewport" in env.commands
+    assert "FMF_CreateSketch" in env.commands
+    assert "FMF_ParameterDock" in env.commands
+    assert "FMF_DatumMidplane" in env.commands
+    assert "FMF_StudioViewport" in env.commands
 
 
 def test_archive_stays_small_enough_to_ship(package):
     version = package.findtext("p:version", namespaces=NAMESPACE)
-    archive_path = ROOT / "dist" / "FusionMyFreeCAD-{}.zip".format(version)
+    archive_path = ROOT / "dist" / "FMF-{}.zip".format(version)
     if not archive_path.is_file():
         pytest.skip("archive not built")
     assert archive_path.stat().st_size < 8 * 1024 * 1024
@@ -794,7 +829,7 @@ def test_every_layout_icon_was_verified_by_freecad_or_its_source(layout, manifes
     `Gui.getIcon()` returns a placeholder rather than failing for an unknown name,
     so a wrong name renders a grey question mark instead of raising. The verified
     list comes from `tools/probe_freecad_icons.py` run against a real install.
-    FusionMyFreeCAD's own composite icons are declared in `authoredIcons`.
+    FMF's own composite icons are declared in `authoredIcons`.
     """
     runtime = json.loads((RESOURCES / "verified-icons.json").read_text("utf-8"))
     source = json.loads((RESOURCES / "source-icons.json").read_text("utf-8"))
@@ -885,7 +920,7 @@ def test_export_ends_the_tab_wherever_it_appears(layout):
             continue
         assert panels[-1] is output[0], workbench
         first = output[0]["commands"][0]
-        assert first[0] == "FusionMyFreeCAD_Export"
+        assert first[0] == "FMF_Export"
         assert first[2] == "large", "the export button has to read as prominent"
 
 
@@ -911,5 +946,5 @@ def test_every_export_format_is_told_apart_by_its_own_icon(layout):
 def test_create_sketch_still_opens_the_part_design_tab(layout):
     """README promises it; the export bookend must not have displaced it."""
     first = layout["workbenches"]["FMFDesignWorkbench"][0]
-    assert first["commands"][0][0] == "FusionMyFreeCAD_CreateSketch"
+    assert first["commands"][0][0] == "FMF_CreateSketch"
     assert first["commands"][0][2] == "large"

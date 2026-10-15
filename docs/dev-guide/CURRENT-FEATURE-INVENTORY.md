@@ -1,6 +1,6 @@
 # Current feature and benefit inventory
 
-This document defines FusionMyFreeCAD's current end-user value as a preservation baseline. A
+This document defines FMF's current end-user value as a preservation baseline. A
 packaging, architecture, or Addon Index refactor is not successful if it silently removes one of
 these benefits. Intentional product changes require an explicit decision, updated documentation,
 and regression coverage.
@@ -10,7 +10,7 @@ implementation so implementation details can change without losing the product.
 
 ## Product contract
 
-FusionMyFreeCAD gives a Fusion 360 user a familiar, coherent workflow across multiple modelling
+FMF gives a Fusion 360 user a familiar, coherent workflow across multiple modelling
 contexts. It is deliberately not a single-purpose workbench. Part Design, Part, Sketcher, and
 Surface each have their own purpose-built layout, while shared interaction conventions make them
 feel like parts of one product.
@@ -46,7 +46,7 @@ one oversized workspace.
 
 ### Current support
 
-`Resources/FusionMyFreeCAD/layout-v3.json` defines four independent layouts:
+`Resources/FMF/layout-v3.json` defines four independent layouts:
 
 - **Part Design**: SKETCH, CREATE, MODIFY, CONSTRUCT, PARAMETERS, FREQUENT, INSPECT, UTILITIES, and
   EXPORT panels.
@@ -55,8 +55,8 @@ one oversized workspace.
   and UTILITIES.
 - **Surface**: CREATE, MODIFY, FREQUENT, INSPECT, UTILITIES, and EXPORT.
 
-`fusion_bootstrap.py` transforms that declarative specification into the Ribbon configuration.
-`Resources/FusionMyFreeCAD/RibbonStructure.json` is the shipped Ribbon structure, and the bundled
+`fmf_bootstrap.py` transforms that declarative specification into the Ribbon configuration.
+`Resources/FMF/RibbonStructure.json` is the shipped Ribbon structure, and the bundled
 FreeCAD-Ribbon runtime renders it.
 
 ### Preservation requirement
@@ -90,7 +90,7 @@ contains the layouts, runtime, icons, styles, and third-party notices.
 ### Preservation requirement
 
 Any dependency or namespacing refactor must retain a one-package user experience. A first-run page
-with a prominent **Activate FusionMyFreeCAD** action is an acceptable additional step if activation
+with a prominent **Activate FMF** action is an acceptable additional step if activation
 is atomic, clearly explained, and followed by the complete working experience.
 
 ## First-run safety and recoverability
@@ -102,18 +102,18 @@ Startup failures should not remove access to verification and recovery commands.
 
 ### Current support
 
-- `fusion_bootstrap.py` records an initial baseline once and does not overwrite it during later
+- `fmf_bootstrap.py` records an initial baseline once and does not overwrite it during later
   updates.
 - `InitGui.py` registers recovery commands before installation and third-party runtime loading.
-- **Verify FusionMyFreeCAD** checks layout, baseline, bundled payload, and startup/runtime failures.
-- **Reset FusionMyFreeCAD** restores FMF defaults and intentionally clears FMF panel personalization.
+- **Verify FMF** checks layout, baseline, bundled payload, and startup/runtime failures.
+- **Reset FMF** restores FMF defaults and intentionally clears FMF panel personalization.
 - FMF owns four separate workbench identities: FMF Design, FMF Part, FMF Sketch, and FMF Surface.
   The curated ribbon is authoritative only in those workbenches.
-- **Disable FusionMyFreeCAD** maps the active FMF workbench to its stock counterpart, restores
+- **Disable FMF** maps the active FMF workbench to its stock counterpart, restores
   managed preferences and shortcuts, hides FMF workbench entries, and persists across restarts.
-- **Enable FusionMyFreeCAD** exposes the owned workbenches and preserves their saved layout and
+- **Enable FMF** exposes the owned workbenches and preserves their saved layout and
   personalization. Stock workbench visibility is a separate reversible preference.
-- `tools/RestoreFusionMyFreeCAD.FCMacro` provides recovery after the add-on itself has been removed.
+- `tools/RestoreFMF.FCMacro` provides recovery after the add-on itself has been removed.
 - Startup steps fail independently and record actionable diagnostics instead of aborting the rest
   of initialization.
 
@@ -135,7 +135,7 @@ elsewhere.
 ### Current support
 
 - `layout-v3.json` separates pinned commands from overflow commands.
-- `fusion_bootstrap.py` reconciles shipped panel/command order with saved user state, generates
+- `fmf_bootstrap.py` reconciles shipped panel/command order with saved user state, generates
   panel menus, records responsive metadata, and resets customization at panel scope.
 - The locally maintained Ribbon widget changes support drag reordering and panel-level reset.
 - Sketcher uses responsive width tiers so useful commands can move between the ribbon face and
@@ -196,7 +196,7 @@ interaction.
 `runtime.py` defines shortcuts for line, rectangles, circle, dimension, pad/extrude, pocket, hole,
 trim, offset, projection, construction geometry, and measure. It applies Revit navigation—the
 closest current FreeCAD built-in match—and places the navigation cube at the top right. Preferences
-allow opting out, and displaced shortcuts are reported by Verify FusionMyFreeCAD.
+allow opting out, and displaced shortcuts are reported by Verify FMF.
 
 ### Preservation requirement
 
@@ -214,9 +214,9 @@ without leaving redundant shortcuts, navigation controls, or model-tree state be
 
 ### Current support
 
-- `FusionMyFreeCAD_CreateSketch` creates the necessary document/body and delegates the attachment
+- `FMF_CreateSketch` creates the necessary document/body and delegates the attachment
   step to Part Design so origin planes remain visible and selectable.
-- `_SketchEditWorkbenchObserver` in `fusion_bootstrap.py` coordinates the transition into and out of
+- `_SketchEditWorkbenchObserver` in `fmf_bootstrap.py` coordinates the transition into and out of
   the Sketcher context.
 - Runtime workbench callbacks refresh the applicable adaptive panel and shared UI state.
 
@@ -235,7 +235,7 @@ Sketcher preference and maps the verified command into the layout.
 
 ### Mirror + Constraints
 
-`fusion_sketch_tools.py` builds on native symmetry, restores supported boundary attachments that
+`fmf_sketch_tools.py` builds on native symmetry, restores supported boundary attachments that
 native mirroring drops, adds live symmetric relationships for appropriate free geometry, preserves
 circle/arc size with equality, rolls back rejected constraints, and reports unsupported cases
 instead of silently guessing.
@@ -283,7 +283,7 @@ the live result, and press Enter without fighting focus or viewport shortcuts.
 
 ### Current support
 
-`fusion_dressup_tools.py`:
+`fmf_dressup_tools.py`:
 
 - enables live spinbox preview;
 - routes numpad digits and decimal input to the active dimension field instead of camera views;
@@ -309,7 +309,7 @@ instead of manually configuring attachment modes and reversal flags.
 
 ### Current support
 
-`fusion_datum_tools.py` validates selection, finds the active Part Design Body, creates the datum
+`fmf_datum_tools.py` validates selection, finds the active Part Design Body, creates the datum
 plane in a FreeCAD transaction, and configures its attachment.
 
 ### Preservation requirement
@@ -326,7 +326,7 @@ the Spreadsheet workbench.
 ### Current support
 
 - **Parameter Table** creates or opens the dedicated Parameters spreadsheet.
-- `fusion_parameters_dock.py` provides an in-canvas dock for parameter names, values/expressions,
+- `fmf_parameters_dock.py` provides an in-canvas dock for parameter names, values/expressions,
   aliases, and notes.
 - The dock tracks its owning document safely and refreshes through a removable document observer.
 
@@ -346,7 +346,7 @@ the first actual failure from untouched downstream features.
 
 ### Current support
 
-`fusion_repair_tools.py` audits link/subelement properties. It limits automatic repair to supported
+`fmf_repair_tools.py` audits link/subelement properties. It limits automatic repair to supported
 attachment references whose prior placement identifies a unique coplanar face. Other broken edges
 and faces are reported. Both repair and update are explicit commands.
 
@@ -365,7 +365,7 @@ save operation.
 
 ### Current support
 
-`fusion_export.py` classifies selected FreeCAD objects, rejects reference-only geometry, chooses the
+`fmf_export.py` classifies selected FreeCAD objects, rejects reference-only geometry, chooses the
 appropriate registered export filter, and delegates file generation to FreeCAD's native
 `Std_Export` command.
 
@@ -383,7 +383,7 @@ restore their prior appearance.
 
 ### Current support
 
-`fusion_viewport.py` backs up affected values before applying viewport presets or the bundled QSS,
+`fmf_viewport.py` backs up affected values before applying viewport presets or the bundled QSS,
 and exposes commands to apply or restore them.
 
 ### Preservation requirement

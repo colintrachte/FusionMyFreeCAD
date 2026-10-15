@@ -27,7 +27,7 @@ OPENROUTER_MODELS = [
     "meta-llama/llama-3.3-70b-instruct:free",
     "openrouter/fusion",
 ]
-OPENROUTER_FUSION_DOC_URL = "https://openrouter.ai/docs/guides/routing/routers/fusion-router"
+OPENROUTER_FMF_DOC_URL = "https://openrouter.ai/docs/guides/routing/routers/fusion-router"
 
 
 def openrouter_model_choices(free_models: list[str]) -> list[str]:
@@ -478,7 +478,7 @@ def read_inbox_responses(path: Path) -> list[str]:
     return [part.strip() for part in parts if part.strip()]
 
 
-def build_fusion_prompt(
+def build_fmf_prompt(
     title: str, responses: list[str], *, prompt: str = "", outcome: str = "", acceptance=()
 ) -> str:
     """One prompt for the fusion pass: the task plus every saved response, unlabelled.

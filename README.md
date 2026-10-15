@@ -1,9 +1,9 @@
-# FusionMyFreeCAD
+# FMF
 
 A self-contained, Fusion-familiar adaptive interface for FreeCAD 1.1 and newer on Windows, macOS,
 and Linux.
 
-FusionMyFreeCAD reorganises FreeCAD's Part Design, Part, Sketcher, and Surface workbenches into a
+FMF reorganises FreeCAD's Part Design, Part, Sketcher, and Surface workbenches into a
 Fusion-style ribbon, adds command search and Fusion keyboard shortcuts, and sets Fusion-like mouse
 navigation. It is a configuration layer: it does not modify FreeCAD's modelling kernel or document
 format, and everything it changes can be undone from inside FreeCAD.
@@ -14,14 +14,14 @@ format, and everything it changes can be undone from inside FreeCAD.
 
 Version **1.8.0** is available from
 [GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.8.0) as a
-self-contained archive. FusionMyFreeCAD has not yet been submitted to FreeCAD's add-on index;
+self-contained archive. FMF has not yet been submitted to FreeCAD's add-on index;
 catalog publication remains separate work.
 
 ## Install
 
-Download `FusionMyFreeCAD-1.8.0.zip` from the
+Download `FMF-1.8.0.zip` from the
 [1.8.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.8.0), extract its
-top-level `FusionMyFreeCAD` folder into FreeCAD's user `Mod` directory, and restart FreeCAD. Full
+top-level `FMF` folder into FreeCAD's user `Mod` directory, and restart FreeCAD. Full
 platform-by-platform steps, verification, update, and removal instructions are in
 [`docs/user-guide/INSTALL-FREECAD-ADDON.md`](docs/user-guide/INSTALL-FREECAD-ADDON.md).
 
@@ -32,12 +32,12 @@ scripts, or configuration files to install.
 
 ## First run
 
-On first launch FusionMyFreeCAD records your existing ribbon layout and the preferences it manages,
+On first launch FMF records your existing ribbon layout and the preferences it manages,
 then applies its own. **The recorded baseline is written once and never overwritten**, so the
 original profile stays recoverable even if later state is lost.
 
 Managed preferences are applied **once per installed version**, not at every launch. Changing one of
-them in FreeCAD's own preferences dialog afterwards sticks; FusionMyFreeCAD will not quietly put it
+them in FreeCAD's own preferences dialog afterwards sticks; FMF will not quietly put it
 back on the next start.
 
 ## Ribbon access and personalisation
@@ -45,7 +45,7 @@ back on the next start.
 Every panel has a dropdown containing its complete command inventory, including commands that do
 not fit on the ribbon face. A normal click runs a visible command; click, hold, and drag past the
 platform's normal drag distance to reorder its icon within that panel. The new order is saved
-automatically and survives FreeCAD restarts and FusionMyFreeCAD layout updates.
+automatically and survives FreeCAD restarts and FMF layout updates.
 
 Sketcher also uses the available window width: frequently useful overflow commands appear at the
 1450 px and 1750 px tiers, then return to their panel dropdowns when the window becomes narrower.
@@ -65,12 +65,12 @@ Sketcher ribbon only after the selected plane has opened the sketch for editing.
 
 Each panel's dropdown ends with **Reset this panel**. It restores only that panel's shipped order
 and pinned commands, leaving every other panel alone. There is deliberately no top-level reset
-button. **Reset FusionMyFreeCAD** remains the explicit whole-interface reset and clears all ribbon
+button. **Reset FMF** remains the explicit whole-interface reset and clears all ribbon
 personalisation along with restoring the other shipped defaults.
 
 ## Modelling and workflow enhancements
 
-FusionMyFreeCAD adds several streamlined tools designed for speed and parity with modern parametric workflows:
+FMF adds several streamlined tools designed for speed and parity with modern parametric workflows:
 
 ### Sketch tools
 - **Coincident**: The ribbon uses FreeCAD's unified command, applying point-to-point Coincident or
@@ -108,14 +108,14 @@ Each lives in an **INSPECT** panel:
 
 | Command | What it does |
 |---|---|
-| **Verify FusionMyFreeCAD** | Checks the installed layout, the restore point, the bundled payload, and any startup or runtime failure, and reports what to do next |
-| **Reset FusionMyFreeCAD** | Returns the whole ribbon, managed preferences, and shortcuts to the shipped defaults; this clears all panel personalisation |
-| **Disable FusionMyFreeCAD** | Switches an active FMF workbench to its stock counterpart, restores managed preferences and shortcuts, disconnects FMF runtime services, hides FMF workbenches, and keeps FMF disabled across restarts |
-| **Enable FusionMyFreeCAD** | Exposes the FMF-owned Design, Part, Sketch, and Surface workbenches and hides their stock counterparts without rewriting stock workbench layouts |
+| **Verify FMF** | Checks the installed layout, the restore point, the bundled payload, and any startup or runtime failure, and reports what to do next |
+| **Reset FMF** | Returns the whole ribbon, managed preferences, and shortcuts to the shipped defaults; this clears all panel personalisation |
+| **Disable FMF** | Switches an active FMF workbench to its stock counterpart, restores managed preferences and shortcuts, disconnects FMF runtime services, hides FMF workbenches, and keeps FMF disabled across restarts |
+| **Enable FMF** | Exposes the FMF-owned Design, Part, Sketch, and Surface workbenches and hides their stock counterparts without rewriting stock workbench layouts |
 
 Enabling or disabling updates the workbench selector immediately and persists the state.
-Run **Disable FusionMyFreeCAD** before removing it in Addon Manager. If you have already removed it,
-[`tools/RestoreFusionMyFreeCAD.FCMacro`](tools/RestoreFusionMyFreeCAD.FCMacro) performs the same
+Run **Disable FMF** before removing it in Addon Manager. If you have already removed it,
+[`tools/RestoreFMF.FCMacro`](tools/RestoreFMF.FCMacro) performs the same
 profile recovery as a standalone macro.
 
 ## Settings
@@ -138,8 +138,8 @@ lists every shortcut that was moved, and which command lost it.
 FreeCAD 1.1.0 or newer, Python 3.11 or newer, as declared in `package.xml`.
 
 The distributed package is **GPL-3.0-or-later**, because it bundles FreeCAD-Ribbon (GPL-3.0-or-later)
-and SearchBar (LGPL-2.1). FusionMyFreeCAD's own first-party source is additionally offered under MIT;
-see [`LICENSES/FusionMyFreeCAD-MIT.txt`](LICENSES/FusionMyFreeCAD-MIT.txt) and
+and SearchBar (LGPL-2.1). FMF's own first-party source is additionally offered under MIT;
+see [`LICENSES/FMF-MIT.txt`](LICENSES/FMF-MIT.txt) and
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 Installing or updating a user interface does not validate CAD geometry, toolpaths, or manufacturing

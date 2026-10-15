@@ -77,7 +77,7 @@ from PySide.QtCore import (
 
 import os
 import Parameters_Ribbon
-import fmf_ribbon_support  # FusionMyFreeCAD local change
+import fmf_ribbon_support  # FMF local change
 from Parameters_Ribbon import Parameters
 import Standard_Functions_Ribbon as StandardFunctions
 import StyleMapping_Ribbon

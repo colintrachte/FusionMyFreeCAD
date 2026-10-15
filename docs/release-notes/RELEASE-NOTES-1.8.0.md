@@ -1,4 +1,4 @@
-# FusionMyFreeCAD 1.8.0
+# FMF 1.8.0
 
 - Added bounded structured startup diagnostics, session health states, vendor-load timing, UI
   snapshots, and menu commands for copying a support summary or opening the diagnostics folder.
@@ -12,9 +12,9 @@ and recover more quickly when changes leave downstream features out of date.
 
 ## Install or update
 
-Download `FusionMyFreeCAD-1.8.0.zip` and
-`FusionMyFreeCAD-1.8.0.zip.sha256` from this release. Replace the entire
-existing `Mod/FusionMyFreeCAD` folder; do not merge it with an older version,
+Download `FMF-1.8.0.zip` and
+`FMF-1.8.0.zip.sha256` from this release. Replace the entire
+existing `Mod/FMF` folder; do not merge it with an older version,
 then restart FreeCAD.
 
 See the [installation guide](https://github.com/colintrachte/FusionMyFreeCAD/blob/v1.8.0/docs/user-guide/INSTALL-FREECAD-ADDON.md)
@@ -28,7 +28,7 @@ that section's drawer. Click a section title to open that drawer, aligned below
 the section rather than below the small title-bar icon. **Reset this panel**
 clears its saved width together with the rest of that panel's customization.
 
-A dragged width is now a ceiling rather than empty space FusionMyFreeCAD must
+A dragged width is now a ceiling rather than empty space FMF must
 fill. The section measures its actual buttons, shows the fullest set that fits,
 and stops at the width those buttons need. This works for mixed sections where
 large buttons and stacks of small buttons use different amounts of room.
@@ -59,13 +59,13 @@ drag into FREQUENT appears immediately.
 
 ## A faster sketcher and workbench switch
 
-FusionMyFreeCAD rebuilds a sketch's internal faces so multi-region profiles stay
+FMF rebuilds a sketch's internal faces so multi-region profiles stay
 selectable and padable. That rebuild runs an OpenCASCADE boolean, and it had been
 running on every solve, which means every frame of a drag. It now waits until you
 leave the sketch and skips entirely when nothing about the shape has changed.
 
 Entering or leaving a sketch no longer repeatedly walks every main-window
-action for every shortcut FusionMyFreeCAD manages. Shortcut processing runs
+action for every shortcut FMF manages. Shortcut processing runs
 after the window is ready, and repeated workbench activations now replace older
 pending copies of the same UI task instead of accumulating redundant shortcut,
 navigation-cube and model-tree retries. Adaptive-command tracking also uses a
@@ -135,7 +135,7 @@ broken input as a separate failure in every dependent feature.
 ## Reliability safeguards
 
 Failures while rebuilding selectable sketch regions or assigning a selected
-region to a Pad are now shown by **Verify FusionMyFreeCAD** instead of being silently
+region to a Pad are now shown by **Verify FMF** instead of being silently
 ignored. If a Pad assignment fails, its previous profile and the sketch's
 visibility are restored.
 
@@ -164,11 +164,11 @@ new deterministic ordering.
 
 FMF now owns separate FMF Design, FMF Part, FMF Sketch, and FMF Surface
 workbenches. Its ribbon no longer replaces the layouts of the stock
-workbenches. **Disable FusionMyFreeCAD** switches back to the corresponding
+workbenches. **Disable FMF** switches back to the corresponding
 stock workbench, restores managed preferences and shortcuts, disconnects its
 runtime callbacks and observers, closes its Parameters dock, and hides the FMF
 workbenches without deleting their saved layout or personalization. The bundled
 Ribbon and every unrelated workbench remain visible, and the selector refreshes immediately.
-**Enable FusionMyFreeCAD** exposes them again and hides their stock counterparts.
-**Reset FusionMyFreeCAD**
+**Enable FMF** exposes them again and hides their stock counterparts.
+**Reset FMF**
 restores FMF's shipped defaults without disabling it.

@@ -25,7 +25,7 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from fusion_common import log_swallowed
+from fmf_common import log_swallowed
 
 
 def _get_app() -> Any:

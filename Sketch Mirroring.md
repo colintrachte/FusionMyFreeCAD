@@ -1,4 +1,4 @@
-# FusionMyFreeCAD: Constraint-Aware Sketch Mirroring
+# FMF: Constraint-Aware Sketch Mirroring
 
 ## Goal
 
@@ -16,7 +16,7 @@ FreeCAD 1.0 and newer provide:
 - `Sketcher_ConstrainCoincidentUnified`: automatically selects point-to-point or point-on-object behavior from the selection.
 - `Sketcher_ConstrainPointOnObject`: explicitly attaches a selected point to a line, arc, curve, or axis.
 
-The current configuration is visible in [layout-v3.json](<fmf-repo>\Resources\FusionMyFreeCAD\layout-v3.json:1197). FreeCAD documents Coincident and Point-on-Object as distinct constraint types, with the unified command selecting between them contextually: [Coincident documentation](https://github.com/FreeCAD/FreeCAD-documentation/blob/main/wiki/Sketcher_ConstrainCoincident.md), [Point-on-Object documentation](https://github.com/FreeCAD/FreeCAD-documentation/blob/main/wiki/Sketcher_ConstrainPointOnObject.md).
+The current configuration is visible in [layout-v3.json](<fmf-repo>\Resources\FMF\layout-v3.json:1197). FreeCAD documents Coincident and Point-on-Object as distinct constraint types, with the unified command selecting between them contextually: [Coincident documentation](https://github.com/FreeCAD/FreeCAD-documentation/blob/main/wiki/Sketcher_ConstrainCoincident.md), [Point-on-Object documentation](https://github.com/FreeCAD/FreeCAD-documentation/blob/main/wiki/Sketcher_ConstrainPointOnObject.md).
 
 FreeCAD’s native Symmetry tool processes constraints restricted to the selected geometry. Constraints connecting selected geometry to unselected borders—such as the twelve missing endpoint constraints in `3x5CardBox`—can therefore be omitted. [FreeCAD Symmetry documentation](https://github.com/FreeCAD/FreeCAD-documentation/blob/main/wiki/Sketcher_Symmetry.md).
 
@@ -40,10 +40,10 @@ Retain the legacy point-to-point-only command in overflow only if compatibility 
 
 ### Modify panel
 
-Replace FusionMyFreeCAD’s primary **Mirror** button with:
+Replace FMF’s primary **Mirror** button with:
 
 - **Mirror + Constraints**
-  - Command: `FusionMyFreeCAD_MirrorWithConstraints`
+  - Command: `FMF_MirrorWithConstraints`
   - Uses Sketcher's synchronous symmetry API, then copies compatible omitted constraints.
   - Requires geometry plus an explicit mirror line or sketch axis to be preselected.
 
@@ -67,9 +67,9 @@ Do not proceed with inferred command or icon names if the probe disagrees.
 
 ### 2. Add the constraint-aware mirror command
 
-Create a focused first-party module such as `fusion_sketch_tools.py` rather than expanding the already-large bootstrap module.
+Create a focused first-party module such as `fmf_sketch_tools.py` rather than expanding the already-large bootstrap module.
 
-`FusionMyFreeCAD_MirrorWithConstraints` should:
+`FMF_MirrorWithConstraints` should:
 
 1. Verify that a sketch is actively being edited.
 2. Capture:
@@ -109,13 +109,13 @@ The command should be explicitly best-effort. It must never silently leave faile
 
 Modify:
 
-- `fusion_bootstrap.py`: register the new command.
-- `Resources/FusionMyFreeCAD/layout-v3.json`:
+- `fmf_bootstrap.py`: register the new command.
+- `Resources/FMF/layout-v3.json`:
   - Add Mirror with Constraints.
   - Add Unified Coincident.
   - Add Point on Object.
   - Preserve the original Mirror as an adjacent top-level button.
-- `Resources/FusionMyFreeCAD/layout-manifest.json`: add the new native and custom command IDs.
+- `Resources/FMF/layout-manifest.json`: add the new native and custom command IDs.
 - `command-map.md`: document the distinction between Coincident and Point on Object.
 - `README.md`: mention constraint-aware mirroring and the dedicated point-on-edge control.
 - `source-icons.json` and `verified-icons.json`: update only after probing a real FreeCAD 1.1 installation.

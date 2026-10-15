@@ -1,4 +1,4 @@
-# FusionMyFreeCAD prototype 1
+# FMF prototype 1
 
 > **Simpler path:** This manual procedure is retained for troubleshooting. For normal use, install
 > the self-contained add-on by following `../docs/user-guide/INSTALL-FREECAD-ADDON.md`.
@@ -12,7 +12,7 @@ It does **not** modify FreeCAD source, create new modeling feature types, write 
 - `fusion-ribbon-freecad-1.1.3.json` — FreeCAD-Ribbon layout for Part Design and Sketcher.
 - `freecad-1.1.3-command-manifest.json` — command identifiers checked against the official FreeCAD 1.1.3 source tag.
 - `shortcut-proposals.json` — proposed Fusion-like bindings; this file does not apply them.
-- `AuditFusionProfile.FCMacro` — read-only runtime check for registered commands and occupied shortcuts.
+- `AuditFMFProfile.FCMacro` — read-only runtime check for registered commands and occupied shortcuts.
 - `validate_prototype.py` — offline schema and command-reference validator.
 
 ## What the layout provides
@@ -68,7 +68,7 @@ SearchBar is optional. A SearchBar problem must not block testing the Ribbon or 
 
 ### 4. Run the read-only audit
 
-In **Macro > Macros**, add or run `AuditFusionProfile.FCMacro`.
+In **Macro > Macros**, add or run `AuditFMFProfile.FCMacro`.
 
 Review the Report view output:
 

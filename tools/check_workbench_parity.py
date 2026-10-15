@@ -55,7 +55,7 @@ def main() -> None:
         print(args.out)
         return
 
-    layout = json.loads((ROOT / "Resources/FusionMyFreeCAD/layout-v3.json").read_text("utf-8"))
+    layout = json.loads((ROOT / "Resources/FMF/layout-v3.json").read_text("utf-8"))
     inventory = None
     if args.action_inventory:
         inventory = json.loads(args.action_inventory.read_text("utf-8"))

@@ -31,7 +31,7 @@ def load_validator():
 
 
 def release_tree(tmp_path: Path) -> Path:
-    (tmp_path / "Resources/FusionMyFreeCAD").mkdir(parents=True)
+    (tmp_path / "Resources/FMF").mkdir(parents=True)
     (tmp_path / "docs/user-guide").mkdir(parents=True)
     (tmp_path / "docs/release-notes").mkdir()
     (tmp_path / "package.xml").write_text(
@@ -39,27 +39,27 @@ def release_tree(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     for name in ("layout-v3.json", "layout-manifest.json"):
-        (tmp_path / "Resources/FusionMyFreeCAD" / name).write_text(
+        (tmp_path / "Resources/FMF" / name).write_text(
             '{\n  "layoutVersion": "1.2.0",\n  "other": true\n}\n', encoding="utf-8"
         )
     (tmp_path / "README.md").write_text(
-        "# FusionMyFreeCAD\n\n"
+        "# FMF\n\n"
         "## Status\n\n"
         "The current source and package metadata are at development version **1.2.0**. "
         "The latest published\n"
         "archive is [version 1.1.0](repo/releases/tag/v1.1.0).\n\n"
         "## Install\n\n"
-        "`FusionMyFreeCAD-1.1.0.zip` [1.1.0 release](repo/releases/tag/v1.1.0)\n",
+        "`FMF-1.1.0.zip` [1.1.0 release](repo/releases/tag/v1.1.0)\n",
         encoding="utf-8",
     )
     (tmp_path / "docs/user-guide/INSTALL-FREECAD-ADDON.md").write_text(
-        "`FusionMyFreeCAD-1.1.0.zip` [1.1.0 release](repo/releases/tag/v1.1.0)\n"
+        "`FMF-1.1.0.zip` [1.1.0 release](repo/releases/tag/v1.1.0)\n"
         "Version 1.2.0 replaced the retired installer.\n",
         encoding="utf-8",
     )
     (tmp_path / "CHANGELOG.md").write_text(
         "# Changelog\n\n"
-        "All notable user-visible changes to FusionMyFreeCAD are recorded here.\n\n"
+        "All notable user-visible changes to FMF are recorded here.\n\n"
         "## 1.2.0 — 2026-08-31\n\nOld changes.\n",
         encoding="utf-8",
     )
@@ -76,13 +76,13 @@ def test_prepare_updates_current_metadata_and_creates_editable_notes(tmp_path):
     assert "<version>1.3.0</version>" in (root / "package.xml").read_text(encoding="utf-8")
     assert "<date>2026-09-01</date>" in (root / "package.xml").read_text(encoding="utf-8")
     for name in ("layout-v3.json", "layout-manifest.json"):
-        assert '"layoutVersion": "1.3.0"' in (root / "Resources/FusionMyFreeCAD" / name).read_text(
+        assert '"layoutVersion": "1.3.0"' in (root / "Resources/FMF" / name).read_text(
             encoding="utf-8"
         )
     assert "Version **1.3.0**" in (root / "README.md").read_text(encoding="utf-8")
-    assert "FusionMyFreeCAD-1.3.0.zip" in (root / "README.md").read_text(encoding="utf-8")
+    assert "FMF-1.3.0.zip" in (root / "README.md").read_text(encoding="utf-8")
     install = (root / "docs/user-guide/INSTALL-FREECAD-ADDON.md").read_text(encoding="utf-8")
-    assert "FusionMyFreeCAD-1.3.0.zip" in install
+    assert "FMF-1.3.0.zip" in install
     assert "Version 1.2.0 replaced the retired installer." in install
     assert "## 1.3.0 — 2026-09-01" in (root / "CHANGELOG.md").read_text(encoding="utf-8")
     assert "TODO" in (root / "docs/release-notes/RELEASE-NOTES-1.3.0.md").read_text(
@@ -105,7 +105,7 @@ def test_release_validator_accepts_complete_prepared_tree(tmp_path):
     validator = load_validator()
     root = release_tree(tmp_path)
     notes = root / "docs/release-notes/RELEASE-NOTES-1.2.0.md"
-    notes.write_text("# FusionMyFreeCAD 1.2.0\n\nComplete notes.\n", encoding="utf-8")
+    notes.write_text("# FMF 1.2.0\n\nComplete notes.\n", encoding="utf-8")
 
     validator.validate(root, "1.2.0")
 
@@ -114,7 +114,7 @@ def test_release_validator_rejects_duplicate_changelog_section(tmp_path):
     validator = load_validator()
     root = release_tree(tmp_path)
     (root / "docs/release-notes/RELEASE-NOTES-1.2.0.md").write_text(
-        "# FusionMyFreeCAD 1.2.0\n\nComplete notes.\n", encoding="utf-8"
+        "# FMF 1.2.0\n\nComplete notes.\n", encoding="utf-8"
     )
     with (root / "CHANGELOG.md").open("a", encoding="utf-8") as changelog:
         changelog.write("\n## 1.2.0 — duplicate\n")

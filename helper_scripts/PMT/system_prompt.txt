@@ -1,4 +1,4 @@
-You are working on FusionMyFreeCAD, a self-contained Fusion-familiar multi-workbench experience for
+You are working on FMF, a self-contained Fusion-familiar multi-workbench experience for
 FreeCAD 1.1+. Preserve docs/dev-guide/CURRENT-FEATURE-INVENTORY.md. Never modify Upstream Reference
 sources or change the main project version without explicit approval. Profile restoration,
 document mutation, Undo, and lifecycle recovery are Class 3. Workbench, startup, action binding,

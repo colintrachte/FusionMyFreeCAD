@@ -3,7 +3,7 @@
 **Status:** Work in progress. One feature is not finished; a crash regression is fixed.
 **Date:** 2026-09-03
 **Author:** Claude (Sonnet 5), from a long pairing session with the maintainer (Colin).
-**Scope:** `fusion_sketch_tools.py`, `fusion_bootstrap.py`, `Resources/FusionMyFreeCAD/runtime.py`,
+**Scope:** `fmf_sketch_tools.py`, `fmf_bootstrap.py`, `Resources/FMF/runtime.py`,
 the Sketcher ribbon layout, `tests/`, `tools/install-dev.ps1`, and the withdrawn v1.3.2 release.
 **Repo state at handoff:** branch `main`, HEAD = `b0d86a5`, in sync with `origin/main`
 (`git status`: `## main...origin/main`, nothing ahead/behind). GitHub release `v1.3.2` is a
@@ -39,8 +39,8 @@ learn and are the constraints any solution must respect.
 FreeCAD frozen, on FreeCAD 1.1.3, typically the first launch after installing 1.3.2, before the
 user ran any command. Did not always reproduce on a plain restart.
 
-**What 1.3.2 added:** `fusion_sketch_tools.py` (new module) + 3 Sketcher ribbon buttons
-(`FusionMyFreeCAD_MirrorWithConstraints`, the `Sketcher_ConstrainCoincidentUnified` swap,
+**What 1.3.2 added:** `fmf_sketch_tools.py` (new module) + 3 Sketcher ribbon buttons
+(`FMF_MirrorWithConstraints`, the `Sketcher_ConstrainCoincidentUnified` swap,
 `Sketcher_ConstrainPointOnObject`).
 
 **Root cause:** `MirrorWithConstraintsCommand.IsActive()` called `active_sketch()` →
@@ -76,7 +76,7 @@ mirrored divider comes back detached: the profile no longer closes cleanly.
 The user's mental model is Fusion 360: mirror a divider inside a rectangle, get three enclosed
 regions you can extrude independently, and dragging the source divider moves the mirror.
 
-`FusionMyFreeCAD_MirrorWithConstraints` (`fusion_sketch_tools.py`) is the attempt to close that
+`FMF_MirrorWithConstraints` (`fmf_sketch_tools.py`) is the attempt to close that
 gap on top of `SketchObject.addSymmetric`.
 
 ---
@@ -159,8 +159,8 @@ These were confirmed empirically on the user's machine. Trust them.
    `skipped Coincident #9: could not identify the mirrored endpoint` as noise. Fixed in `59d4c44`
    (`classify_constraint`: `if not in_source: return "native"`).
 
-10. **The user has FusionMyFreeCAD installed in two Mod dirs simultaneously:**
-    `%APPDATA%\FreeCAD\Mod\FusionMyFreeCAD` and `%APPDATA%\FreeCAD\v1-1\Mod\FusionMyFreeCAD`.
+10. **The user has FMF installed in two Mod dirs simultaneously:**
+    `%APPDATA%\FreeCAD\Mod\FMF` and `%APPDATA%\FreeCAD\v1-1\Mod\FMF`.
     `App.getUserAppDataDir()` resolves to the `v1-1` one (that is where FMF writes its backups).
     Two copies sharing one `RibbonUI_Data` is the likely cause of the
     "replaced a ribbon layout that changed outside the add-on" line on every launch. Advise the
@@ -191,7 +191,7 @@ line downgraded to `PrintLog`).
 
 ## 7. Current implementation (`b0d86a5`)
 
-`fusion_sketch_tools.mirror_sketch_geometry`:
+`fmf_sketch_tools.mirror_sketch_geometry`:
 
 1. `sketch.addSymmetric(source_indices, reference_geoid, reference_pos)` → mirror geometry +
    `mapping` {source geoid → mirror geoid}.
@@ -293,8 +293,8 @@ plus: leave the sketch, hover the middle region in 3D, report what it highlights
 
 ## 10. Repo / workflow reference
 
-- **Build a testable zip:** `python tools/build_addon_package.py` → `dist/FusionMyFreeCAD-<ver>.zip`
-  (single top-level `FusionMyFreeCAD/` folder — correct FreeCAD add-on layout).
+- **Build a testable zip:** `python tools/build_addon_package.py` → `dist/FMF-<ver>.zip`
+  (single top-level `FMF/` folder — correct FreeCAD add-on layout).
 - **Install into FreeCAD for testing:** `.\tools\install-dev.ps1` (PowerShell, from repo root).
   First run lists detected Mod dirs and asks; the choice is saved to `.install-dev.local.json`
   (git-ignored). `-NoBuild` reinstalls the last zip; `-List` shows candidates; `-Reset` forgets.
@@ -302,21 +302,21 @@ plus: leave the sketch, hover the middle region in 3D, report what it highlights
   `python -m pytest tests -q` · `python -m ruff check .` · `python -m ruff format --check .` ·
   `python validate_addon.py`
 - **Deliver to the user:** they follow from another device — send builds with `SendUserFile`
-  and quote the SHA-256 from `dist/FusionMyFreeCAD-<ver>.zip.sha256`.
+  and quote the SHA-256 from `dist/FMF-<ver>.zip.sha256`.
 - **Key files:**
-  - `fusion_sketch_tools.py` — the whole mirror feature. Pure helpers + FreeCAD-touching
+  - `fmf_sketch_tools.py` — the whole mirror feature. Pure helpers + FreeCAD-touching
     `mirror_sketch_geometry` / `mirror_with_constraints` + `MirrorWithConstraintsCommand`.
-  - `fusion_bootstrap.py` — `register_commands` wires in `fusion_sketch_tools.register()`;
+  - `fmf_bootstrap.py` — `register_commands` wires in `fmf_sketch_tools.register()`;
     `_SketchEditWorkbenchObserver` (the deferred workbench switch); `prepare()` / `_verify_layout`
     (ribbon regen + the "changed outside the add-on" logic, §5.10).
-  - `Resources/FusionMyFreeCAD/runtime.py` — `reconcile_actions` (shortcut reassignment + the
+  - `Resources/FMF/runtime.py` — `reconcile_actions` (shortcut reassignment + the
     summary line), `refresh_adaptive_panel` (FREQUENT), `MakeInternals` preference is set here.
-  - `Resources/FusionMyFreeCAD/layout-v3.json` — `FusionMyFreeCAD_MirrorWithConstraints` is a
+  - `Resources/FMF/layout-v3.json` — `FMF_MirrorWithConstraints` is a
     small button in the Sketcher `Fusion Sketch Modify_newPanel`, in front of the large native
     `Sketcher_Symmetry`. `layout-manifest.json` has `authoredIcons`
-    (`["FusionMyFreeCAD_MirrorWithConstraints"]`) so the icon-provenance tests accept the
+    (`["FMF_MirrorWithConstraints"]`) so the icon-provenance tests accept the
     add-on-drawn SVG at
-    `bundled-addons/FreeCAD-Ribbon/Resources/FreeCAD Icons/FusionMyFreeCAD_MirrorWithConstraints.svg`
+    `bundled-addons/FreeCAD-Ribbon/Resources/FreeCAD Icons/FMF_MirrorWithConstraints.svg`
     (native Mirror glyph + green "+" badge — user approved).
   - `tests/fake_freecad.py` — `FakeSketch` (`addSymmetric`, `mirror_selected` which now also
     reproduces `Vertical`/`Horizontal`/`Block` onto copies), `_refresh_rejections` +

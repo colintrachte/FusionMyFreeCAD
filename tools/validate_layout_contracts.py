@@ -20,7 +20,7 @@ COMMAND_CONTRACTS = {
         "panel": "FMF Sketch Modify_newPanel",
     },
     "create-sketch": {
-        "command": "FusionMyFreeCAD_CreateSketch",
+        "command": "FMF_CreateSketch",
         "workbench": "FMFDesignWorkbench",
         "panel": "FMF Sketch Entry_newPanel",
     },
@@ -38,7 +38,7 @@ COMMAND_CONTRACTS = {
 
 
 def validate(root: Path) -> None:
-    resources = root / "Resources" / "FusionMyFreeCAD"
+    resources = root / "Resources" / "FMF"
     layout = json.loads((resources / "layout-v3.json").read_text(encoding="utf-8"))
     manifest = json.loads((resources / "layout-manifest.json").read_text(encoding="utf-8"))
     primary = set(manifest["primaryCommands"])

@@ -13,7 +13,7 @@
 | Project | `P` | Sketcher External Projection | command exists; verify local default | Rebind to `P` |
 | Normal / Construction | `X` | Toggle Construction Geometry | command exists; verify local default | Rebind to `X` |
 | Coincident | none in Autodesk's core shortcut list | `Sketcher_ConstrainCoincidentUnified` | command exists; verify local default | Keep as the visible **Coincident** control; it chooses point-to-point or Point-on-Object from the selection |
-| Mirror | none in Autodesk's core shortcut list | `FusionMyFreeCAD_MirrorWithConstraints` | `Z`, then `S` | Small **Mirror + Constraints** button in front of the native **Mirror** (`Sketcher_Symmetry`), which keeps its large size |
+| Mirror | none in Autodesk's core shortcut list | `FMF_MirrorWithConstraints` | `Z`, then `S` | Small **Mirror + Constraints** button in front of the native **Mirror** (`Sketcher_Symmetry`), which keeps its large size |
 | Rectangular Pattern | none in core list | Move/Array Transform | varies / verify locally | Pin to toolbar or `S` menu |
 | Circular Pattern | none in core list | Rotate/Polar Transform | varies / verify locally | Pin to toolbar or `S` menu |
 
@@ -89,7 +89,7 @@ mirrored selection. Constraints that tie a selected element to an *unchanged* bo
 the endpoint-on-edge attachments in `3x5CardBox` — are silently dropped, and the profile no longer
 closes.
 
-`FusionMyFreeCAD_MirrorWithConstraints` uses Sketcher's synchronous symmetry API and then adds
+`FMF_MirrorWithConstraints` uses Sketcher's synchronous symmetry API and then adds
 what native Symmetry leaves out on FreeCAD 1.1.3: a live `Symmetric` link between each element and
 its mirrored copy (so moving one moves the other), `Equal` for mirrored circles, and —
 for any pair a link cannot cover — the boundary endpoint constraints onto the mirrored geometry.

@@ -19,7 +19,7 @@ def env(tmp_path):
     # Most existing tests exercise the pre-migration compatibility projection.
     # Owned-workbench tests opt into the new default explicitly so each behavior
     # remains independently covered.
-    environment.param("User parameter:BaseApp/Preferences/Mod/FusionMyFreeCAD").SetBool(
+    environment.param("User parameter:BaseApp/Preferences/Mod/FMF").SetBool(
         "UseOwnedWorkbenches", False
     )
     yield environment
@@ -27,7 +27,7 @@ def env(tmp_path):
     for name in [
         k
         for k in list(sys.modules.keys())
-        if k.startswith("fusion_") or k == "_fusion_my_freecad_runtime"
+        if k.startswith("fmf_") or k == "_fmf_my_freecad_runtime"
     ]:
         sys.modules.pop(name, None)
     for name in (
@@ -68,14 +68,14 @@ def runtime(env, bootstrap):
 @pytest.fixture(scope="session")
 def layout():
     return json.loads(
-        (ROOT / "Resources" / "FusionMyFreeCAD" / "layout-v3.json").read_text("utf-8")
+        (ROOT / "Resources" / "FMF" / "layout-v3.json").read_text("utf-8")
     )
 
 
 @pytest.fixture(scope="session")
 def manifest():
     return json.loads(
-        (ROOT / "Resources" / "FusionMyFreeCAD" / "layout-manifest.json").read_text("utf-8")
+        (ROOT / "Resources" / "FMF" / "layout-manifest.json").read_text("utf-8")
     )
 
 

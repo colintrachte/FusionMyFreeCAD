@@ -1,4 +1,4 @@
-# FusionMyFreeCAD 1.3.2
+# FMF 1.3.2
 
 This release adds a safer sketch-mirroring workflow. **Mirror + Constraints** preserves compatible
 endpoint attachments to unchanged border geometry, fixing the common case where mirrored dividers
@@ -17,6 +17,6 @@ conflicts.
 
 ## Install or update
 
-Download `FusionMyFreeCAD-1.3.2.zip` and `FusionMyFreeCAD-1.3.2.zip.sha256` from this release. Replace the entire existing `Mod/FusionMyFreeCAD` folder; do not merge it with an older version.
+Download `FMF-1.3.2.zip` and `FMF-1.3.2.zip.sha256` from this release. Replace the entire existing `Mod/FMF` folder; do not merge it with an older version.
 
 See the [installation guide](https://github.com/colintrachte/FusionMyFreeCAD/blob/v1.3.2/docs/INSTALL-FREECAD-ADDON.md) and [full changelog](https://github.com/colintrachte/FusionMyFreeCAD/blob/v1.3.2/CHANGELOG.md).

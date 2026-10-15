@@ -1,4 +1,4 @@
-# FusionMyFreeCAD review tiers
+# FMF review tiers
 
 > **Instantiation note:** copy this to `REVIEW_TIERS.md` at the project root, alongside
 > `TRIAGE_POLICY.md`/`IN_PROCESSING.md` — `CLAUDE.md` §1/§7 link to it rather than

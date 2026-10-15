@@ -1,1 +1,1 @@
-"""FusionMyFreeCAD has no document-layer initialization."""
+"""FMF has no document-layer initialization."""

@@ -1,9 +1,9 @@
-# Roadmap: FusionMyFreeCAD (FMF) Intent Preservation & Fusion-Familiar UX
+# Roadmap: FMF (FMF) Intent Preservation & Fusion-Familiar UX
 
 **Status:** Architecture & Implementation Plan  
 **Date:** 2026-09-03  
 **Target Platform:** FreeCAD 1.1+ / Python 3.11+  
-**Scope:** FusionMyFreeCAD Add-on (Pure Python, PySide/Qt, Coin3D `pivy`, FreeCAD App/Gui APIs)
+**Scope:** FMF Add-on (Pure Python, PySide/Qt, Coin3D `pivy`, FreeCAD App/Gui APIs)
 
 ---
 
@@ -13,7 +13,7 @@ FreeCAD 1.0 and 1.1 resolved fundamental architectural hurdles (notably the Topo
 
 Fusion assumes that when a user creates or transforms geometry (mirroring, offsetting, projecting, trimming), they intend to preserve parametric relationships, equality, symmetry, and construction states. FreeCAD historically assumed the user only wanted the resulting geometric primitives, leaving constraints to be manually reconstructed.
 
-**FusionMyFreeCAD (FMF)** is a self-contained configuration and workflow orchestration layer. It does not modify FreeCAD's C++ core or document formats. This roadmap outlines how FMF can bridge the intent gap directly inside Python, delivering a seamless, Fusion-familiar modeling experience without maintaining a separate C++ fork.
+**FMF (FMF)** is a self-contained configuration and workflow orchestration layer. It does not modify FreeCAD's C++ core or document formats. This roadmap outlines how FMF can bridge the intent gap directly inside Python, delivering a seamless, Fusion-familiar modeling experience without maintaining a separate C++ fork.
 
 ---
 
@@ -22,7 +22,7 @@ Fusion assumes that when a user creates or transforms geometry (mirroring, offse
 FreeCAD's Python API exposes full read/write access to `SketchObject.Geometry` and `SketchObject.Constraints`. FMF can intercept transformations, capture the pre-operation constraint topology, and synthesize missing intent relationships in a single undo transaction.
 
 ### 2.1 Constraint-Aware Mirroring (`Mirror + Constraints`)
-*Building on work started in `Sketch Mirroring.md` and `fusion_sketch_tools.py`.*
+*Building on work started in `Sketch Mirroring.md` and `fmf_sketch_tools.py`.*
 * **Mechanism**:
   1. Capture selected source geometry indices and existing constraints involving them.
   2. Invoke `SketchObject.addSymmetric` against the selected mirror axis or line.
@@ -137,7 +137,7 @@ FreeCAD's Python API exposes full read/write access to `SketchObject.Geometry` a
 
 | Stage | Target Version | Focus Areas | Deliverables |
 | :--- | :--- | :--- | :--- |
-| **Phase 1** | FMF 1.4 | Sketcher Intent Wrappers | Finalize `Mirror + Constraints` (`fusion_sketch_tools.py`), Smart Slot tool, and Auto-Midline macro. |
+| **Phase 1** | FMF 1.4 | Sketcher Intent Wrappers | Finalize `Mirror + Constraints` (`fmf_sketch_tools.py`), Smart Slot tool, and Auto-Midline macro. |
 | **Phase 2** | FMF 1.5 | Ergonomics & Construction | 1-Click Midplane/Datum tools, unified Extrude dialog, and Solver Diagnostic HUD translator. |
 | **Phase 3** | FMF 1.6 | Viewport & Parameters | Coin3D In-Context Ghosted Sketcher view, and Fast In-Canvas Parameters Dock. |
 

@@ -40,7 +40,7 @@ from typing import Any
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from fusion_common import notify, transaction
+from fmf_common import notify, transaction
 
 #: Prefix each command's messages carry in the Report view.
 LABEL = "Repair References"
@@ -457,19 +457,19 @@ def repair_document(document=None) -> dict:
 
     for repair in repaired:
         App.Console.PrintMessage(
-            "FusionMyFreeCAD reattached {} to {}.\n".format(
+            "FMF reattached {} to {}.\n".format(
                 _describe(repair), repair["replacement"]
             )
         )
     for finding in plan["suggestions"]:
         App.Console.PrintWarning(
-            "FusionMyFreeCAD: {} looks like it belongs on {}, but its placement was "
+            "FMF: {} looks like it belongs on {}, but its placement was "
             "reset when the reference broke, so it has been left alone. Select it and "
             "use Map Sketch to confirm.\n".format(_describe(finding), finding["replacement"])
         )
     for finding in plan["unresolved"]:
         App.Console.PrintWarning(
-            "FusionMyFreeCAD could not repair {}; nothing in the document records "
+            "FMF could not repair {}; nothing in the document records "
             "where it was. Re-pick it by hand.\n".format(_describe(finding))
         )
     _report(repaired, outstanding)
@@ -518,7 +518,7 @@ class RepairReferencesCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_RepairReferences",
+            "Pixmap": "FMF_RepairReferences",
             "MenuText": "Repair References",
             "ToolTip": (
                 "Find sketches, dress-ups and features whose face or edge references "
@@ -648,7 +648,7 @@ def update_model(document=None) -> dict:
     blocked = [entry for entry in errors if entry[2] == "not reached"]
     for name, status, kind in errors:
         App.Console.PrintWarning(
-            "FusionMyFreeCAD: {} {}: {}\n".format(
+            "FMF: {} {}: {}\n".format(
                 name, "failed" if kind == "failed" else "was not reached", status
             )
         )
@@ -688,7 +688,7 @@ class UpdateModelCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_UpdateModel",
+            "Pixmap": "FMF_UpdateModel",
             "MenuText": "Update Model",
             "ToolTip": (
                 "Rebuild every feature, so a change to one carries down to everything "
@@ -708,5 +708,5 @@ class UpdateModelCommand:
 
 def register(add_command=None):
     register_with = add_command or Gui.addCommand
-    register_with("FusionMyFreeCAD_RepairReferences", RepairReferencesCommand())
-    register_with("FusionMyFreeCAD_UpdateModel", UpdateModelCommand())
+    register_with("FMF_RepairReferences", RepairReferencesCommand())
+    register_with("FMF_UpdateModel", UpdateModelCommand())

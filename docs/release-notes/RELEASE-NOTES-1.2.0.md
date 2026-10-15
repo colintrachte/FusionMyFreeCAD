@@ -1,4 +1,4 @@
-FusionMyFreeCAD 1.2.0 makes the ribbon complete, directly customizable, and safer to install or
+FMF 1.2.0 makes the ribbon complete, directly customizable, and safer to install or
 remove.
 
 Highlights:
@@ -15,10 +15,10 @@ Highlights:
 - All 153 required command icons are curated from FreeCAD's official source and checked by content
   hash.
 
-Upgrade by replacing the entire existing `Mod/FusionMyFreeCAD` directory with the folder from the
+Upgrade by replacing the entire existing `Mod/FMF` directory with the folder from the
 new archive. Do not merge files from older versions. Existing add-on-based panel arrangements are
 reconciled with the new layout.
 
-Download both `FusionMyFreeCAD-1.2.0.zip` and `FusionMyFreeCAD-1.2.0.zip.sha256`. See the
+Download both `FMF-1.2.0.zip` and `FMF-1.2.0.zip.sha256`. See the
 [installation guide](https://github.com/colintrachte/FusionMyFreeCAD/blob/v1.2.0/docs/INSTALL-FREECAD-ADDON.md)
 and [full changelog](https://github.com/colintrachte/FusionMyFreeCAD/blob/v1.2.0/CHANGELOG.md).

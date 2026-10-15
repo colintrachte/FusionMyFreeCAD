@@ -47,23 +47,23 @@ action.
 
 ### FMF inventory
 
-- `FusionMyFreeCAD_CreateSketch`
-- `FusionMyFreeCAD_DatumMidplane`
-- `FusionMyFreeCAD_Export`
-- `FusionMyFreeCAD_Export3MF`
-- `FusionMyFreeCAD_ExportDXF`
-- `FusionMyFreeCAD_ExportSTEP`
-- `FusionMyFreeCAD_ExportSTL`
-- `FusionMyFreeCAD_ParameterDock`
-- `FusionMyFreeCAD_ParameterTable`
-- `FusionMyFreeCAD_Reapply`
-- `FusionMyFreeCAD_RepairReferences`
-- `FusionMyFreeCAD_Restore`
-- `FusionMyFreeCAD_StudioViewport`
-- `FusionMyFreeCAD_UpdateModel`
-- `FusionMyFreeCAD_Verify`
-- `Fusion_MoreCreate_ddb`
-- `Fusion_Pattern_ddb`
+- `FMF_CreateSketch`
+- `FMF_DatumMidplane`
+- `FMF_Export`
+- `FMF_Export3MF`
+- `FMF_ExportDXF`
+- `FMF_ExportSTEP`
+- `FMF_ExportSTL`
+- `FMF_ParameterDock`
+- `FMF_ParameterTable`
+- `FMF_Reapply`
+- `FMF_RepairReferences`
+- `FMF_Restore`
+- `FMF_StudioViewport`
+- `FMF_UpdateModel`
+- `FMF_Verify`
+- `FMF_MoreCreate_ddb`
+- `FMF_Pattern_ddb`
 - `PartDesign_AdditiveHelix`
 - `PartDesign_AdditiveLoft`
 - `PartDesign_AdditivePipe`
@@ -134,13 +134,13 @@ action.
 
 ### FMF inventory
 
-- `FusionMyFreeCAD_Export`
-- `FusionMyFreeCAD_Export3MF`
-- `FusionMyFreeCAD_ExportDXF`
-- `FusionMyFreeCAD_ExportSTEP`
-- `FusionMyFreeCAD_ExportSTL`
-- `FusionMyFreeCAD_RepairReferences`
-- `FusionMyFreeCAD_UpdateModel`
+- `FMF_Export`
+- `FMF_Export3MF`
+- `FMF_ExportDXF`
+- `FMF_ExportSTEP`
+- `FMF_ExportSTL`
+- `FMF_RepairReferences`
+- `FMF_UpdateModel`
 - `Part_Boolean`
 - `Part_BooleanFragments`
 - `Part_Box`
@@ -269,16 +269,16 @@ action.
 
 ### FMF inventory
 
-- `FusionMyFreeCAD_AddMidline`
-- `FusionMyFreeCAD_ConstrainMidpoint`
-- `FusionMyFreeCAD_CreateSketch`
-- `FusionMyFreeCAD_CreateSlot`
-- `FusionMyFreeCAD_MirrorWithConstraints`
-- `FusionMyFreeCAD_RepairReferences`
-- `FusionMyFreeCAD_SmartOffset`
-- `FusionMyFreeCAD_SolverDiagnostics`
-- `FusionMyFreeCAD_UpdateModel`
-- `Fusion_MoreSketchCreate_ddb`
+- `FMF_AddMidline`
+- `FMF_ConstrainMidpoint`
+- `FMF_CreateSketch`
+- `FMF_CreateSlot`
+- `FMF_MirrorWithConstraints`
+- `FMF_RepairReferences`
+- `FMF_SmartOffset`
+- `FMF_SolverDiagnostics`
+- `FMF_UpdateModel`
+- `FMF_MoreSketchCreate_ddb`
 - `Sketcher_ArcOverlay`
 - `Sketcher_BSplineConvertToNURBS`
 - `Sketcher_BSplineDecreaseDegree`
@@ -370,16 +370,16 @@ action.
 
 ### FMF inventory
 
-- `FusionMyFreeCAD_Export`
-- `FusionMyFreeCAD_Export3MF`
-- `FusionMyFreeCAD_ExportDXF`
-- `FusionMyFreeCAD_ExportSTEP`
-- `FusionMyFreeCAD_ExportSTL`
-- `FusionMyFreeCAD_Reapply`
-- `FusionMyFreeCAD_RepairReferences`
-- `FusionMyFreeCAD_Restore`
-- `FusionMyFreeCAD_UpdateModel`
-- `FusionMyFreeCAD_Verify`
+- `FMF_Export`
+- `FMF_Export3MF`
+- `FMF_ExportDXF`
+- `FMF_ExportSTEP`
+- `FMF_ExportSTL`
+- `FMF_Reapply`
+- `FMF_RepairReferences`
+- `FMF_Restore`
+- `FMF_UpdateModel`
+- `FMF_Verify`
 - `Part_CheckGeometry`
 - `Std_BoxElementSelection`
 - `Std_BoxSelection`

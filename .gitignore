@@ -1,4 +1,4 @@
-# FusionMyFreeCAD repository ignores
+# FMF repository ignores
 #
 # Keep source layouts, manifests, icons, vendored runtime snapshots, and licenses
 # under version control. Ignore only reproducible output, caches, machine-local
@@ -48,9 +48,9 @@ wheels/
 /user.cfg
 /system.cfg
 /RibbonUI_Data/
-/FusionMyFreeCAD-addon-state.json
-/FusionMyFreeCAD-runtime-status.json
-/FusionMyFreeCAD-usage.json
+/FMF-addon-state.json
+/FMF-runtime-status.json
+/FMF-usage.json
 *.FCBak
 *.FCStd1
 

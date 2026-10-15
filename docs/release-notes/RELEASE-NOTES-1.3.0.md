@@ -1,4 +1,4 @@
-# FusionMyFreeCAD 1.3.0
+# FMF 1.3.0
 
 This release makes sketch creation and extrusion behave more like Fusion while using FreeCAD's
 native modeling engine. Closed regions formed by ordinary sketch geometry are selectable for
@@ -15,7 +15,7 @@ source, produces the add-on archive and checksum, and attaches them to the tagge
 
 ## Install or update
 
-Download `FusionMyFreeCAD-1.3.0.zip` and `FusionMyFreeCAD-1.3.0.zip.sha256` from this release. Replace the entire existing `Mod/FusionMyFreeCAD` folder; do not merge it with an older version.
+Download `FMF-1.3.0.zip` and `FMF-1.3.0.zip.sha256` from this release. Replace the entire existing `Mod/FMF` folder; do not merge it with an older version.
 
 Close FreeCAD before replacing the folder, then restart it. Existing ribbon panel arrangements are
 retained and reconciled with the 1.3.0 layout.

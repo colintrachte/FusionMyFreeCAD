@@ -14,7 +14,7 @@ user deltas made after activation. They must never be collapsed into one snapsho
   and shortcuts are restored from the immutable baseline, and FMF workbench entries are hidden.
 - **Disabled:** stock workbenches and the bundled Ribbon remain usable; the generated FMF layout and
   personalization stay on disk for lossless re-enable. This state persists across restarts and
-  enablement remains available in Preferences and the FusionMyFreeCAD menu.
+  enablement remains available in Preferences and the FMF menu.
 - **Recovery required:** an interrupted transition is detected and completed or rolled back before
   normal startup continues.
 
@@ -36,7 +36,7 @@ path when files are already removed.
 
 ## Canonical ownership
 
-`fusion_bootstrap.py` owns the original baseline and transition journal. Runtime services own only
+`fmf_bootstrap.py` owns the original baseline and transition journal. Runtime services own only
 their current subscriptions. Layout defaults remain in the layout JSON; user personalization is a
 delta keyed by stable IDs. No service may overwrite the baseline during upgrade or Reset.
 
@@ -66,13 +66,13 @@ byte-for-byte unchanged. See `tests/fixtures/freecad-lifecycle.json`.
 ## Local diagnostics
 
 FMF writes bounded structured diagnostics under
-`FusionMyFreeCAD-Diagnostics` in FreeCAD's user-data directory. `events.jsonl` records ordered,
+`FMF-Diagnostics` in FreeCAD's user-data directory. `events.jsonl` records ordered,
 session-linked startup steps, vendor loading, durations, exceptions, and the final UI-health
 snapshot. `session-status.json` reports `starting`, `healthy`, `degraded`, or
 `activation_rolled_back`; `healthy` is not written until the deferred visual check confirms a
 visible Ribbon, or until disabled startup restores the stock workbench tabs.
 
-Use **FusionMyFreeCAD → Copy Diagnostic Summary** for a short support report or
-**FusionMyFreeCAD → Open Diagnostics Folder** for the complete local evidence. Logs rotate at
+Use **FMF → Copy Diagnostic Summary** for a short support report or
+**FMF → Open Diagnostics Folder** for the complete local evidence. Logs rotate at
 512 KiB with three archives, contain no document contents, and are deliberately non-fatal: an
 unwritable diagnostics directory must never prevent FreeCAD from starting.

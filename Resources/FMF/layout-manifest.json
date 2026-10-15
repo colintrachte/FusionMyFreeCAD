@@ -2,45 +2,45 @@
   "layoutVersion": "1.8.0",
   "targetFreeCAD": "1.1.x",
   "authoredIcons": [
-    "FusionMyFreeCAD_AddMidline",
-    "FusionMyFreeCAD_ConstrainMidpoint",
-    "FusionMyFreeCAD_CreateSlot",
-    "FusionMyFreeCAD_DatumMidplane",
-    "FusionMyFreeCAD_Export",
-    "FusionMyFreeCAD_Export3MF",
-    "FusionMyFreeCAD_ExportDXF",
-    "FusionMyFreeCAD_ExportSTEP",
-    "FusionMyFreeCAD_ExportSTL",
-    "FusionMyFreeCAD_MirrorWithConstraints",
-    "FusionMyFreeCAD_ParameterDock",
-    "FusionMyFreeCAD_RepairReferences",
-    "FusionMyFreeCAD_SmartOffset",
-    "FusionMyFreeCAD_SolverDiagnostics",
-    "FusionMyFreeCAD_StudioViewport",
-    "FusionMyFreeCAD_UpdateModel"
+    "FMF_AddMidline",
+    "FMF_ConstrainMidpoint",
+    "FMF_CreateSlot",
+    "FMF_DatumMidplane",
+    "FMF_Export",
+    "FMF_Export3MF",
+    "FMF_ExportDXF",
+    "FMF_ExportSTEP",
+    "FMF_ExportSTL",
+    "FMF_MirrorWithConstraints",
+    "FMF_ParameterDock",
+    "FMF_RepairReferences",
+    "FMF_SmartOffset",
+    "FMF_SolverDiagnostics",
+    "FMF_StudioViewport",
+    "FMF_UpdateModel"
   ],
   "primaryCommands": [
-    "FusionMyFreeCAD_AddMidline",
-    "FusionMyFreeCAD_ConstrainMidpoint",
-    "FusionMyFreeCAD_CreateSketch",
-    "FusionMyFreeCAD_CreateSlot",
-    "FusionMyFreeCAD_DatumMidplane",
-    "FusionMyFreeCAD_Export",
-    "FusionMyFreeCAD_Export3MF",
-    "FusionMyFreeCAD_ExportDXF",
-    "FusionMyFreeCAD_ExportSTEP",
-    "FusionMyFreeCAD_ExportSTL",
-    "FusionMyFreeCAD_MirrorWithConstraints",
-    "FusionMyFreeCAD_ParameterDock",
-    "FusionMyFreeCAD_ParameterTable",
-    "FusionMyFreeCAD_Reapply",
-    "FusionMyFreeCAD_RepairReferences",
-    "FusionMyFreeCAD_Restore",
-    "FusionMyFreeCAD_SmartOffset",
-    "FusionMyFreeCAD_SolverDiagnostics",
-    "FusionMyFreeCAD_StudioViewport",
-    "FusionMyFreeCAD_UpdateModel",
-    "FusionMyFreeCAD_Verify",
+    "FMF_AddMidline",
+    "FMF_ConstrainMidpoint",
+    "FMF_CreateSketch",
+    "FMF_CreateSlot",
+    "FMF_DatumMidplane",
+    "FMF_Export",
+    "FMF_Export3MF",
+    "FMF_ExportDXF",
+    "FMF_ExportSTEP",
+    "FMF_ExportSTL",
+    "FMF_MirrorWithConstraints",
+    "FMF_ParameterDock",
+    "FMF_ParameterTable",
+    "FMF_Reapply",
+    "FMF_RepairReferences",
+    "FMF_Restore",
+    "FMF_SmartOffset",
+    "FMF_SolverDiagnostics",
+    "FMF_StudioViewport",
+    "FMF_UpdateModel",
+    "FMF_Verify",
     "PartDesign_AdditiveHelix",
     "PartDesign_AdditiveLoft",
     "PartDesign_AdditivePipe",
@@ -266,7 +266,7 @@
             "Std_Measure"
           ],
           "commands": {
-            "FusionMyFreeCAD_CreateSketch": [
+            "FMF_CreateSketch": [
               "General",
               "large",
               "Create Sketch",
@@ -434,11 +434,11 @@
               "Scaled Pattern",
               "PartDesign_Scaled"
             ],
-            "FusionMyFreeCAD_DatumMidplane": [
+            "FMF_DatumMidplane": [
               "General",
               "large",
               "Midplane",
-              "FusionMyFreeCAD_DatumMidplane"
+              "FMF_DatumMidplane"
             ],
             "PartDesign_Plane": [
               "PartDesignWorkbench",
@@ -470,17 +470,17 @@
               "Coordinate System",
               "PartDesign_CoordinateSystem"
             ],
-            "FusionMyFreeCAD_ParameterTable": [
+            "FMF_ParameterTable": [
               "General",
               "large",
               "Parameter Table",
               "Spreadsheet"
             ],
-            "FusionMyFreeCAD_ParameterDock": [
+            "FMF_ParameterDock": [
               "General",
               "small",
               "Parameters Dock",
-              "FusionMyFreeCAD_ParameterDock"
+              "FMF_ParameterDock"
             ],
             "PartDesign_Mirrored": [
               "PartDesignWorkbench",
@@ -506,41 +506,41 @@
               "Fit All",
               "zoom-all"
             ],
-            "FusionMyFreeCAD_Verify": [
+            "FMF_Verify": [
               "General",
               "small",
               "Verify UI",
               "Std_DlgParameter"
             ],
-            "FusionMyFreeCAD_Reapply": [
+            "FMF_Reapply": [
               "General",
               "small",
-              "Reset FusionMyFreeCAD",
+              "Reset FMF",
               "Std_DlgParameter"
             ],
-            "FusionMyFreeCAD_Restore": [
+            "FMF_Restore": [
               "General",
               "small",
-              "Disable FusionMyFreeCAD",
+              "Disable FMF",
               "applications-accessories"
             ],
-            "FusionMyFreeCAD_StudioViewport": [
+            "FMF_StudioViewport": [
               "General",
               "small",
               "Studio View",
-              "FusionMyFreeCAD_StudioViewport"
+              "FMF_StudioViewport"
             ],
-            "FusionMyFreeCAD_UpdateModel": [
+            "FMF_UpdateModel": [
               "General",
               "small",
               "Update Model",
-              "FusionMyFreeCAD_UpdateModel"
+              "FMF_UpdateModel"
             ],
-            "FusionMyFreeCAD_RepairReferences": [
+            "FMF_RepairReferences": [
               "General",
               "small",
               "Repair References",
-              "FusionMyFreeCAD_RepairReferences"
+              "FMF_RepairReferences"
             ],
             "Std_UnitsCalculator": [
               "General",
@@ -572,35 +572,35 @@
               "What's This?",
               "WhatsThis"
             ],
-            "FusionMyFreeCAD_Export": [
+            "FMF_Export": [
               "General",
               "large",
               "Export",
-              "FusionMyFreeCAD_Export"
+              "FMF_Export"
             ],
-            "FusionMyFreeCAD_ExportSTEP": [
+            "FMF_ExportSTEP": [
               "General",
               "small",
               "STEP",
-              "FusionMyFreeCAD_ExportSTEP"
+              "FMF_ExportSTEP"
             ],
-            "FusionMyFreeCAD_ExportSTL": [
+            "FMF_ExportSTL": [
               "General",
               "small",
               "STL",
-              "FusionMyFreeCAD_ExportSTL"
+              "FMF_ExportSTL"
             ],
-            "FusionMyFreeCAD_Export3MF": [
+            "FMF_Export3MF": [
               "General",
               "small",
               "3MF",
-              "FusionMyFreeCAD_Export3MF"
+              "FMF_Export3MF"
             ],
-            "FusionMyFreeCAD_ExportDXF": [
+            "FMF_ExportDXF": [
               "General",
               "small",
               "DXF",
-              "FusionMyFreeCAD_ExportDXF"
+              "FMF_ExportDXF"
             ]
           }
         }
@@ -918,17 +918,17 @@
               "Fit All",
               "zoom-all"
             ],
-            "FusionMyFreeCAD_UpdateModel": [
+            "FMF_UpdateModel": [
               "General",
               "small",
               "Update Model",
-              "FusionMyFreeCAD_UpdateModel"
+              "FMF_UpdateModel"
             ],
-            "FusionMyFreeCAD_RepairReferences": [
+            "FMF_RepairReferences": [
               "General",
               "small",
               "Repair References",
-              "FusionMyFreeCAD_RepairReferences"
+              "FMF_RepairReferences"
             ],
             "Std_UnitsCalculator": [
               "General",
@@ -960,35 +960,35 @@
               "What's This?",
               "WhatsThis"
             ],
-            "FusionMyFreeCAD_Export": [
+            "FMF_Export": [
               "General",
               "large",
               "Export",
-              "FusionMyFreeCAD_Export"
+              "FMF_Export"
             ],
-            "FusionMyFreeCAD_ExportSTEP": [
+            "FMF_ExportSTEP": [
               "General",
               "small",
               "STEP",
-              "FusionMyFreeCAD_ExportSTEP"
+              "FMF_ExportSTEP"
             ],
-            "FusionMyFreeCAD_ExportSTL": [
+            "FMF_ExportSTL": [
               "General",
               "small",
               "STL",
-              "FusionMyFreeCAD_ExportSTL"
+              "FMF_ExportSTL"
             ],
-            "FusionMyFreeCAD_Export3MF": [
+            "FMF_Export3MF": [
               "General",
               "small",
               "3MF",
-              "FusionMyFreeCAD_Export3MF"
+              "FMF_Export3MF"
             ],
-            "FusionMyFreeCAD_ExportDXF": [
+            "FMF_ExportDXF": [
               "General",
               "small",
               "DXF",
-              "FusionMyFreeCAD_ExportDXF"
+              "FMF_ExportDXF"
             ]
           }
         }
@@ -1046,7 +1046,7 @@
             "Sketcher_CompExternal"
           ],
           "commands": {
-            "FusionMyFreeCAD_CreateSketch": [
+            "FMF_CreateSketch": [
               "General",
               "large",
               "Create Sketch",
@@ -1082,11 +1082,11 @@
               "Arc",
               "Sketcher_CreateArc"
             ],
-            "FusionMyFreeCAD_CreateSlot": [
+            "FMF_CreateSlot": [
               "General",
               "small",
               "Smart Slot",
-              "FusionMyFreeCAD_CreateSlot"
+              "FMF_CreateSlot"
             ],
             "Sketcher_CreateSlot": [
               "SketcherWorkbench",
@@ -1166,23 +1166,23 @@
               "Offset",
               "Sketcher_Offset"
             ],
-            "FusionMyFreeCAD_SmartOffset": [
+            "FMF_SmartOffset": [
               "General",
               "small",
               "Smart Offset",
-              "FusionMyFreeCAD_SmartOffset"
+              "FMF_SmartOffset"
             ],
-            "FusionMyFreeCAD_AddMidline": [
+            "FMF_AddMidline": [
               "General",
               "small",
               "Midline",
-              "FusionMyFreeCAD_AddMidline"
+              "FMF_AddMidline"
             ],
-            "FusionMyFreeCAD_MirrorWithConstraints": [
+            "FMF_MirrorWithConstraints": [
               "General",
               "small",
               "Mirror + Constraints",
-              "FusionMyFreeCAD_MirrorWithConstraints"
+              "FMF_MirrorWithConstraints"
             ],
             "Sketcher_Symmetry": [
               "SketcherWorkbench",
@@ -1310,17 +1310,17 @@
               "Coincident",
               "Constraint_PointOnPoint"
             ],
-            "FusionMyFreeCAD_ConstrainMidpoint": [
+            "FMF_ConstrainMidpoint": [
               "SketcherWorkbench",
               "small",
               "Midpoint",
-              "FusionMyFreeCAD_ConstrainMidpoint"
+              "FMF_ConstrainMidpoint"
             ],
-            "FusionMyFreeCAD_SolverDiagnostics": [
+            "FMF_SolverDiagnostics": [
               "General",
               "small",
               "Diagnostics",
-              "FusionMyFreeCAD_SolverDiagnostics"
+              "FMF_SolverDiagnostics"
             ],
             "Sketcher_ConstrainTangent": [
               "SketcherWorkbench",
@@ -1496,17 +1496,17 @@
               "Cancel Sketch",
               "process-stop"
             ],
-            "FusionMyFreeCAD_UpdateModel": [
+            "FMF_UpdateModel": [
               "General",
               "small",
               "Update Model",
-              "FusionMyFreeCAD_UpdateModel"
+              "FMF_UpdateModel"
             ],
-            "FusionMyFreeCAD_RepairReferences": [
+            "FMF_RepairReferences": [
               "General",
               "small",
               "Repair References",
-              "FusionMyFreeCAD_RepairReferences"
+              "FMF_RepairReferences"
             ],
             "Std_UnitsCalculator": [
               "General",
@@ -1602,35 +1602,35 @@
               "Check Geometry",
               "Part_CheckGeometry"
             ],
-            "FusionMyFreeCAD_Verify": [
+            "FMF_Verify": [
               "General",
               "small",
               "Verify UI",
               "Std_DlgParameter"
             ],
-            "FusionMyFreeCAD_Reapply": [
+            "FMF_Reapply": [
               "General",
               "small",
-              "Reset FusionMyFreeCAD",
+              "Reset FMF",
               "Std_DlgParameter"
             ],
-            "FusionMyFreeCAD_Restore": [
+            "FMF_Restore": [
               "General",
               "small",
-              "Disable FusionMyFreeCAD",
+              "Disable FMF",
               "applications-accessories"
             ],
-            "FusionMyFreeCAD_UpdateModel": [
+            "FMF_UpdateModel": [
               "General",
               "small",
               "Update Model",
-              "FusionMyFreeCAD_UpdateModel"
+              "FMF_UpdateModel"
             ],
-            "FusionMyFreeCAD_RepairReferences": [
+            "FMF_RepairReferences": [
               "General",
               "small",
               "Repair References",
-              "FusionMyFreeCAD_RepairReferences"
+              "FMF_RepairReferences"
             ],
             "Std_UnitsCalculator": [
               "General",
@@ -1662,35 +1662,35 @@
               "What's This?",
               "WhatsThis"
             ],
-            "FusionMyFreeCAD_Export": [
+            "FMF_Export": [
               "General",
               "large",
               "Export",
-              "FusionMyFreeCAD_Export"
+              "FMF_Export"
             ],
-            "FusionMyFreeCAD_ExportSTEP": [
+            "FMF_ExportSTEP": [
               "General",
               "small",
               "STEP",
-              "FusionMyFreeCAD_ExportSTEP"
+              "FMF_ExportSTEP"
             ],
-            "FusionMyFreeCAD_ExportSTL": [
+            "FMF_ExportSTL": [
               "General",
               "small",
               "STL",
-              "FusionMyFreeCAD_ExportSTL"
+              "FMF_ExportSTL"
             ],
-            "FusionMyFreeCAD_Export3MF": [
+            "FMF_Export3MF": [
               "General",
               "small",
               "3MF",
-              "FusionMyFreeCAD_Export3MF"
+              "FMF_Export3MF"
             ],
-            "FusionMyFreeCAD_ExportDXF": [
+            "FMF_ExportDXF": [
               "General",
               "small",
               "DXF",
-              "FusionMyFreeCAD_ExportDXF"
+              "FMF_ExportDXF"
             ]
           }
         }

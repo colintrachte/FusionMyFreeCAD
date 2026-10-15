@@ -1,16 +1,16 @@
 # FreeCAD Core Suggestions Box
 
 **Architectural Proposals for Upstream FreeCAD (v1.1 / v1.2+)**  
-*Derived from the FusionMyFreeCAD (FMF) Modernization Initiative*
+*Derived from the FMF (FMF) Modernization Initiative*
 
 > [!NOTE]
-> **Internal Repository Documentation**: These architectural proposals and problem analyses are cataloged internally within the FusionMyFreeCAD repository for future architectural reference and are NOT submitted to upstream FreeCAD issue trackers or forums without explicit direction.
+> **Internal Repository Documentation**: These architectural proposals and problem analyses are cataloged internally within the FMF repository for future architectural reference and are NOT submitted to upstream FreeCAD issue trackers or forums without explicit direction.
 
 ---
 
 ## Executive Summary & Design Philosophy
 
-Add-ons like **FusionMyFreeCAD (FMF)** excel at opinionated workflow assembly: organizing ribbon tabs, wiring high-leverage geometric shortcuts, providing fast in-canvas utilities, and establishing clean defaults.
+Add-ons like **FMF (FMF)** excel at opinionated workflow assembly: organizing ribbon tabs, wiring high-leverage geometric shortcuts, providing fast in-canvas utilities, and establishing clean defaults.
 
 However, when an add-on attempts to compensate for foundational CAD engine limitations through Python hooks, it inevitably encounters fragility:
 - **Scene graph hacking**: Custom Coin3D/OpenGL shaders in Python cause driver-dependent crashes, memory leaks, and viewport flicker.

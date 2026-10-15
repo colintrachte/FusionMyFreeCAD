@@ -1,6 +1,6 @@
 """Native QAction adapter contracts."""
 
-from fusion_actions import NativeActionAdapter
+from fmf_actions import NativeActionAdapter
 
 
 class Signal:

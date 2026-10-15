@@ -1,6 +1,6 @@
-"""Constraint-aware sketch mirroring for FusionMyFreeCAD.
+"""Constraint-aware sketch mirroring for FMF.
 
-``FusionMyFreeCAD_MirrorWithConstraints`` uses Sketcher's synchronous symmetry API
+``FMF_MirrorWithConstraints`` uses Sketcher's synchronous symmetry API
 and then does two things native Symmetry does not do on FreeCAD 1.1.3, in order:
 
 1. Copies the *boundary* constraints native Symmetry drops -- the ones that tie a
@@ -36,7 +36,7 @@ import os
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from fusion_common import SketcherCommand, log_swallowed, notify
+from fmf_common import SketcherCommand, log_swallowed, notify
 
 # Distance below which two sketch coordinates are treated as the same point.
 TOLERANCE = 1e-6
@@ -1762,11 +1762,11 @@ def _notify_midline(text: str, error: bool = False) -> None:
 
 
 class MirrorWithConstraintsCommand(SketcherCommand):
-    """``FusionMyFreeCAD_MirrorWithConstraints`` ribbon command."""
+    """``FMF_MirrorWithConstraints`` ribbon command."""
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_MirrorWithConstraints",
+            "Pixmap": "FMF_MirrorWithConstraints",
             "MenuText": "Mirror + Constraints",
             "ToolTip": (
                 "Mirror like FreeCAD's Mirror, then add the constraints it leaves out: "
@@ -1782,11 +1782,11 @@ class MirrorWithConstraintsCommand(SketcherCommand):
 
 
 class AddMidlineCommand(SketcherCommand):
-    """``FusionMyFreeCAD_AddMidline`` ribbon command."""
+    """``FMF_AddMidline`` ribbon command."""
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_AddMidline",
+            "Pixmap": "FMF_AddMidline",
             "MenuText": "Midline",
             "ToolTip": (
                 "Create a construction midline / symmetry axis from selected geometry:\n"
@@ -2026,11 +2026,11 @@ def _notify_midpoint(text: str, error: bool = False) -> None:
 
 
 class ConstrainMidpointCommand(SketcherCommand):
-    """``FusionMyFreeCAD_ConstrainMidpoint`` ribbon command."""
+    """``FMF_ConstrainMidpoint`` ribbon command."""
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_ConstrainMidpoint",
+            "Pixmap": "FMF_ConstrainMidpoint",
             "MenuText": "Midpoint",
             "ToolTip": (
                 "Constrain a point to the midpoint of a line segment, or between two points.\n"
@@ -2177,11 +2177,11 @@ def _notify_slot(text: str, error: bool = False) -> None:
 
 
 class SmartSlotCommand(SketcherCommand):
-    """``FusionMyFreeCAD_CreateSlot`` ribbon command."""
+    """``FMF_CreateSlot`` ribbon command."""
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_CreateSlot",
+            "Pixmap": "FMF_CreateSlot",
             "MenuText": "Smart Slot",
             "ToolTip": (
                 "Create a parametric Center-to-Center Slot with auto-applied tangency, "
@@ -2420,11 +2420,11 @@ def _notify_offset(text: str, error: bool = False) -> None:
 
 
 class SmartOffsetCommand(SketcherCommand):
-    """``FusionMyFreeCAD_SmartOffset`` ribbon command."""
+    """``FMF_SmartOffset`` ribbon command."""
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_SmartOffset",
+            "Pixmap": "FMF_SmartOffset",
             "MenuText": "Smart Offset",
             "ToolTip": (
                 "Create a parametric loop offset with preserved parallel, tangent, and "
@@ -2598,7 +2598,7 @@ def run_solver_diagnostics():
         _notify_diagnostics(msg)
         return {"status": "clean", "report": report}
 
-    App.Console.PrintWarning("=== FusionMyFreeCAD Solver Diagnostics ===\n")
+    App.Console.PrintWarning("=== FMF Solver Diagnostics ===\n")
     if report["conflicting"]:
         App.Console.PrintError("Conflicting constraints:\n")
         for line in report["conflicting"]:
@@ -2623,11 +2623,11 @@ def _notify_diagnostics(text: str, error: bool = False) -> None:
 
 
 class SolverDiagnosticsCommand(SketcherCommand):
-    """``FusionMyFreeCAD_SolverDiagnostics`` ribbon command."""
+    """``FMF_SolverDiagnostics`` ribbon command."""
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_SolverDiagnostics",
+            "Pixmap": "FMF_SolverDiagnostics",
             "MenuText": "Solver Diagnostics",
             "ToolTip": (
                 "Inspect sketch solver conflicts and redundant constraints with "
@@ -2666,9 +2666,9 @@ def register(add_command=None):
     """Register the commands with FreeCAD (or a supplied callable, for tests)."""
     _register_icon_path()
     register_with = add_command or Gui.addCommand
-    register_with("FusionMyFreeCAD_MirrorWithConstraints", MirrorWithConstraintsCommand())
-    register_with("FusionMyFreeCAD_AddMidline", AddMidlineCommand())
-    register_with("FusionMyFreeCAD_ConstrainMidpoint", ConstrainMidpointCommand())
-    register_with("FusionMyFreeCAD_CreateSlot", SmartSlotCommand())
-    register_with("FusionMyFreeCAD_SmartOffset", SmartOffsetCommand())
-    register_with("FusionMyFreeCAD_SolverDiagnostics", SolverDiagnosticsCommand())
+    register_with("FMF_MirrorWithConstraints", MirrorWithConstraintsCommand())
+    register_with("FMF_AddMidline", AddMidlineCommand())
+    register_with("FMF_ConstrainMidpoint", ConstrainMidpointCommand())
+    register_with("FMF_CreateSlot", SmartSlotCommand())
+    register_with("FMF_SmartOffset", SmartOffsetCommand())
+    register_with("FMF_SolverDiagnostics", SolverDiagnosticsCommand())

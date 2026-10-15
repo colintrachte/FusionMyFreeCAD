@@ -71,7 +71,7 @@ def test_baseline_is_written_once_and_never_overwritten(env, bootstrap):
     captured = {(e["path"], e["name"]): e["value"] for e in baseline["preferences"]}
     assert captured[("User parameter:BaseApp/Preferences/View", "NavigationStyle")] == "Original"
 
-    # Simulate FusionMyFreeCAD having applied its own settings.
+    # Simulate FMF having applied its own settings.
     env.param("User parameter:BaseApp/Preferences/View").SetString(
         "NavigationStyle", "Gui::RevitNavigationStyle"
     )
@@ -115,12 +115,68 @@ def test_existing_state_is_migrated_to_the_immutable_baseline(env, bootstrap):
     assert baseline["migratedFromState"] is True
 
 
-def test_lost_state_does_not_capture_fusion_settings_as_the_baseline(env, bootstrap):
+def test_previous_brand_state_and_preferences_are_carried_forward(env, bootstrap):
+    previous_state = Path(bootstrap._PREVIOUS_FILE_PATHS[bootstrap.STATE_PATH])
+    previous_state.parent.mkdir(parents=True, exist_ok=True)
+    previous_state.write_text('{"marker": "previous"}', encoding="utf-8")
+    previous_preferences = env.param(bootstrap._PREVIOUS_PREFERENCE_ROOT)
+    previous_preferences.SetBool("SetShortcuts", False)
+
+    bootstrap._migrate_previous_brand_data()
+
+    assert json.loads(Path(bootstrap.STATE_PATH).read_text("utf-8")) == {
+        "marker": "previous"
+    }
+    assert env.param(bootstrap.PREFERENCE_ROOT).GetBool("SetShortcuts") is False
+    assert previous_state.is_file()
+
+
+def test_previous_brand_data_never_overwrites_fmf_data(env, bootstrap):
+    previous_state = Path(bootstrap._PREVIOUS_FILE_PATHS[bootstrap.STATE_PATH])
+    previous_state.parent.mkdir(parents=True, exist_ok=True)
+    previous_state.write_text('{"marker": "previous"}', encoding="utf-8")
+    Path(bootstrap.STATE_PATH).write_text('{"marker": "fmf"}', encoding="utf-8")
+    env.param(bootstrap._PREVIOUS_PREFERENCE_ROOT).SetBool("SetShortcuts", False)
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("SetShortcuts", True)
+
+    bootstrap._migrate_previous_brand_data()
+
+    assert json.loads(Path(bootstrap.STATE_PATH).read_text("utf-8")) == {"marker": "fmf"}
+    assert env.param(bootstrap.PREFERENCE_ROOT).GetBool("SetShortcuts") is True
+
+
+def test_previous_brand_customization_command_ids_are_migrated(env, bootstrap):
+    bootstrap._atomic_json(
+        bootstrap.CUSTOMIZATION_PATH,
+        {
+            "schemaVersion": 1,
+            "workbenches": {
+                "FusionDesignWorkbench": {
+                    "panelOrder": ["Fusion Create_newPanel"],
+                    "panels": {
+                        "Fusion Create_newPanel": {
+                            "order": ["FusionMyFreeCAD_CreateSketch"],
+                            "pinned": ["FusionMyFreeCAD_CreateSketch"],
+                        }
+                    },
+                }
+            },
+        },
+    )
+
+    customization = bootstrap._read_customization()
+    migrated = customization["workbenches"]["FMFDesignWorkbench"]
+    assert migrated["panelOrder"] == ["FMF Create_newPanel"]
+    assert migrated["panels"]["FMF Create_newPanel"]["order"] == ["FMF_CreateSketch"]
+    assert migrated["panels"]["FMF Create_newPanel"]["pinned"] == ["FMF_CreateSketch"]
+
+
+def test_lost_state_does_not_capture_fmf_settings_as_the_baseline(env, bootstrap):
     """The regression that would silently destroy the user's original profile."""
     env.param("User parameter:BaseApp/Preferences/View").SetString("NavigationStyle", "Original")
     bootstrap.prepare()
 
-    # The state file is lost; FusionMyFreeCAD's own values are now in the profile.
+    # The state file is lost; FMF's own values are now in the profile.
     Path(bootstrap.STATE_PATH).unlink()
     env.param("User parameter:BaseApp/Preferences/View").SetString(
         "NavigationStyle", "Gui::RevitNavigationStyle"
@@ -263,7 +319,7 @@ def test_restore_returns_the_profile_to_its_original_state(env, bootstrap):
     assert json.loads(Path(bootstrap.RIBBON_PATH).read_text("utf-8")) == {"previous": True}
     assert view.GetString("NavigationStyle") == "PreviousStyle"
     assert sketcher.GetBool("MakeInternals") is False
-    assert (Path(removed) / "FusionMyFreeCAD-addon-state.json").is_file()
+    assert (Path(removed) / "FMF-addon-state.json").is_file()
 
 
 def test_restore_removes_keys_that_did_not_previously_exist(env, bootstrap):
@@ -434,13 +490,13 @@ def test_the_recovery_macro_restores_without_the_addon_installed(env, bootstrap,
     view.SetString("NavigationStyle", "Gui::RevitNavigationStyle")
     env.param(bootstrap.PREFERENCE_ROOT).SetString("AppliedVersion", bootstrap.PACKAGE_VERSION)
 
-    # Simulate Addon Manager having deleted Mod/FusionMyFreeCAD entirely.
+    # Simulate Addon Manager having deleted Mod/FMF entirely.
     import sys
 
     from fake_freecad import ROOT, _import_module
 
-    sys.modules.pop("fusion_bootstrap", None)
-    macro = ROOT / "tools" / "RestoreFusionMyFreeCAD.FCMacro"
+    sys.modules.pop("fmf_bootstrap", None)
+    macro = ROOT / "tools" / "RestoreFMF.FCMacro"
     module_path = tmp_path / "restore_macro.py"
     module_path.write_text(macro.read_text(encoding="utf-8"), encoding="utf-8")
     _import_module("restore_macro_under_test", module_path)
@@ -448,7 +504,7 @@ def test_the_recovery_macro_restores_without_the_addon_installed(env, bootstrap,
     assert view.GetString("NavigationStyle") == "PreviousStyle"
     assert "AppliedVersion" not in env.param(bootstrap.PREFERENCE_ROOT).GetStrings()
     assert not Path(bootstrap.STATE_PATH).exists()
-    assert any("FusionMyFreeCAD restored" in message for message in env.console.messages)
+    assert any("FMF restored" in message for message in env.console.messages)
 
 
 def test_the_recovery_macro_says_so_when_there_is_nothing_to_restore(env, bootstrap, tmp_path):
@@ -456,8 +512,8 @@ def test_the_recovery_macro_says_so_when_there_is_nothing_to_restore(env, bootst
 
     from fake_freecad import ROOT, _import_module
 
-    sys.modules.pop("fusion_bootstrap", None)
-    macro = ROOT / "tools" / "RestoreFusionMyFreeCAD.FCMacro"
+    sys.modules.pop("fmf_bootstrap", None)
+    macro = ROOT / "tools" / "RestoreFMF.FCMacro"
     module_path = tmp_path / "restore_macro_empty.py"
     module_path.write_text(macro.read_text(encoding="utf-8"), encoding="utf-8")
     _import_module("restore_macro_empty_under_test", module_path)

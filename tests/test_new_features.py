@@ -1,4 +1,4 @@
-"""Unit tests for FusionMyFreeCAD roadmap features:
+"""Unit tests for FMF roadmap features:
 
 - Smart Slot Generator
 - Smart Loop Offset Wrapper
@@ -189,7 +189,7 @@ def test_diagnose_sketch_solver_with_redundancy(sketch_env):
 
 
 def test_create_midplane(sketch_env):
-    import fusion_datum_tools
+    import fmf_datum_tools
 
     doc = sketch_env.app.ActiveDocument or sketch_env._new_document()
     body = doc.addObject("PartDesign::Body", "Body")
@@ -198,7 +198,7 @@ def test_create_midplane(sketch_env):
     face2 = types.SimpleNamespace(Object=body, SubElementNames=["Face2"])
     sketch_env.selection_ex = [face1, face2]
 
-    res = fusion_datum_tools.create_midplane()
+    res = fmf_datum_tools.create_midplane()
     assert res["status"] == "ok"
     plane = res["plane"]
     assert plane.Label == "Midplane"
@@ -206,7 +206,7 @@ def test_create_midplane(sketch_env):
 
 
 def test_create_plane_at_angle(sketch_env):
-    import fusion_datum_tools
+    import fmf_datum_tools
 
     doc = sketch_env.app.ActiveDocument or sketch_env._new_document()
     body = doc.addObject("PartDesign::Body", "Body")
@@ -214,7 +214,7 @@ def test_create_plane_at_angle(sketch_env):
     face = (body, ["Face1"])
     edge = (body, ["Edge1"])
 
-    res = fusion_datum_tools.create_plane_at_angle(face_ref=face, edge_ref=edge, angle=30.0)
+    res = fmf_datum_tools.create_plane_at_angle(face_ref=face, edge_ref=edge, angle=30.0)
     assert res["status"] == "ok"
     plane = res["plane"]
     assert plane.Label == "PlaneAtAngle"
@@ -228,19 +228,19 @@ def test_create_plane_at_angle(sketch_env):
 
 def test_sketch_repair_observer_recompute(sketch_env):
     """_SketchRepairObserver ensures sketch.InternalShape is populated on Shape change."""
-    import fusion_bootstrap
+    import fmf_bootstrap
 
     doc = sketch_env.app.ActiveDocument or sketch_env._new_document()
     sketch = doc.addObject("Sketcher::SketchObject", "Sketch")
 
-    obs = fusion_bootstrap._SketchRepairObserver()
+    obs = fmf_bootstrap._SketchRepairObserver()
     # Trigger slotChangedObject on Shape
     obs.slotChangedObject(sketch, "Shape")
 
 
 def test_sketch_repair_observer_reports_failure(sketch_env, monkeypatch):
-    import fusion_bootstrap
-    import fusion_sketch_tools
+    import fmf_bootstrap
+    import fmf_sketch_tools
 
     doc = sketch_env.app.ActiveDocument or sketch_env._new_document()
     sketch = doc.addObject("Sketcher::SketchObject", "Sketch")
@@ -249,14 +249,14 @@ def test_sketch_repair_observer_reports_failure(sketch_env, monkeypatch):
     def explode(_sketch):
         raise RuntimeError("OpenCASCADE failed")
 
-    monkeypatch.setattr(fusion_sketch_tools, "repair_sketch_internal_faces", explode)
+    monkeypatch.setattr(fmf_sketch_tools, "repair_sketch_internal_faces", explode)
     monkeypatch.setattr(
-        fusion_bootstrap,
+        fmf_bootstrap,
         "record_startup_failure",
         lambda step, error: reported.append((step, str(error))),
     )
 
-    obs = fusion_bootstrap._SketchRepairObserver()
+    obs = fmf_bootstrap._SketchRepairObserver()
     obs.slotChangedObject(sketch, "Shape")
 
     assert obs._updating is False
@@ -265,7 +265,7 @@ def test_sketch_repair_observer_reports_failure(sketch_env, monkeypatch):
 
 def test_pad_selection_observer_internal_face(sketch_env):
     """_PadSelectionObserver enables picking InternalFace in 3D to set Pad profile."""
-    import fusion_bootstrap
+    import fmf_bootstrap
 
     doc = sketch_env.app.ActiveDocument or sketch_env._new_document()
     body = doc.addObject("PartDesign::Body", "Body")
@@ -276,7 +276,7 @@ def test_pad_selection_observer_internal_face(sketch_env):
     pad.Profile = (sketch, [""])
     body.addObject(pad)
 
-    obs = fusion_bootstrap._PadSelectionObserver()
+    obs = fmf_bootstrap._PadSelectionObserver()
     obs.addSelection(doc.Name, sketch.Name, "Sketch.InternalFace1")
 
     # Profile should now be updated to (sketch, ['InternalFace1'])
@@ -284,7 +284,7 @@ def test_pad_selection_observer_internal_face(sketch_env):
 
 
 def test_pad_selection_observer_reports_failure_and_clears_busy(sketch_env, monkeypatch):
-    import fusion_bootstrap
+    import fmf_bootstrap
 
     doc = sketch_env.app.ActiveDocument or sketch_env._new_document()
     body = doc.addObject("PartDesign::Body", "Body")
@@ -296,12 +296,12 @@ def test_pad_selection_observer_reports_failure_and_clears_busy(sketch_env, monk
     reported = []
     pad.recompute = lambda: (_ for _ in ()).throw(RuntimeError("Pad recompute failed"))
     monkeypatch.setattr(
-        fusion_bootstrap,
+        fmf_bootstrap,
         "record_startup_failure",
         lambda step, error: reported.append((step, str(error))),
     )
 
-    obs = fusion_bootstrap._PadSelectionObserver()
+    obs = fmf_bootstrap._PadSelectionObserver()
     obs.addSelection(doc.Name, sketch.Name, "Sketch.InternalFace1")
 
     assert obs._busy is False
@@ -315,10 +315,10 @@ def test_pad_selection_observer_reports_failure_and_clears_busy(sketch_env, monk
 
 
 def test_parameters_sheet_creation(sketch_env):
-    import fusion_parameters_dock
+    import fmf_parameters_dock
 
     doc = sketch_env.app.ActiveDocument or sketch_env._new_document()
-    sheet = fusion_parameters_dock.get_or_create_parameters_sheet(doc)
+    sheet = fmf_parameters_dock.get_or_create_parameters_sheet(doc)
 
     assert sheet is not None
     assert sheet.Label == "Parameters"
@@ -329,18 +329,18 @@ def test_parameters_sheet_creation(sketch_env):
 def test_parameters_dock_document_safety(env):
     """The dock must bind to a specific document and never mutate another document."""
     env.install()
-    import fusion_parameters_dock
+    import fmf_parameters_dock
 
     doc1 = env._new_document("Doc1")
     doc2 = env._new_document("Doc2")
 
-    dock = fusion_parameters_dock.FastParametersDock()
+    dock = fmf_parameters_dock.FastParametersDock()
     dock.bind_to_document(doc1)
     assert dock._bound_doc_name == "Doc1"
 
     # Add parameter to Doc1
     dock.on_add_parameter()
-    sheet1 = fusion_parameters_dock.get_or_create_parameters_sheet(doc1)
+    sheet1 = fmf_parameters_dock.get_or_create_parameters_sheet(doc1)
     assert sheet1.get("A2") == "Param1"
 
     # Switch active document to Doc2
@@ -376,10 +376,10 @@ def test_parameters_dock_gap_tolerance_and_row_tracking(env):
     env.install()
     from PySide import QtCore
 
-    import fusion_parameters_dock
+    import fmf_parameters_dock
 
     doc = env._new_document("ParamDoc")
-    dock = fusion_parameters_dock.FastParametersDock()
+    dock = fmf_parameters_dock.FastParametersDock()
     dock.bind_to_document(doc)
 
     # Add 3 parameters
@@ -388,7 +388,7 @@ def test_parameters_dock_gap_tolerance_and_row_tracking(env):
     dock.on_add_parameter()  # Param3 at row 4
     assert dock.table.rowCount() == 3
 
-    sheet = fusion_parameters_dock.get_or_create_parameters_sheet(doc)
+    sheet = fmf_parameters_dock.get_or_create_parameters_sheet(doc)
     assert sheet.get("A2") == "Param1"
     assert sheet.get("A3") == "Param2"
     assert sheet.get("A4") == "Param3"
@@ -419,10 +419,10 @@ def test_parameters_dock_gap_tolerance_and_row_tracking(env):
 def test_parameters_dock_undo_transactions(env):
     """All dock mutations must be wrapped in atomic undo transactions."""
     env.install()
-    import fusion_parameters_dock
+    import fmf_parameters_dock
 
     doc = env._new_document("TxDoc")
-    dock = fusion_parameters_dock.FastParametersDock()
+    dock = fmf_parameters_dock.FastParametersDock()
     dock.bind_to_document(doc)
 
     # 1. Add
@@ -446,60 +446,60 @@ def test_parameters_dock_undo_transactions(env):
 def test_atomic_datum_planes_no_orphaned_bodies(env):
     """Invalid selections must abort before creating any Body or Plane."""
     env.install()
-    import fusion_datum_tools
+    import fmf_datum_tools
 
     doc = env._new_document("DatumDoc")
     assert len(doc.Objects) == 0
 
     # Call with no selection
     env.selection_ex = []
-    res_mid = fusion_datum_tools.create_midplane(document=doc)
+    res_mid = fmf_datum_tools.create_midplane(document=doc)
     assert res_mid["status"] in ("error", "insufficient-selection")
     assert len(doc.Objects) == 0
 
-    res_ang = fusion_datum_tools.create_plane_at_angle(document=doc)
+    res_ang = fmf_datum_tools.create_plane_at_angle(document=doc)
     assert res_ang["status"] in ("error", "insufficient-selection")
     assert len(doc.Objects) == 0
 
-    res_tan = fusion_datum_tools.create_plane_tangent(document=doc)
+    res_tan = fmf_datum_tools.create_plane_tangent(document=doc)
     assert res_tan["status"] in ("error", "insufficient-selection")
     assert len(doc.Objects) == 0
 
 
 # ---------------------------------------------------------------------------
-# 9. Fusion Common Primitives & Error Handling
+# 9. FMF Common Primitives & Error Handling
 # ---------------------------------------------------------------------------
 
 
-def test_fusion_common_primitives(env):
+def test_fmf_common_primitives(env):
     """Test transaction context manager, notify, log_swallowed, and SketcherCommand."""
     env.install()
     import pytest
 
-    import fusion_common
+    import fmf_common
 
     doc = env._new_document("CommonDoc")
 
     # 1. Successful transaction commits
-    with fusion_common.transaction(doc, "Good Transaction"):
+    with fmf_common.transaction(doc, "Good Transaction"):
         doc.addObject("PartDesign::Body", "TestBody")
     assert ("commit", "Good Transaction") in doc.transactions
 
     # 2. Exceptional transaction aborts and re-raises
     with pytest.raises(RuntimeError, match="Deliberate error"):
-        with fusion_common.transaction(doc, "Bad Transaction"):
+        with fmf_common.transaction(doc, "Bad Transaction"):
             raise RuntimeError("Deliberate error")
     assert ("abort", "Bad Transaction") in doc.transactions
 
     # 3. Notify runs safely without crashing
-    fusion_common.notify("TestPrefix", "Info message", error=False)
-    fusion_common.notify("TestPrefix", "Error message", error=True)
+    fmf_common.notify("TestPrefix", "Info message", error=False)
+    fmf_common.notify("TestPrefix", "Error message", error=True)
 
     # 4. log_swallowed logs safely without crashing
-    fusion_common.log_swallowed("TestingContext", ValueError("Test failure"))
+    fmf_common.log_swallowed("TestingContext", ValueError("Test failure"))
 
     # 5. SketcherCommand IsActive behavior
-    cmd = fusion_common.SketcherCommand()
+    cmd = fmf_common.SketcherCommand()
     assert cmd.IsActive() is False  # Not in SketcherWorkbench
     env.active_workbench = "SketcherWorkbench"
     assert cmd.IsActive() is True
@@ -510,19 +510,19 @@ def test_fusion_common_primitives(env):
 def test_parameters_dock_observer_and_gap_handling(env):
     """Parameters dock tracks document observer events, gap handling, and cell editing."""
     env.install()
-    import fusion_parameters_dock
+    import fmf_parameters_dock
 
     doc1 = env._new_document("Doc1")
     _doc2 = env._new_document("Doc2")
 
-    dock = fusion_parameters_dock.show_parameters_dock()
+    dock = fmf_parameters_dock.show_parameters_dock()
     assert dock is not None
     assert dock._bound_doc_name == "Doc2"
     assert dock._observer in env.document_observers
 
     # Switch active document to Doc1
     env.app.ActiveDocument = doc1
-    obs = fusion_parameters_dock._active_parameters_dock._observer
+    obs = fmf_parameters_dock._active_parameters_dock._observer
     obs.slotActivatedDocument(doc1)
     assert dock._bound_doc_name == "Doc1"
 
@@ -546,9 +546,9 @@ def test_parameters_dock_observer_and_gap_handling(env):
     assert sheet1.get("A2") == ""
 
     observer = dock._observer
-    fusion_parameters_dock.close_parameters_dock()
+    fmf_parameters_dock.close_parameters_dock()
     assert observer not in env.document_observers
-    assert fusion_parameters_dock._active_parameters_dock is None
+    assert fmf_parameters_dock._active_parameters_dock is None
     assert dock.isVisible() is False
     assert sheet1.get("B2") == ""
 
@@ -560,36 +560,36 @@ def test_parameters_dock_observer_and_gap_handling(env):
 def test_datum_tools_error_and_rollback_paths(env):
     """Datum plane tools validate pre-flight selections and roll back cleanly on errors."""
     env.install()
-    import fusion_datum_tools
+    import fmf_datum_tools
 
     # 1. No document
     env.app.ActiveDocument = None
-    res_angle_no_doc = fusion_datum_tools.create_plane_at_angle()
+    res_angle_no_doc = fmf_datum_tools.create_plane_at_angle()
     assert res_angle_no_doc["status"] == "no-document"
 
-    res_tangent_no_doc = fusion_datum_tools.create_plane_tangent()
+    res_tangent_no_doc = fmf_datum_tools.create_plane_tangent()
     assert res_tangent_no_doc["status"] == "no-document"
 
     # 2. Document with invalid selection
     doc = env._new_document("DatumErrorDoc")
-    res_angle_bad = fusion_datum_tools.create_plane_at_angle(document=doc)
+    res_angle_bad = fmf_datum_tools.create_plane_at_angle(document=doc)
     assert res_angle_bad["status"] == "insufficient-selection"
 
-    res_tangent_bad = fusion_datum_tools.create_plane_tangent(document=doc)
+    res_tangent_bad = fmf_datum_tools.create_plane_tangent(document=doc)
     assert res_tangent_bad["status"] == "insufficient-selection"
 
 
-def test_fusion_viewport_register_custom_add_command(env):
-    """fusion_viewport.register accepts injectable add_command for testing."""
+def test_fmf_viewport_register_custom_add_command(env):
+    """fmf_viewport.register accepts injectable add_command for testing."""
     env.install()
-    import fusion_viewport
+    import fmf_viewport
 
     collected = {}
 
     def custom_add_command(name, cmd):
         collected[name] = cmd
 
-    fusion_viewport.register(add_command=custom_add_command)
-    assert "FusionMyFreeCAD_StudioViewport" in collected
-    assert "FusionMyFreeCAD_RestoreViewport" in collected
-    assert "FusionMyFreeCAD_ModernZincTheme" in collected
+    fmf_viewport.register(add_command=custom_add_command)
+    assert "FMF_StudioViewport" in collected
+    assert "FMF_RestoreViewport" in collected
+    assert "FMF_ModernZincTheme" in collected

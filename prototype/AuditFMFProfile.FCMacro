@@ -1,4 +1,4 @@
-"""Read-only FreeCAD GUI audit for FusionMyFreeCAD command and shortcut readiness."""
+"""Read-only FreeCAD GUI audit for FMF command and shortcut readiness."""
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -83,7 +83,7 @@ def normalized(sequence):
     return QtGui.QKeySequence(sequence).toString()
 
 
-write("=== FusionMyFreeCAD read-only profile audit ===")
+write("=== FMF read-only profile audit ===")
 write("This macro does not change shortcuts, preferences, or files.")
 
 previous_workbench = ""

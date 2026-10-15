@@ -19,8 +19,8 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-LAYOUT = ROOT / "Resources" / "FusionMyFreeCAD" / "layout-v3.json"
-MANIFEST = ROOT / "Resources" / "FusionMyFreeCAD" / "layout-manifest.json"
+LAYOUT = ROOT / "Resources" / "FMF" / "layout-v3.json"
+MANIFEST = ROOT / "Resources" / "FMF" / "layout-manifest.json"
 
 
 def is_candidate(command: str) -> bool:

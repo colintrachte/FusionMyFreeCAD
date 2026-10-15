@@ -1,8 +1,8 @@
 """Ask a real FreeCAD which icon names it serves, and record the answer.
 
-FusionMyFreeCAD vendors only the FreeCAD command icons named by `layout-v3.json`.
+FMF vendors only the FreeCAD command icons named by `layout-v3.json`.
 This script checks those names against a real installation via `Gui.getIcon()` and
-writes `Resources/FusionMyFreeCAD/verified-icons.json`. The offline test suite then
+writes `Resources/FMF/verified-icons.json`. The offline test suite then
 asserts the layout only uses verified names and the bundle contains exactly that set.
 
 **`Gui.getIcon()` never fails.** Given an unknown name it returns FreeCAD's
@@ -32,8 +32,8 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LAYOUT = ROOT / "Resources" / "FusionMyFreeCAD" / "layout-v3.json"
-OUTPUT = ROOT / "Resources" / "FusionMyFreeCAD" / "verified-icons.json"
+LAYOUT = ROOT / "Resources" / "FMF" / "layout-v3.json"
+OUTPUT = ROOT / "Resources" / "FMF" / "verified-icons.json"
 
 # Executed inside FreeCAD, which supplies FreeCAD/FreeCADGui.
 PROBE = '''

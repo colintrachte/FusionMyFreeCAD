@@ -91,7 +91,7 @@
                 "AssemblyWorkbench"
             ]
         ],
-        "Fusion_Extrude_ddb": [
+        "FMF_Extrude_ddb": [
             [
                 "PartDesign_Pad",
                 "PartDesignWorkbench"
@@ -105,7 +105,7 @@
                 "PartDesignWorkbench"
             ]
         ],
-        "Fusion_Create_ddb": [
+        "FMF_Create_ddb": [
             [
                 "PartDesign_NewSketch",
                 "PartDesignWorkbench"
@@ -139,7 +139,7 @@
                 "PartDesignWorkbench"
             ]
         ],
-        "Fusion_Modify_ddb": [
+        "FMF_Modify_ddb": [
             [
                 "PartDesign_Fillet",
                 "PartDesignWorkbench"
@@ -161,7 +161,7 @@
                 "PartDesignWorkbench"
             ]
         ],
-        "Fusion_Construct_ddb": [
+        "FMF_Construct_ddb": [
             [
                 "PartDesign_Plane",
                 "PartDesignWorkbench"
@@ -179,7 +179,7 @@
                 "PartDesignWorkbench"
             ]
         ],
-        "Fusion_Inspect_ddb": [
+        "FMF_Inspect_ddb": [
             [
                 "Std_Measure",
                 "Global"
@@ -193,7 +193,7 @@
                 "Global"
             ]
         ],
-        "Fusion_SketchCreate_ddb": [
+        "FMF_SketchCreate_ddb": [
             [
                 "Sketcher_CreateLine",
                 "SketcherWorkbench"
@@ -215,7 +215,7 @@
                 "SketcherWorkbench"
             ]
         ],
-        "Fusion_SketchModify_ddb": [
+        "FMF_SketchModify_ddb": [
             [
                 "Sketcher_CompCreateFillets",
                 "SketcherWorkbench"
@@ -249,7 +249,7 @@
                 "SketcherWorkbench"
             ]
         ],
-        "Fusion_Constraints_ddb": [
+        "FMF_Constraints_ddb": [
             [
                 "Sketcher_Dimension",
                 "SketcherWorkbench"
@@ -306,7 +306,7 @@
             ],
             "FMF Create_newPanel": [
                 [
-                    "Fusion_Extrude_ddb",
+                    "FMF_Extrude_ddb",
                     "General"
                 ],
                 [
@@ -314,19 +314,19 @@
                     "PartDesignWorkbench"
                 ],
                 [
-                    "Fusion_Create_ddb",
+                    "FMF_Create_ddb",
                     "General"
                 ]
             ],
             "FMF Modify_newPanel": [
                 [
-                    "Fusion_Modify_ddb",
+                    "FMF_Modify_ddb",
                     "General"
                 ]
             ],
             "FMF Construct_newPanel": [
                 [
-                    "Fusion_Construct_ddb",
+                    "FMF_Construct_ddb",
                     "General"
                 ]
             ],
@@ -350,7 +350,7 @@
             ],
             "FMF Inspect_newPanel": [
                 [
-                    "Fusion_Inspect_ddb",
+                    "FMF_Inspect_ddb",
                     "General"
                 ]
             ]
@@ -376,7 +376,7 @@
                     "SketcherWorkbench"
                 ],
                 [
-                    "Fusion_SketchCreate_ddb",
+                    "FMF_SketchCreate_ddb",
                     "General"
                 ],
                 [
@@ -386,7 +386,7 @@
             ],
             "FMF Sketch Modify_newPanel": [
                 [
-                    "Fusion_SketchModify_ddb",
+                    "FMF_SketchModify_ddb",
                     "General"
                 ],
                 [
@@ -408,7 +408,7 @@
                     "SketcherWorkbench"
                 ],
                 [
-                    "Fusion_Constraints_ddb",
+                    "FMF_Constraints_ddb",
                     "General"
                 ]
             ],
@@ -453,12 +453,12 @@
                     "title": "CREATE",
                     "Enabled": true,
                     "order": [
-                        "Fusion_Extrude_ddb",
+                        "FMF_Extrude_ddb",
                         "PartDesign_Hole",
-                        "Fusion_Create_ddb"
+                        "FMF_Create_ddb"
                     ],
                     "commands": {
-                        "Fusion_Extrude_ddb": {
+                        "FMF_Extrude_ddb": {
                             "size": "large",
                             "text": "Extrude",
                             "icon": "PartDesign_Pad",
@@ -470,7 +470,7 @@
                             "icon": "PartDesign_Hole",
                             "IsExtra": true
                         },
-                        "Fusion_Create_ddb": {
+                        "FMF_Create_ddb": {
                             "size": "small",
                             "text": "More Create",
                             "icon": "PartDesign_NewSketch",
@@ -482,10 +482,10 @@
                     "title": "MODIFY",
                     "Enabled": true,
                     "order": [
-                        "Fusion_Modify_ddb"
+                        "FMF_Modify_ddb"
                     ],
                     "commands": {
-                        "Fusion_Modify_ddb": {
+                        "FMF_Modify_ddb": {
                             "size": "large",
                             "text": "Modify",
                             "icon": "PartDesign_Fillet",
@@ -497,10 +497,10 @@
                     "title": "CONSTRUCT",
                     "Enabled": true,
                     "order": [
-                        "Fusion_Construct_ddb"
+                        "FMF_Construct_ddb"
                     ],
                     "commands": {
-                        "Fusion_Construct_ddb": {
+                        "FMF_Construct_ddb": {
                             "size": "large",
                             "text": "Construct",
                             "icon": "PartDesign_Plane",
@@ -548,10 +548,10 @@
                     "title": "INSPECT",
                     "Enabled": true,
                     "order": [
-                        "Fusion_Inspect_ddb"
+                        "FMF_Inspect_ddb"
                     ],
                     "commands": {
-                        "Fusion_Inspect_ddb": {
+                        "FMF_Inspect_ddb": {
                             "size": "large",
                             "text": "Inspect",
                             "icon": "Std_Measure",
@@ -2405,7 +2405,7 @@
                         "Sketcher_CreateLine",
                         "Sketcher_CompCreateRectangles",
                         "Sketcher_CompCreateConic",
-                        "Fusion_SketchCreate_ddb",
+                        "FMF_SketchCreate_ddb",
                         "Sketcher_ToggleConstruction"
                     ],
                     "commands": {
@@ -2427,7 +2427,7 @@
                             "icon": "Sketcher_CreateCircle",
                             "IsExtra": true
                         },
-                        "Fusion_SketchCreate_ddb": {
+                        "FMF_SketchCreate_ddb": {
                             "size": "small",
                             "text": "More Create",
                             "icon": "Sketcher_CreateLine",
@@ -2445,13 +2445,13 @@
                     "title": "MODIFY",
                     "Enabled": true,
                     "order": [
-                        "Fusion_SketchModify_ddb",
+                        "FMF_SketchModify_ddb",
                         "Sketcher_Symmetry",
                         "Sketcher_RectangularArray",
                         "Sketcher_CompExternal"
                     ],
                     "commands": {
-                        "Fusion_SketchModify_ddb": {
+                        "FMF_SketchModify_ddb": {
                             "size": "large",
                             "text": "Modify",
                             "icon": "Sketcher_CompCurveEdition",
@@ -2482,7 +2482,7 @@
                     "Enabled": true,
                     "order": [
                         "Sketcher_Dimension",
-                        "Fusion_Constraints_ddb"
+                        "FMF_Constraints_ddb"
                     ],
                     "commands": {
                         "Sketcher_Dimension": {
@@ -2491,7 +2491,7 @@
                             "icon": "Sketcher_Dimension",
                             "IsExtra": true
                         },
-                        "Fusion_Constraints_ddb": {
+                        "FMF_Constraints_ddb": {
                             "size": "large",
                             "text": "Constraints",
                             "icon": "Sketcher_CompConstrainTools",

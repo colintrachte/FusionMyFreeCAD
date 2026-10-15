@@ -7,7 +7,7 @@ settings, a custom toolbar, and shortcuts?
 
 This is the pre-add-on baseline the project started from. It remains useful as the
 rationale for the shipped command mapping and as a fallback for anyone who wants
-the muscle-memory benefit without installing FusionMyFreeCAD. The independent
+the muscle-memory benefit without installing FMF. The independent
 source review is in
 [`ui-architecture-independent-review-2026-07-30.md`](ui-architecture-independent-review-2026-07-30.md).
 

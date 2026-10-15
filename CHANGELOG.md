@@ -1,6 +1,6 @@
 # Changelog
 
-All notable user-visible changes to FusionMyFreeCAD are recorded here.
+All notable user-visible changes to FMF are recorded here.
 
 ## 1.8.0 — 2026-10-09
 
@@ -69,7 +69,7 @@ All notable user-visible changes to FusionMyFreeCAD are recorded here.
 - The shortcut sweep ran on the thread that draws the window, every time a
   workbench was activated -- which is once on the way into a sketch and once on
   the way out. It asked every action in the main window for its shortcut once
-  per shortcut FusionMyFreeCAD sets, so a tree of several thousand actions was
+  per shortcut FMF sets, so a tree of several thousand actions was
   walked thirteen times over, twice per edit. It now reads each action once and
   runs after the window is up rather than in front of it.
 
@@ -107,7 +107,7 @@ Repair References, corrected against a real document instead of a test double.
 
 ### A region keeps its number
 
-- FusionMyFreeCAD divides a multi-region sketch into faces so each region can be
+- FMF divides a multi-region sketch into faces so each region can be
   padded, and a Pad that uses one records it by index -- `InternalFace2`. Those
   faces came out in whatever order OpenCASCADE's boolean produced them, which
   reshuffles on almost any edit, so a Pad built on a region could start reporting
@@ -198,7 +198,7 @@ Repair References, corrected against a real document instead of a test double.
 
 ### The sketcher stays responsive as a sketch grows
 
-- FusionMyFreeCAD rebuilds a sketch's internal faces so multi-region profiles are
+- FMF rebuilds a sketch's internal faces so multi-region profiles are
   selectable and padable. That rebuild runs an OpenCASCADE boolean, and it was
   running on every solve -- which means every frame of a drag. It is now skipped
   while a sketch is open for editing, skipped when the shape has not changed
@@ -225,25 +225,25 @@ Repair References, corrected against a real document instead of a test double.
 
 ### Added
 - **Sketcher workflow commands**:
-  - `FusionMyFreeCAD_AddMidline`: Generates construction centerlines between symmetric elements.
-  - `FusionMyFreeCAD_ConstrainMidpoint`: One-step midpoint constraint on vertex and edge.
-  - `FusionMyFreeCAD_CreateSlot`: Parameterized center-to-center slot with tangent arcs.
-  - `FusionMyFreeCAD_SmartOffset`: Directional profile offset tool.
-  - `FusionMyFreeCAD_SolverDiagnostics`: Plain-language solver diagnostics for under-constrained sketches.
+  - `FMF_AddMidline`: Generates construction centerlines between symmetric elements.
+  - `FMF_ConstrainMidpoint`: One-step midpoint constraint on vertex and edge.
+  - `FMF_CreateSlot`: Parameterized center-to-center slot with tangent arcs.
+  - `FMF_SmartOffset`: Directional profile offset tool.
+  - `FMF_SolverDiagnostics`: Plain-language solver diagnostics for under-constrained sketches.
 - **Datum Plane tools**:
-  - `FusionMyFreeCAD_DatumMidplane`: Constructs a parametric midplane bisecting two selected faces.
+  - `FMF_DatumMidplane`: Constructs a parametric midplane bisecting two selected faces.
 - **In-Canvas Parameters Dock**:
-  - `FusionMyFreeCAD_ParameterDock`: In-canvas dock widget for creating and editing variables and aliases. Multi-document safe with observer-driven synchronization and gap-tolerant spreadsheet reading.
+  - `FMF_ParameterDock`: In-canvas dock widget for creating and editing variables and aliases. Multi-document safe with observer-driven synchronization and gap-tolerant spreadsheet reading.
 - **Studio Viewport & Theme**:
-  - `FusionMyFreeCAD_StudioViewport`: Clean canvas viewport preset with subtle NaviCube positioning.
-  - `FusionMyFreeCAD_ModernZincTheme`: Sleek Zinc stylesheet.
-  - `FusionMyFreeCAD_RestoreViewport`: One-click viewport and style restoration.
+  - `FMF_StudioViewport`: Clean canvas viewport preset with subtle NaviCube positioning.
+  - `FMF_ModernZincTheme`: Sleek Zinc stylesheet.
+  - `FMF_RestoreViewport`: One-click viewport and style restoration.
 - **FreeCAD Core Suggestions Box**:
   - Cataloged core-bound features (e.g. dynamic Heads-Up Display and Ghost Sketches) in `docs/dev-guide/freecad_core_suggestions_box.md` to keep FMF runtime strictly focused on reliable add-on enhancements.
 
 ### Reliability & Infrastructure
-- **Shared Infrastructure (`fusion_common.py`)**: Centralized `RUNTIME_MODULES` canonical manifest, unified atomic `transaction(doc, label)` context manager, standard `notify()`, base `SketcherCommand`, and swallowed exception logging (`log_swallowed`).
-- **Release Packaging Gate**: `tools/build_addon_package.py` and `validate_addon.py` now import `RUNTIME_MODULES` from `fusion_common.py` as single source of truth, and verify that all packaged runtime modules and assets are tracked in git.
+- **Shared Infrastructure (`fmf_common.py`)**: Centralized `RUNTIME_MODULES` canonical manifest, unified atomic `transaction(doc, label)` context manager, standard `notify()`, base `SketcherCommand`, and swallowed exception logging (`log_swallowed`).
+- **Release Packaging Gate**: `tools/build_addon_package.py` and `validate_addon.py` now import `RUNTIME_MODULES` from `fmf_common.py` as single source of truth, and verify that all packaged runtime modules and assets are tracked in git.
 - **Test Suite Hardening**: Fixed test-induced global state mutation by dynamic module eviction; 100% pass across all 198 tests with zero flakiness.
 - **Repository Hygiene**: Replaced the 15.7 MB static PDF in `docs/` with official web documentation links (`docs/user-guide/FREECAD-MANUAL-LINK.md`) and made agent guide paths portable.
 
@@ -309,13 +309,13 @@ Repair References, corrected against a real document instead of a test double.
 
 - The ~20 per-launch "moved the *X* shortcut from …" lines are now one summary line in the
   Report view (`reassigned N keyboard shortcuts …`), with the per-shortcut detail kept in the
-  log and in **Verify FusionMyFreeCAD**.
+  log and in **Verify FMF**.
 - The "updated FREQUENT …" and "replaced a ribbon layout that changed outside the add-on"
   lines move to the log; the ribbon backup is still written and still surfaced by Verify UI.
 
 ### Upgrade notes
 
-- Replace the entire existing `Mod/FusionMyFreeCAD` folder; do not merge files from older
+- Replace the entire existing `Mod/FMF` folder; do not merge files from older
   versions. Restart FreeCAD after updating.
 - If FreeCAD is currently crashing on the Sketcher tab after installing 1.3.2, installing
   1.3.3 over it resolves it. No sketch or document data is affected.
@@ -393,7 +393,7 @@ Repair References, corrected against a real document instead of a test double.
 
 ### Upgrade notes
 
-- Replace the entire existing `Mod/FusionMyFreeCAD` folder; do not merge files from older versions.
+- Replace the entire existing `Mod/FMF` folder; do not merge files from older versions.
 - Restart FreeCAD after updating. FMF applies the new selectable-region preference once for 1.3.0
   while retaining existing ribbon panel arrangements.
 
@@ -401,11 +401,11 @@ Repair References, corrected against a real document instead of a test double.
 
 ### Ribbon access and personalization
 
-- Added a complete dropdown menu to every FusionMyFreeCAD panel, keeping commands accessible even
+- Added a complete dropdown menu to every FMF panel, keeping commands accessible even
   when they are not pinned to the ribbon face.
 - Added direct click-hold-drag reordering for visible ribbon icons without a separate arrangement
   mode. Ordinary clicks continue to run commands using Qt's normal drag threshold.
-- Persisted panel and command order across FreeCAD restarts and FusionMyFreeCAD layout updates.
+- Persisted panel and command order across FreeCAD restarts and FMF layout updates.
 - Added **Reset this panel** to each panel menu. It restores only that panel; **Reapply UI** remains
   the deliberate whole-interface reset.
 - Expanded the Part Design, Part, and Sketcher command inventories so less-frequent native tools are
@@ -417,7 +417,7 @@ Repair References, corrected against a real document instead of a test double.
   for Windows, macOS, and Linux.
 - Added an immutable first-run baseline, **Verify UI**, **Reapply UI**, and **Restore UI** workflows.
 - Added a standalone recovery macro for restoring the previous UI after the add-on was removed.
-- Added FusionMyFreeCAD preferences for the startup workbench, navigation, shortcuts, and optional
+- Added FMF preferences for the startup workbench, navigation, shortcuts, and optional
   starter design.
 - Preserved user preference changes after initial setup by applying defaults only once per release.
 
@@ -433,7 +433,7 @@ Repair References, corrected against a real document instead of a test double.
 
 ### Upgrade notes
 
-- Replace the entire existing `Mod/FusionMyFreeCAD` folder; do not merge files from older versions.
+- Replace the entire existing `Mod/FMF` folder; do not merge files from older versions.
 - Existing add-on-based panel arrangements are retained and reconciled with the 1.2.0 layout.
 - Users of the retired installer should remove its obsolete copy after installing the release
   archive in FreeCAD's active user `Mod` directory.

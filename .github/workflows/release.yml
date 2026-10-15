@@ -60,10 +60,10 @@ jobs:
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7
         with:
-          name: FusionMyFreeCAD-${{ inputs.version }}
+          name: FMF-${{ inputs.version }}
           path: |
-            dist/FusionMyFreeCAD-${{ inputs.version }}.zip
-            dist/FusionMyFreeCAD-${{ inputs.version }}.zip.sha256
+            dist/FMF-${{ inputs.version }}.zip
+            dist/FMF-${{ inputs.version }}.zip.sha256
 
       - name: Create tagged draft release and upload files
         env:
@@ -71,13 +71,13 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
           gh release create "v${RELEASE_VERSION}" \
-            "dist/FusionMyFreeCAD-${RELEASE_VERSION}.zip" \
-            "dist/FusionMyFreeCAD-${RELEASE_VERSION}.zip.sha256" \
+            "dist/FMF-${RELEASE_VERSION}.zip" \
+            "dist/FMF-${RELEASE_VERSION}.zip.sha256" \
             --draft \
             --fail-on-no-commits \
             --notes-file "docs/release-notes/RELEASE-NOTES-${RELEASE_VERSION}.md" \
             --target "$GITHUB_SHA" \
-            --title "FusionMyFreeCAD ${RELEASE_VERSION}"
+            --title "FMF ${RELEASE_VERSION}"
 
       - name: Add review link to the run summary
         if: success()

@@ -1762,7 +1762,7 @@ class ModernMenu(RibbonBar):
                     newPanel = self.CreatePanel(workbenchName=workbenchName, panelName=objPanel.objectName(), addPanel=False, Dict=self.workBenchDict, ignoreColumnLimit=True, showEnableControl=True, enableSeparator=True, ActivateButtons=True)                                
                     if newPanel is None:
                         App.Console.PrintWarning(
-                            "FusionMyFreeCAD: could not expand panel '{}' for "
+                            "FMF: could not expand panel '{}' for "
                             "customization; leaving the existing panel unchanged.\n".format(
                                 objPanel.objectName()
                             )
@@ -1999,7 +1999,7 @@ class ModernMenu(RibbonBar):
             
                     
         # update the ribbonstructure before writing it to disk
-        # FusionMyFreeCAD panels declare a stable number of pinned commands. In
+        # FMF panels declare a stable number of pinned commands. In
         # Arrange mode every menu command is shown, so the user's final order
         # determines which commands remain on the face of the panel.
         for workbench in self.workBenchDict.get("authoritativeWorkbenches", []):
@@ -2044,11 +2044,11 @@ class ModernMenu(RibbonBar):
         with open(JsonFile, "w") as outfile:
             json.dump(self.ribbonStructure, outfile, indent=4)
         try:
-            import fusion_bootstrap
+            import fmf_bootstrap
 
-            fusion_bootstrap.record_customization(self.ribbonStructure)
+            fmf_bootstrap.record_customization(self.ribbonStructure)
         except (ImportError, AttributeError):
-            # FreeCAD-Ribbon is also usable without FusionMyFreeCAD.
+            # FreeCAD-Ribbon is also usable without FMF.
             pass
                 
         # Close the temporary document
@@ -2738,24 +2738,24 @@ class ModernMenu(RibbonBar):
         with open(Parameters.RIBBON_STRUCTURE_JSON, "w") as outfile:
             json.dump(self.ribbonStructure, outfile, indent=4)
         try:
-            import fusion_bootstrap
+            import fmf_bootstrap
 
-            fusion_bootstrap.record_customization(self.ribbonStructure)
+            fmf_bootstrap.record_customization(self.ribbonStructure)
         except (ImportError, AttributeError):
             pass
 
     def _onPanelResized(self, panel, deltaX: int):
-        """FusionMyFreeCAD local change: a divider drag resizes one panel."""
+        """FMF local change: a divider drag resizes one panel."""
         fmf_widgets.resize_panel(self, panel, deltaX)
 
     def _resetOnePanel(self, panel):
         """Restore one FMF panel while retaining every other customization."""
         try:
-            import fusion_bootstrap
+            import fmf_bootstrap
 
             workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())
             panelName = panel.objectName()
-            ribbon = fusion_bootstrap.reset_panel_customization(workbenchName, panelName)
+            ribbon = fmf_bootstrap.reset_panel_customization(workbenchName, panelName)
             self.ribbonStructure.clear()
             self.ribbonStructure.update(ribbon)
             self.workBenchDict.clear()
@@ -2775,7 +2775,7 @@ class ModernMenu(RibbonBar):
             self.currentCategory()._panels[replacement.objectName()] = replacement
             panel.close()
             App.Console.PrintMessage(
-                "FusionMyFreeCAD reset the {} panel.\n".format(replacement.title())
+                "FMF reset the {} panel.\n".format(replacement.title())
             )
         except (ImportError, AttributeError):
             return
@@ -3583,7 +3583,7 @@ class ModernMenu(RibbonBar):
 
     def _fmfAuthoritativeWorkbenchActive(self):
         enabled = App.ParamGet(
-            "User parameter:BaseApp/Preferences/Mod/FusionMyFreeCAD"
+            "User parameter:BaseApp/Preferences/Mod/FMF"
         ).GetBool("Enabled", True)
         if not enabled:
             return False
@@ -4562,7 +4562,7 @@ class ModernMenu(RibbonBar):
 
         workbench = Gui.getWorkbench(workbenchName)
         # Get the list of toolbars from the active workbench
-        # FusionMyFreeCAD can provide a complete replacement for selected
+        # FMF can provide a complete replacement for selected
         # workbenches.  In that case do not rediscover native toolbars and
         # append them after the configured panels.
         if workbenchName in Dict.get("authoritativeWorkbenches", []):
@@ -6150,7 +6150,7 @@ class ModernMenu(RibbonBar):
             .get("toolbars", {})
             .get(panelName, {})
         )
-        # Set the maximum columns. FusionMyFreeCAD local change: a panel whose
+        # Set the maximum columns. FMF local change: a panel whose
         # divider the user has dragged carries its own budget; everything else
         # still follows the global preference. The budget is only honoured
         # alongside a stored width, so column budgets written by an earlier
@@ -6260,7 +6260,7 @@ class ModernMenu(RibbonBar):
                     )
                 except (TypeError, ValueError):
                     pass
-                # FusionMyFreeCAD local change: once the user has sized a
+                # FMF local change: once the user has sized a
                 # section by dragging its divider, its width is the only thing
                 # that decides what it shows. The shipped overflow list still
                 # governs every section nobody has touched.
@@ -6713,7 +6713,7 @@ class ModernMenu(RibbonBar):
         panel.addWidget(spacer, rowSpan=6)
 
         # Enable all buttons, so you can access them with a right click.
-        # FusionMyFreeCAD local change: honour the ActivateButtons argument,
+        # FMF local change: honour the ActivateButtons argument,
         # which upstream declares and then ignores. Force-enabling every button
         # in the window is right while arranging the ribbon, where a disabled
         # button cannot be right-clicked, but it is wrong after an ordinary
@@ -6916,7 +6916,7 @@ class ModernMenu(RibbonBar):
         # Set the panelheight. setting the ribbonheigt, cause the first tab to be shown to large
         # add an offset to make room for the panel titles and icons
         #
-        # FusionMyFreeCAD local change: let this panel's divider resize it.
+        # FMF local change: let this panel's divider resize it.
         # setPanelProperties runs for every panel, including rebuilt ones, so the
         # connection is guarded rather than made unconditionally. The guard reads
         # __dict__ directly because RibbonPanel.__getattr__ raises AssertionError

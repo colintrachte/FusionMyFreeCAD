@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the FusionMyFreeCAD Ribbon prototype without importing it into FreeCAD."""
+"""Validate the FMF Ribbon prototype without importing it into FreeCAD."""
 
 from __future__ import annotations
 
@@ -155,7 +155,7 @@ def validate(preset: dict[str, Any], manifest: dict[str, Any]) -> list[str]:
 def main() -> int:
     directory = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser()
-    parser.add_argument("--preset", type=Path, default=directory / "fusion-ribbon-freecad-1.1.3.json")
+    parser.add_argument("--preset", type=Path, default=directory / "fmf-ribbon-freecad-1.1.3.json")
     parser.add_argument(
         "--manifest", type=Path, default=directory / "freecad-1.1.3-command-manifest.json"
     )

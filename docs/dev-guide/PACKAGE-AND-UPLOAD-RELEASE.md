@@ -1,11 +1,11 @@
-# Package and upload a FusionMyFreeCAD release
+# Package and upload a FMF release
 
 This guide is the short operational path for producing a release archive and uploading it as a
 reviewable GitHub draft. [RELEASING.md](../../RELEASING.md) remains the authoritative full runbook.
 
 ## 1. Obtain approval for the release version
 
-Do not change FusionMyFreeCAD's main project version without the user's explicit prior approval.
+Do not change FMF's main project version without the user's explicit prior approval.
 Preparing, packaging, or uploading a release does not by itself authorize a version increment.
 
 After approval, start from `main` with all intended changes committed or safely set aside. Confirm
@@ -50,13 +50,13 @@ The package builder reads the version from `package.xml` and creates determinist
 `dist/`:
 
 ```text
-dist/FusionMyFreeCAD-<version>.zip
-dist/FusionMyFreeCAD-<version>.zip.sha256
+dist/FMF-<version>.zip
+dist/FMF-<version>.zip.sha256
 ```
 
 Do not commit `dist/`; it is reproducible build output and is ignored by Git.
 
-Inspect the archive before upload. It must have one top-level `FusionMyFreeCAD` folder containing
+Inspect the archive before upload. It must have one top-level `FMF` folder containing
 `InitGui.py`, `package.xml`, `Resources/`, and `bundled-addons/`. Verify the checksum and complete
 the interactive FreeCAD checklist in [MAINTAINING.md](../../MAINTAINING.md) using a disposable or
 backed-up profile.
@@ -101,7 +101,7 @@ Download the draft assets once and verify:
 - clean installation and **Verify UI** results.
 
 Publishing is a separate external action. Do not click **Publish release** without explicit user
-authorization. Until publication, the draft and tag are not a public FusionMyFreeCAD release.
+authorization. Until publication, the draft and tag are not a public FMF release.
 
 ## Failure and rollback
 

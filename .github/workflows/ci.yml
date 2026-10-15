@@ -62,7 +62,7 @@ jobs:
         if: matrix.os == 'ubuntu-24.04' && matrix.python == '3.13'
         uses: actions/upload-artifact@v7
         with:
-          name: fusionmyfreecad-addon
+          name: fmf-addon
           path: dist/*.zip
 
   package-hygiene:

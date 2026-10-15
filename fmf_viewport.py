@@ -1,4 +1,4 @@
-"""FusionMyFreeCAD Viewport & Aesthetic Presets.
+"""FMF Viewport & Aesthetic Presets.
 
 Applies calibrated 3-point studio lighting, radial Zinc canvas, charcoal edge
 contrast, and MSAA anti-aliasing to transform FreeCAD 1.1+'s native viewport into
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent
 
 VIEW_PARAM_PATH = "User parameter:BaseApp/Preferences/View"
 NAVICUBE_PARAM_PATH = "User parameter:BaseApp/Preferences/NaviCube"
-BACKUP_PARAM_PATH = "User parameter:BaseApp/Preferences/Mod/FusionMyFreeCAD/ViewportBackup"
+BACKUP_PARAM_PATH = "User parameter:BaseApp/Preferences/Mod/FMF/ViewportBackup"
 GENERAL_PARAM_PATH = "User parameter:BaseApp/Preferences/General"
 
 
@@ -78,7 +78,7 @@ ZINC_VIEW_PRESETS: dict[str, tuple[str, Any]] = {
     ("AmbientLightColor", "Unsigned"): hex_to_uint("#e2e8f0"),  # Ambient cool gray
 }
 
-THEME_BACKUP_PARAM_PATH = "User parameter:BaseApp/Preferences/Mod/FusionMyFreeCAD/ThemeBackup"
+THEME_BACKUP_PARAM_PATH = "User parameter:BaseApp/Preferences/Mod/FMF/ThemeBackup"
 
 ZINC_NAVICUBE_PRESETS: dict[str, tuple[str, Any]] = {
     ("InactiveOpacity", "Int"): 30,
@@ -143,7 +143,7 @@ def apply_studio_viewport(backup: bool = True) -> dict[str, Any]:
             view.redraw()
 
     if hasattr(app, "Console") and app.Console:
-        app.Console.PrintMessage("FusionMyFreeCAD: Applied Modern Zinc Studio Viewport preset.\n")
+        app.Console.PrintMessage("FMF: Applied Modern Zinc Studio Viewport preset.\n")
 
     return {"status": "ok", "message": "Applied Modern Zinc Studio Viewport preset"}
 
@@ -203,7 +203,7 @@ def restore_default_viewport() -> dict[str, Any]:
             view.redraw()
 
     if hasattr(app, "Console") and app.Console:
-        app.Console.PrintMessage("FusionMyFreeCAD: Restored previous viewport settings.\n")
+        app.Console.PrintMessage("FMF: Restored previous viewport settings.\n")
 
     return {"status": "ok", "message": "Restored previous viewport settings"}
 
@@ -297,7 +297,7 @@ def restore_theme() -> dict[str, Any]:
 
     theme_backup_grp.SetBool("HasBackup", False)
     if hasattr(app, "Console") and app.Console:
-        app.Console.PrintMessage("FusionMyFreeCAD: Restored previous theme settings.\n")
+        app.Console.PrintMessage("FMF: Restored previous theme settings.\n")
 
     return {"status": "ok", "message": "Restored previous theme settings"}
 
@@ -320,8 +320,8 @@ class ApplyStudioViewportCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_StudioViewport",
-            "MenuText": "Fusion Studio Viewport",
+            "Pixmap": "FMF_StudioViewport",
+            "MenuText": "FMF Studio Viewport",
             "ToolTip": "Apply modern studio 3-point lighting and radial zinc canvas",
             "Accel": "",
         }
@@ -356,7 +356,7 @@ class ApplyModernZincThemeCommand:
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_StudioViewport",
+            "Pixmap": "FMF_StudioViewport",
             "MenuText": "Apply Modern Zinc Theme",
             "ToolTip": "Apply flat Tailwind Zinc theme across FreeCAD",
             "Accel": "",
@@ -375,6 +375,6 @@ def register(add_command=None):
     if not callable(register_with):
         return
 
-    register_with("FusionMyFreeCAD_StudioViewport", ApplyStudioViewportCommand())
-    register_with("FusionMyFreeCAD_RestoreViewport", RestoreViewportCommand())
-    register_with("FusionMyFreeCAD_ModernZincTheme", ApplyModernZincThemeCommand())
+    register_with("FMF_StudioViewport", ApplyStudioViewportCommand())
+    register_with("FMF_RestoreViewport", RestoreViewportCommand())
+    register_with("FMF_ModernZincTheme", ApplyModernZincThemeCommand())

@@ -59,7 +59,7 @@ from .utils import DataFile
 class RibbonPanelTitle(QLabel):
     """Widget to display the title of a panel.
 
-    FusionMyFreeCAD local change: the title doubles as the trigger for the
+    FMF local change: the title doubles as the trigger for the
     panel's overflow drawer, so the whole header reads as the dropdown it
     already is rather than only the small icon beside it.
     """
@@ -201,7 +201,7 @@ class RibbonPanel(QFrame):
 
     # Panel options signal
     panelOptionClicked = Signal(bool)
-    # FusionMyFreeCAD local change: emitted as (panel, pixel delta) when the user
+    # FMF local change: emitted as (panel, pixel delta) when the user
     # finishes dragging this panel's divider. FCBinding turns the delta into a
     # column budget for this panel alone.
     panelResizeRequested = Signal(object, int)
@@ -283,7 +283,7 @@ class RibbonPanel(QFrame):
 
         self._mainLayout.addWidget(self._titleWidget, 1,0,1,1)
         
-        # Add a separator. FusionMyFreeCAD local change: draggable, so a panel's
+        # Add a separator. FMF local change: draggable, so a panel's
         # width is the user's to set rather than a single global column budget.
         self._separator = DraggablePanelSeparator(width=3)
         self._separator.dividerReleased.connect(

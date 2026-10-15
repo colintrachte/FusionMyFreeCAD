@@ -3,7 +3,7 @@
 **Status:** Independent code review of the current add-on (Codex-authored)
 **Date:** 2026-08-25
 **Reviewer:** Claude (Opus 5)
-**Scope:** `InitGui.py`, `fusion_bootstrap.py`, `Resources/FusionMyFreeCAD/`, `validate_addon.py`, `tools/`, packaging, docs, and repository hygiene.
+**Scope:** `InitGui.py`, `fmf_bootstrap.py`, `Resources/FMF/`, `validate_addon.py`, `tools/`, packaging, docs, and repository hygiene.
 **Baseline:** `git HEAD = b23e834 "Release 0.1"`, corrected package version 1.0.0, working tree clean. `python validate_addon.py` passes (`VALID: self-contained add-on 1.0.0; 3.6 MiB unpacked`).
 
 ## Overall assessment
@@ -24,7 +24,7 @@ Recommendations below are ordered by expected value, not by effort.
 
 ### 1. Do not let `prepare()` failure disable Verify and Restore
 
-`InitGui.py:9-13` calls `prepare()`, `register_commands()`, `run_runtime()`, then the two vendor loads, with no error handling. `prepare()` raises on an old FreeCAD (`fusion_bootstrap.py:219`), a missing payload file (`:222`), an invalid generated ribbon (`:256`), and — unguarded — on a corrupt or schema-drifted state file (`:224` `_load_json`, `:247` `state["backupRoot"]`).
+`InitGui.py:9-13` calls `prepare()`, `register_commands()`, `run_runtime()`, then the two vendor loads, with no error handling. `prepare()` raises on an old FreeCAD (`fmf_bootstrap.py:219`), a missing payload file (`:222`), an invalid generated ribbon (`:256`), and — unguarded — on a corrupt or schema-drifted state file (`:224` `_load_json`, `:247` `state["backupRoot"]`).
 
 Any of those aborts the module, so the user is left with whatever half-applied state exists **and no Verify UI or Restore UI commands to get out of it**. That inverts the product's core promise.
 
@@ -32,15 +32,15 @@ Any of those aborts the module, so the user is left with whatever half-applied s
 
 ### 2. Never re-capture a baseline over your own settings
 
-`prepare()` captures the pre-install preference baseline only when `state is None` (`fusion_bootstrap.py:236-245`). If `FusionMyFreeCAD-addon-state.json` is deleted, corrupted, or lost with a profile copy while the add-on is still installed, the next launch captures **FusionMyFreeCAD's own applied values** as the "previous UI." Restore then restores Fusion settings and the user's original configuration is permanently gone.
+`prepare()` captures the pre-install preference baseline only when `state is None` (`fmf_bootstrap.py:236-245`). If `FMF-addon-state.json` is deleted, corrupted, or lost with a profile copy while the add-on is still installed, the next launch captures **FMF's own applied values** as the "previous UI." Restore then restores Fusion settings and the user's original configuration is permanently gone.
 
-**Fix:** write a second, never-overwritten `baseline.json` inside `FusionMyFreeCAD-Backups/` on true first install and treat its presence as proof a baseline already exists. Refuse to re-capture when a backup root exists but state does not; surface that as a Verify failure instead.
+**Fix:** write a second, never-overwritten `baseline.json` inside `FMF-Backups/` on true first install and treat its presence as proof a baseline already exists. Refuse to re-capture when a backup root exists but state does not; surface that as a Verify failure instead.
 
 ### 3. Stop overwriting user customization at every launch
 
 `apply_preferences()` (`runtime.py:59-119`) runs on every start and writes unconditionally. Only three groups are opt-out-able (`SetStartWorkbench`, `SetNavigation`, `SetShortcuts`); ComboView docking, all Ribbon icon sizes, the four Sketcher dimensioning flags, and the SearchBar dialog suppression are forced every time. A user who changes any of them in FreeCAD's own preferences dialog silently loses the change on the next restart, with no message explaining why.
 
-**Fix:** apply managed preferences once (keyed on `packageVersion` + `layoutVersion` in the state file), then only on explicit user request via a "Reapply FusionMyFreeCAD defaults" command. If a value must be enforced every launch, say so in `README.md` and list it in Verify's output.
+**Fix:** apply managed preferences once (keyed on `packageVersion` + `layoutVersion` in the state file), then only on explicit user request via a "Reapply FMF defaults" command. If a value must be enforced every launch, say so in `README.md` and list it in Verify's output.
 
 ### 4. Make the shortcut hijack visible and reversible
 
@@ -48,7 +48,7 @@ Any of those aborts the module, so the user is left with whatever half-applied s
 
 Two problems: the user is never told which native or custom bindings were taken away, and the removals live only in Qt — `restore()` restores the `Preferences/Shortcut` parameter group but nothing records what was stripped at runtime.
 
-**Fix:** collect the displaced `(objectName, sequence)` pairs, log them once via `App.Console.PrintMessage`, include the list in `FusionMyFreeCAD-runtime-status.json`, and show it in Verify UI. Skip the steal entirely when `SetShortcuts` is off.
+**Fix:** collect the displaced `(objectName, sequence)` pairs, log them once via `App.Console.PrintMessage`, include the list in `FMF-runtime-status.json`, and show it in Verify UI. Skip the steal entirely when `SetShortcuts` is off.
 
 ### 5. Default `CreateStarterDesign` to off
 
@@ -74,7 +74,7 @@ On a version bump `prepare()` regenerates `RibbonStructure.json` wholesale. Anyt
 
 ### 8. Reconsider bundling forks of FreeCAD-Ribbon and SearchBar
 
-Bundling gets one-step install, and the dependency-stripping patches (lxml, NumPy, Matplotlib → stdlib) are real value. But the cost compounds: users with the standalone add-ons get a fragile duplicate-detection heuristic (`load_vendor` checks `"FCBinding" in sys.modules`, `fusion_bootstrap.py:437-457` — a guess about another package's import side effects); upstream bug fixes and security fixes never reach users; and `tools/sync_bundled_addons.py` must re-apply local patches forever, by hand, against an ignored `vendor/` tree that no one else can reproduce.
+Bundling gets one-step install, and the dependency-stripping patches (lxml, NumPy, Matplotlib → stdlib) are real value. But the cost compounds: users with the standalone add-ons get a fragile duplicate-detection heuristic (`load_vendor` checks `"FCBinding" in sys.modules`, `fmf_bootstrap.py:437-457` — a guess about another package's import side effects); upstream bug fixes and security fixes never reach users; and `tools/sync_bundled_addons.py` must re-apply local patches forever, by hand, against an ignored `vendor/` tree that no one else can reproduce.
 
 **Fix, in order:**
 1. Upstream the dependency-removal patches to FreeCAD-Ribbon and SearchBar. They are strictly beneficial to those projects and would delete most of the maintenance burden here.
@@ -85,17 +85,17 @@ Bundling gets one-step install, and the dependency-stripping patches (lxml, NumP
 
 | Duplicated thing | Copies |
 |---|---|
-| Version `1.0.0` | `package.xml`, `fusion_bootstrap.py:17`, `layout-v3.json`, `layout-manifest.json`, `validate_addon.py` — synchronization is a manual `rg` per `MAINTAINING.md` |
-| Layout spec | A second Windows-only copy had already diverged from `Resources/FusionMyFreeCAD/layout-v3.json` |
-| Manifest | A second Windows-only copy had already diverged from `Resources/FusionMyFreeCAD/layout-manifest.json` |
+| Version `1.0.0` | `package.xml`, `fmf_bootstrap.py:17`, `layout-v3.json`, `layout-manifest.json`, `validate_addon.py` — synchronization is a manual `rg` per `MAINTAINING.md` |
+| Layout spec | A second Windows-only copy had already diverged from `Resources/FMF/layout-v3.json` |
+| Manifest | A second Windows-only copy had already diverged from `Resources/FMF/layout-manifest.json` |
 | Panel order | `layout-v3.json` panel list vs `layout-manifest.json["workbenchPanelOrder"]` |
-| Runtime code | A second Windows-only runtime copy had diverged from `Resources/FusionMyFreeCAD/runtime.py` |
+| Runtime code | A second Windows-only runtime copy had diverged from `Resources/FMF/runtime.py` |
 
 **Fix:** read the version from `package.xml` at runtime (or generate a one-line `_version.py`), derive `workbenchPanelOrder` from the layout at load time instead of storing it, and remove the duplicate Windows-only payload.
 
 ### 10. Derive `_verify_layout` from the layout spec
 
-`fusion_bootstrap.py:166-214` hard-codes fourteen checks against literal panel names (`"Fusion Sketch Entry_newPanel"`, `"Fusion Parameters_newPanel"`, …) and one literal label (`"Smart Dimension"`). Renaming a panel in `layout-v3.json` silently breaks verification — or, worse, passes while checking nothing meaningful.
+`fmf_bootstrap.py:166-214` hard-codes fourteen checks against literal panel names (`"Fusion Sketch Entry_newPanel"`, `"Fusion Parameters_newPanel"`, …) and one literal label (`"Smart Dimension"`). Renaming a panel in `layout-v3.json` silently breaks verification — or, worse, passes while checking nothing meaningful.
 
 **Fix:** generate the structural checks from `layout-v3.json` (every declared panel exists, order matches, every declared command is present, no native toolbar leaked into `order`) and keep only genuinely invariant assertions as literals.
 
@@ -160,7 +160,7 @@ The current `README.md` is two documents fused together: install/status text, th
 
 ### 17. Reconcile the license story
 
-`package.xml` declares `GPL-3.0-or-later`, `LICENSE` is GPL-3, `LICENSES/FusionMyFreeCAD-MIT.txt` retains MIT for the original code, and no file states which source files each covers. Separately, `THIRD_PARTY_NOTICES.md` records SearchBar as LGPL-2.1 (matching its `LICENSE` file) while the bundled `SearchBar/package.xml` declares `CCOv1` — an upstream inconsistency inherited without comment.
+`package.xml` declares `GPL-3.0-or-later`, `LICENSE` is GPL-3, `LICENSES/FMF-MIT.txt` retains MIT for the original code, and no file states which source files each covers. Separately, `THIRD_PARTY_NOTICES.md` records SearchBar as LGPL-2.1 (matching its `LICENSE` file) while the bundled `SearchBar/package.xml` declares `CCOv1` — an upstream inconsistency inherited without comment.
 
 **Fix:** add SPDX headers to first-party files, state plainly in `README.md` that the distributed combined work is GPL-3.0-or-later because it bundles FreeCAD-Ribbon, and note the SearchBar license discrepancy in `THIRD_PARTY_NOTICES.md` (ideally after asking upstream which is authoritative).
 
@@ -168,19 +168,19 @@ The current `README.md` is two documents fused together: install/status text, th
 
 - `bundled-addons/SearchBar/package.xml` still declares `<depend type="python">lxml</depend>` even though the patch removed that requirement — the whole point of the change.
 - `dist/` held stale and mismatched release artifacts.
-- `Resources/FusionMyFreeCAD/__pycache__/runtime.cpython-311.pyc` exists in the working tree (ignored, but it will be picked up by anything that walks the tree).
+- `Resources/FMF/__pycache__/runtime.cpython-311.pyc` exists in the working tree (ignored, but it will be picked up by anything that walks the tree).
 - 13 of the 78 icons referenced by `layout-v3.json` have no bundled file. **Checked while implementing: these are all FreeCAD built-in command icons and resolve from FreeCAD's own registry at runtime, so nothing is broken.** The real defect is that `sync_bundled_addons.py` selects icons by stem match and silently skips anything it cannot find, so a genuine typo would render a blank button with no warning.
 - `package.xml` declares `<content><workbench>` but `InitGui.py` never calls `Gui.addWorkbench`. Verify how Addon Manager presents an add-on that declares a workbench and registers none before submission.
 
 ### 19. Add a preferences page
 
-Four documented opt-outs (`SetStartWorkbench`, `SetNavigation`, `SetShortcuts`, `CreateStarterDesign`) exist only as raw parameters under `Mod/FusionMyFreeCAD`, reachable through the parameter editor. Given items 3–5, these are exactly the switches an unhappy user needs.
+Four documented opt-outs (`SetStartWorkbench`, `SetNavigation`, `SetShortcuts`, `CreateStarterDesign`) exist only as raw parameters under `Mod/FMF`, reachable through the parameter editor. Given items 3–5, these are exactly the switches an unhappy user needs.
 
 **Fix:** ship a small `.ui` preferences page (the bundled SearchBar already demonstrates the pattern in `Resources/ui/PreferencesUI_SearchBar.ui`) and link it from Verify UI's output.
 
 ### 20. Handle orphaned state after removal
 
-Removing the add-on through Addon Manager deletes `Mod/FusionMyFreeCAD` but leaves `RibbonUI_Data/`, `FusionMyFreeCAD-addon-state.json`, `FusionMyFreeCAD-usage.json`, `FusionMyFreeCAD-runtime-status.json`, and every applied preference. The docs say to click Restore UI first; users will not.
+Removing the add-on through Addon Manager deletes `Mod/FMF` but leaves `RibbonUI_Data/`, `FMF-addon-state.json`, `FMF-usage.json`, `FMF-runtime-status.json`, and every applied preference. The docs say to click Restore UI first; users will not.
 
 **Fix:** publish a standalone one-file recovery macro in `tools/` that performs a restore from the state file without the add-on installed, and link it from `docs/user-guide/INSTALL-FREECAD-ADDON.md`.
 
@@ -188,18 +188,18 @@ Removing the add-on through Addon Manager deletes `Mod/FusionMyFreeCAD` but leav
 
 ## Smaller notes
 
-- `fusion_bootstrap.py:262` writes `ribbonSha256` that nothing ever reads; `verify()` should compare it (see item 6) or it should be dropped.
+- `fmf_bootstrap.py:262` writes `ribbonSha256` that nothing ever reads; `verify()` should compare it (see item 6) or it should be dropped.
 - `restore()` (`:281-303`) is not transactional: a throw inside `_restore_preferences` leaves the ribbon restored and the state file still present. Make it idempotent and safe to re-run.
-- `run_runtime`/`load_vendor` stash load flags as attributes on the `FreeCAD` module (`App._fusion_my_freecad_runtime_loaded`). A module-level guard in a small `fusion_state.py` is equivalent and does not mutate another package's namespace.
+- `run_runtime`/`load_vendor` stash load flags as attributes on the `FreeCAD` module (`App._fmf_my_freecad_runtime_loaded`). A module-level guard in a small `fmf_state.py` is equivalent and does not mutate another package's namespace.
 - `reconcile_actions()` does `main_window.findChildren(QAction)` — thousands of objects — then an inner scan per shortcut, on every workbench activation. Cache the name→action map and invalidate on workbench change.
 - `write_runtime_status()` re-reads `layout-manifest.json` from disk instead of using `load_manifest()`'s cache, and rewrites the status JSON on every activation.
-- `_message()` (`fusion_bootstrap.py:307-311`) uses PySide6-only `.exec()`, while `runtime.py:11-16` carries a PySide2 fallback. Pick one Qt baseline and state it.
+- `_message()` (`fmf_bootstrap.py:307-311`) uses PySide6-only `.exec()`, while `runtime.py:11-16` carries a PySide2 fallback. Pick one Qt baseline and state it.
 - `except Exception` with only a console warning appears in five places (`runtime.py:127`, `:157`, `:177`, `:249`, `:400`). Failures there are invisible in normal use; route them into the status file so Verify UI can report them.
 - `verify()` reports pass/fail per check but no remediation text. Each failed check should say what to do next.
 
 ## What not to change
 
-- The capture/restore model in `fusion_bootstrap.py`. It is the right design; the fixes above harden it rather than replace it.
+- The capture/restore model in `fmf_bootstrap.py`. It is the right design; the fixes above harden it rather than replace it.
 - `_atomic_json` / temp-file-plus-`os.replace` throughout. Correct.
 - The AST-based assertion that Ribbon's startup cache check cannot raise a modal dialog (`validate_addon.py:141-149`). That is a well-chosen test for a real, reported failure mode.
 - The fake-FreeCAD harness in `validate_addon.py`. Promote it, do not discard it.
@@ -225,8 +225,8 @@ Verification: `95 passed`, `ruff check` clean, `ruff format --check` clean,
 
 | # | Item | What changed |
 |---|---|---|
-| 1 | `prepare()` failure disables recovery | `InitGui.py` wraps every step in `_step()`; commands and the preferences page register **first**; failures go to the console and `FusionMyFreeCAD-startup.json`, and Verify UI reports them |
-| 2 | Baseline re-capture destroys the profile | `FusionMyFreeCAD-Backups/baseline.json`, written once and never overwritten; lost state now returns `"recovered"` and reuses it |
+| 1 | `prepare()` failure disables recovery | `InitGui.py` wraps every step in `_step()`; commands and the preferences page register **first**; failures go to the console and `FMF-startup.json`, and Verify UI reports them |
+| 2 | Baseline re-capture destroys the profile | `FMF-Backups/baseline.json`, written once and never overwritten; lost state now returns `"recovered"` and reuses it |
 | 3 | Preferences overwritten every launch | Split into `_apply_structural()` (every launch, paths only) and `_apply_defaults()` (once per version, gated on `AppliedVersion`); new **Reapply UI** command |
 | 4 | Silent shortcut theft | Displaced bindings are recorded, logged, written to the status file, and listed by Verify UI; skipped entirely when `SetShortcuts` is off |
 | 5 | Starter design on by default | Now defaults to off |
@@ -241,8 +241,8 @@ Verification: `95 passed`, `ruff check` clean, `ruff format --check` clean,
 | 16 | README was two documents | Rewritten as a real README; the research prose moved to `research/native-freecad-baseline-2026-07-30.md` |
 | 17 | Licence story unclear | `THIRD_PARTY_NOTICES.md` states the effective licence, tabulates components, and documents the upstream SearchBar LGPL-2.1-vs-CC0 discrepancy |
 | 18 | Stale metadata | `lxml` dependency removed from SearchBar's `package.xml` **and** `sync_bundled_addons.py` now strips such declarations mechanically; stale `dist/` artifacts removed |
-| 19 | No preferences page | `Resources/FusionMyFreeCAD/preferences.ui`, registered via `register_preferences_page()`; a test derives the required controls from the runtime's own `PREFERENCES` reads |
-| 20 | Orphaned state after removal | `tools/RestoreFusionMyFreeCAD.FCMacro`, shipped inside the archive and tested |
+| 19 | No preferences page | `Resources/FMF/preferences.ui`, registered via `register_preferences_page()`; a test derives the required controls from the runtime's own `PREFERENCES` reads |
+| 20 | Orphaned state after removal | `tools/RestoreFMF.FCMacro`, shipped inside the archive and tested |
 
 Smaller notes also addressed: `restore()` is now step-independent and returns `(directory, problems)`; `_restore_preferences` no longer abandons the remaining keys on one bad entry; module-load flags moved off the `FreeCAD` module into a module-level `_loaded` set; `_exec()` handles both Qt bindings; broad `except Exception` handlers now route into the status file; Verify UI names the next step for every failure.
 
@@ -269,7 +269,7 @@ Every Priority-1 fix was mutation-checked — the bug was reintroduced and the s
 | Silent shortcut theft | `test_a_displaced_shortcut_is_recorded_and_reported`, `test_displaced_shortcuts_reach_the_status_file` |
 | Old 0.75 promotion baseline | `test_a_single_click_does_not_displace_a_default` |
 | Starter design on by default | `test_starter_design_is_off_by_default` |
-| Baseline re-captured over own settings | `test_lost_state_does_not_capture_fusion_settings_as_the_baseline` |
+| Baseline re-captured over own settings | `test_lost_state_does_not_capture_fmf_settings_as_the_baseline` |
 | Restore leaves machine-local files | `test_restore_moves_machine_local_runtime_files_aside` |
 | Deferral without retry | `test_install_waits_for_a_slow_main_window` |
 | A new opt-out with no UI control | `test_the_preferences_page_covers_every_switch_the_runtime_reads` |
@@ -287,7 +287,7 @@ checklist in `MAINTAINING.md`, and specifically exercise the paths this pass cha
 4. **Reapply UI** → confirm defaults return and the ribbon regenerates.
 5. **Restore UI** → confirm the original profile returns.
 6. Remove the add-on without restoring, then run the recovery macro (item 20).
-7. Preferences → FusionMyFreeCAD → toggle each switch and confirm it takes effect after Reapply.
+7. Preferences → FMF → toggle each switch and confirm it takes effect after Reapply.
 
 ---
 
@@ -344,7 +344,7 @@ now name a representative member, which is the convention FreeCAD-Ribbon already
 - **`bundled-addons/FreeCAD-Ribbon/Resources/FreeCAD Icons/` deleted** — 69 files, 1.2 MiB of images
   FreeCAD already installs. The Ribbon's own chrome (`Resources/icons`) is untouched.
 - **`tools/probe_freecad_icons.py`** added: fingerprints the placeholder, checks every layout icon
-  against a real install, writes `Resources/FusionMyFreeCAD/verified-icons.json`, exits non-zero on
+  against a real install, writes `Resources/FMF/verified-icons.json`, exits non-zero on
   any unresolved name. Uses a throwaway config so it cannot touch the user's profile.
 - **`sync_bundled_addons.py`** no longer copies FreeCAD icons and now *refuses* to, so an upstream
   refresh cannot silently reintroduce them.

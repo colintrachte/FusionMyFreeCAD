@@ -6,9 +6,9 @@ from PySide.QtCore import Qt, Signal, QEvent, QObject
 import os
 import Parameters_SearchBar
 
-# FusionMyFreeCAD ships its own release information.  Suppress SearchBar's
+# FMF ships its own release information.  Suppress SearchBar's
 # always-on-top startup changelog at the source so add-on load order cannot
-# re-enable it before FusionMyFreeCAD preferences are applied.
+# re-enable it before FMF preferences are applied.
 Parameters_SearchBar.Settings.SetStringSetting("DoNotShowAgain", "1.8")
 Parameters_SearchBar.Settings.SetBoolSetting("ShowChangeDialog", False)
 Parameters_SearchBar.DO_NOT_SHOW_AGAIN = "1.8"

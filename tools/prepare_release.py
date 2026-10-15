@@ -1,4 +1,4 @@
-"""Prepare FusionMyFreeCAD's versioned files for a human-authored release."""
+"""Prepare FMF's versioned files for a human-authored release."""
 
 from __future__ import annotations
 
@@ -65,8 +65,8 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
         changed.append(package_path)
 
     for relative in (
-        "Resources/FusionMyFreeCAD/layout-v3.json",
-        "Resources/FusionMyFreeCAD/layout-manifest.json",
+        "Resources/FMF/layout-v3.json",
+        "Resources/FMF/layout-manifest.json",
     ):
         path = root / relative
         if update_text_file(
@@ -87,8 +87,8 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
             "## Status\n\n"
             f"Version **{version}** is available from\n"
             "[GitHub Releases](https://github.com/colintrachte/"
-            f"FusionMyFreeCAD/releases/tag/v{version}) as a\n"
-            "self-contained archive. FusionMyFreeCAD has not yet been submitted to FreeCAD's "
+            f"FMF/releases/tag/v{version}) as a\n"
+            "self-contained archive. FMF has not yet been submitted to FreeCAD's "
             "add-on index;\n"
             "catalog publication remains separate work.\n"
         )
@@ -101,7 +101,7 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
 
     def update_download_references(text: str, target: str, path: Path) -> str:
         replacements = (
-            (r"FusionMyFreeCAD-[0-9]+\.[0-9]+\.[0-9]+\.zip", f"FusionMyFreeCAD-{target}.zip"),
+            (r"FMF-[0-9]+\.[0-9]+\.[0-9]+\.zip", f"FMF-{target}.zip"),
             (r"\[[0-9]+\.[0-9]+\.[0-9]+ release\]", f"[{target} release]"),
             (r"/tag/v[0-9]+\.[0-9]+\.[0-9]+", f"/tag/v{target}"),
         )
@@ -127,7 +127,7 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
     if changelog_heading not in changelog_path.read_text(encoding="utf-8"):
 
         def add_changelog_section(text: str) -> str:
-            marker = "All notable user-visible changes to FusionMyFreeCAD are recorded here.\n"
+            marker = "All notable user-visible changes to FMF are recorded here.\n"
             if marker not in text:
                 raise RuntimeError("Could not find the CHANGELOG introduction")
             section = (
@@ -143,16 +143,16 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
     notes_path.parent.mkdir(parents=True, exist_ok=True)
     if not notes_path.exists():
         notes_path.write_text(
-            f"# FusionMyFreeCAD {version}\n\n"
+            f"# FMF {version}\n\n"
             "TODO: Write a short release summary.\n\n"
             "## Install or update\n\n"
-            f"Download `FusionMyFreeCAD-{version}.zip` and "
-            f"`FusionMyFreeCAD-{version}.zip.sha256` from this release. Replace the entire "
-            "existing `Mod/FusionMyFreeCAD` folder; do not merge it with an older version.\n\n"
+            f"Download `FMF-{version}.zip` and "
+            f"`FMF-{version}.zip.sha256` from this release. Replace the entire "
+            "existing `Mod/FMF` folder; do not merge it with an older version.\n\n"
             "See the [installation guide](https://github.com/colintrachte/"
-            f"FusionMyFreeCAD/blob/v{version}/docs/user-guide/INSTALL-FREECAD-ADDON.md) and "
+            f"FMF/blob/v{version}/docs/user-guide/INSTALL-FREECAD-ADDON.md) and "
             "[full changelog](https://github.com/colintrachte/"
-            f"FusionMyFreeCAD/blob/v{version}/CHANGELOG.md).\n",
+            f"FMF/blob/v{version}/CHANGELOG.md).\n",
             encoding="utf-8",
             newline="\n",
         )

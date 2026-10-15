@@ -1,4 +1,4 @@
-"""Fast in-canvas Parameters dock widget for FusionMyFreeCAD.
+"""Fast in-canvas Parameters dock widget for FMF.
 
 Allows creating, editing, and inspecting model parameters directly from the 3D
 canvas sidebar without interrupting CAD workflows by switching to the
@@ -10,7 +10,7 @@ from __future__ import annotations
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from fusion_common import log_swallowed, transaction
+from fmf_common import log_swallowed, transaction
 
 try:
     from PySide import QtCore, QtWidgets
@@ -106,7 +106,7 @@ if QtWidgets is not None:
 
         def __init__(self, parent=None):
             super().__init__("Parameters", parent)
-            self.setObjectName("FusionMyFreeCAD_ParametersDock")
+            self.setObjectName("FMF_ParametersDock")
             self._updating = False
             active_doc = getattr(App, "ActiveDocument", None)
             self._bound_doc_name: str | None = (
@@ -469,7 +469,7 @@ def close_parameters_dock():
 
 
 class ParameterDockCommand:
-    """``FusionMyFreeCAD_ParameterDock`` ribbon command."""
+    """``FMF_ParameterDock`` ribbon command."""
 
     def GetResources(self):
         return {
@@ -487,4 +487,4 @@ class ParameterDockCommand:
 
 def register(add_command=None):
     register_with = add_command or Gui.addCommand
-    register_with("FusionMyFreeCAD_ParameterDock", ParameterDockCommand())
+    register_with("FMF_ParameterDock", ParameterDockCommand())

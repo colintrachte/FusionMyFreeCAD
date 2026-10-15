@@ -3,7 +3,7 @@
 Run these journeys before and after each owned-workbench migration slice. Record FreeCAD build,
 OS, display scale, clean/custom profile, elapsed time, errors, assistance, and recovery result.
 
-1. Install, restart, verify four layouts, and run **Verify FusionMyFreeCAD**.
+1. Install, restart, verify four layouts, and run **Verify FMF**.
 2. Create a document/body/sketch from Part Design, select an origin plane, finish, and return.
 3. Create constrained geometry using Coincident, Smart Dimension, Midpoint, and Smart Slot.
 4. Mirror attached and free geometry with **Mirror + Constraints** and Pad multiple regions.
@@ -30,7 +30,7 @@ and output under this repository's ignored `ai_poop/` directory.
 Set `FREECAD_USER_HOME`, `FREECAD_USER_DATA`, and `FREECAD_USER_TEMP` to an isolated directory and
 also pass isolated `--user-cfg` and `--system-cfg` paths. Add this repository with `-M` only when
 the test intentionally loads FMF. For native-FreeCAD control measurements, pass
-`--disable-addon FusionMyFreeCAD`. On the checked source build, prepend the Pixi environment,
+`--disable-addon FMF`. On the checked source build, prepend the Pixi environment,
 `Library/bin`, and `Scripts` to `PATH` and set `QT_PLUGIN_PATH` to
 `Library/lib/qt6/plugins` before launching.
 
@@ -70,8 +70,8 @@ short note for each item; attach screenshots for items 1, 3, 5, and 9.
    confirm each file is created and non-empty.
 8. Search and adaptation: find one command using Fusion terminology and one using its FreeCAD name;
    invoke a FREQUENT candidate repeatedly, restart, and confirm only FREQUENT changes.
-9. Lifecycle: run Verify FusionMyFreeCAD, note the result, run Reset FusionMyFreeCAD, then disable
-   FusionMyFreeCAD. Confirm immediately that native menus/toolbars and stock workbenches return.
+9. Lifecycle: run Verify FMF, note the result, run Reset FMF, then disable
+   FMF. Confirm immediately that native menus/toolbars and stock workbenches return.
    Re-enable FMF in Preferences and confirm immediately that its workbench family returns.
 
 Report the FreeCAD version, Windows display scale, whether the profile was already customized, and

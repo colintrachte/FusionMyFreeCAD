@@ -1,7 +1,7 @@
-# Agent Workspace Guidelines for FusionMyFreeCAD
+# Agent Workspace Guidelines for FMF
 
 ## Version Authority
-- **Never increment or otherwise change FusionMyFreeCAD's main project/release version without the
+- **Never increment or otherwise change FMF's main project/release version without the
   user's explicit prior approval.** The current 1.8.0 version is accepted and must not be rolled
   back merely because it was previously incremented without consultation.
 - Do not infer permission for a future project-version bump from a feature request, bug fix,
@@ -22,5 +22,5 @@
 - **FreeCAD 1.1 Executables:** Locate the active installation with `Get-Command freecad.exe,
   freecadcmd.exe` or use its actual install directory. Do not assume `C:\Program Files\FreeCAD 1.1`;
   that path is not present on every development machine.
-- **Addon Mod Path:** `%APPDATA%\FreeCAD\v1-1\Mod\FusionMyFreeCAD` (PowerShell: `$env:APPDATA\FreeCAD\v1-1\Mod\FusionMyFreeCAD`, Linux: `~/.local/share/FreeCAD/Mod/FusionMyFreeCAD`)
+- **Addon Mod Path:** `%APPDATA%\FreeCAD\v1-1\Mod\FMF` (PowerShell: `$env:APPDATA\FreeCAD\v1-1\Mod\FMF`, Linux: `~/.local/share/FreeCAD/Mod/FMF`)
 - **Local Dev Deploy:** `powershell -ExecutionPolicy Bypass -File .\tools\install-dev.ps1`

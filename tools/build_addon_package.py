@@ -13,9 +13,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from fusion_common import RUNTIME_MODULES  # noqa: E402
+from fmf_common import RUNTIME_MODULES  # noqa: E402
 
-PACKAGE_NAME = "FusionMyFreeCAD"
+PACKAGE_NAME = "FMF"
 PACKAGE_METADATA_FILES = (
     "package.xml",
     "LICENSE",
@@ -25,7 +25,7 @@ PACKAGE_METADATA_FILES = (
     "docs/user-guide/INSTALL-FREECAD-ADDON.md",
     # The install guide tells users to recover with this macro after removing the
     # add-on, so it has to travel inside the archive.
-    "tools/RestoreFusionMyFreeCAD.FCMacro",
+    "tools/RestoreFMF.FCMacro",
 )
 PACKAGE_FILES = RUNTIME_MODULES + PACKAGE_METADATA_FILES
 PACKAGE_DIRECTORIES = ("Resources", "bundled-addons")

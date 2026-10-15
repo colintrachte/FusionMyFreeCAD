@@ -8,9 +8,9 @@ from fake_freecad import FakeObject
 
 @pytest.fixture
 def export(env):
-    import fusion_export
+    import fmf_export
 
-    return fusion_export
+    return fmf_export
 
 
 def _obj(type_id, name="Obj", **attributes):
@@ -222,7 +222,7 @@ def test_every_export_command_registers(export, env):
 
 def test_the_button_is_dim_until_something_is_selected(export, env):
     export.register()
-    command = env.commands["FusionMyFreeCAD_Export"]
+    command = env.commands["FMF_Export"]
 
     assert command.IsActive() is False, "no document"
 
@@ -251,7 +251,7 @@ def test_is_active_never_inspects_shapes(export, env):
     obj.Shape = Tripwire()
     env.select_objects(obj)
 
-    assert env.commands["FusionMyFreeCAD_Export"].IsActive() is True
+    assert env.commands["FMF_Export"].IsActive() is True
 
 
 def test_each_command_reports_its_own_resources(export, env):
@@ -259,7 +259,7 @@ def test_each_command_reports_its_own_resources(export, env):
     for name, _kind, menu_text, _tip in export.COMMANDS:
         resources = env.commands[name].GetResources()
         assert resources["MenuText"] == menu_text
-        assert resources["Pixmap"] == "FusionMyFreeCAD_Export"
+        assert resources["Pixmap"] == "FMF_Export"
         assert resources["ToolTip"]
 
 
@@ -268,7 +268,7 @@ def test_activating_a_format_command_exports_in_that_format(export, env):
     document = env.app.newDocument("Doc")
     env.select_objects(document.addObject("Part::Feature", "Solid"))
 
-    env.commands["FusionMyFreeCAD_ExportDXF"].Activated()
+    env.commands["FMF_ExportDXF"].Activated()
 
     stored = env.app.ParamGet(export.EXPORT_FILTER_GROUP).GetString(export.EXPORT_FILTER_KEY)
     assert stored == "Autodesk DXF 2D (*.dxf)"

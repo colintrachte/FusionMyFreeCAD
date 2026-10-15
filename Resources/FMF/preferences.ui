@@ -17,7 +17,7 @@
    <item>
     <widget class="QLabel" name="introLabel">
      <property name="text">
-      <string>Enable or disable FMF here; the workbench selector updates immediately. Use &lt;b&gt;Reset FusionMyFreeCAD&lt;/b&gt; in an INSPECT panel only when you want to discard FMF interface customizations.</string>
+      <string>Enable or disable FMF here; the workbench selector updates immediately. Use &lt;b&gt;Reset FMF&lt;/b&gt; in an INSPECT panel only when you want to discard FMF interface customizations.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
@@ -45,7 +45,7 @@
          <cstring>Enabled</cstring>
         </property>
         <property name="prefPath" stdset="0">
-         <cstring>Mod/FusionMyFreeCAD</cstring>
+         <cstring>Mod/FMF</cstring>
         </property>
        </widget>
       </item>
@@ -73,7 +73,7 @@
          <cstring>SetStartWorkbench</cstring>
         </property>
         <property name="prefPath" stdset="0">
-         <cstring>Mod/FusionMyFreeCAD</cstring>
+         <cstring>Mod/FMF</cstring>
         </property>
        </widget>
       </item>
@@ -92,7 +92,7 @@
          <cstring>SetNavigation</cstring>
         </property>
         <property name="prefPath" stdset="0">
-         <cstring>Mod/FusionMyFreeCAD</cstring>
+         <cstring>Mod/FMF</cstring>
         </property>
        </widget>
       </item>
@@ -111,7 +111,7 @@
          <cstring>SetShortcuts</cstring>
         </property>
         <property name="prefPath" stdset="0">
-         <cstring>Mod/FusionMyFreeCAD</cstring>
+         <cstring>Mod/FMF</cstring>
         </property>
        </widget>
       </item>
@@ -139,7 +139,7 @@
          <cstring>CreateStarterDesign</cstring>
         </property>
         <property name="prefPath" stdset="0">
-         <cstring>Mod/FusionMyFreeCAD</cstring>
+         <cstring>Mod/FMF</cstring>
         </property>
        </widget>
       </item>

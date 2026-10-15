@@ -1,4 +1,4 @@
-# Make a new FusionMyFreeCAD release
+# Make a new FMF release
 
 This is the maintainer's start-to-finish release runbook. The preparation command updates the
 version everywhere it belongs. GitHub then repeats all automated checks, builds the archive, and
@@ -51,14 +51,14 @@ python tools/build_addon_package.py
 
 The last command creates these ignored files under `dist/`:
 
-- `FusionMyFreeCAD-1.3.0.zip`
-- `FusionMyFreeCAD-1.3.0.zip.sha256`
+- `FMF-1.3.0.zip`
+- `FMF-1.3.0.zip.sha256`
 
 Complete the **Interactive FreeCAD checklist** in `MAINTAINING.md`. Use a disposable or backed-up
 FreeCAD profile. Automated tests do not validate the real FreeCAD UI or production CAD output.
 Run the non-destructive real-FreeCAD command smoke check documented there before the manual pass.
 
-Inspect the ZIP before continuing. It must contain one top-level `FusionMyFreeCAD` folder, with
+Inspect the ZIP before continuing. It must contain one top-level `FMF` folder, with
 `InitGui.py`, `package.xml`, `Resources`, and `bundled-addons` directly inside it.
 
 ## 3. Commit and push
@@ -68,8 +68,8 @@ Review the diff, then commit and push the prepared release candidate:
 ```powershell
 git diff --check
 git status --short
-git add package.xml README.md CHANGELOG.md docs/user-guide/INSTALL-FREECAD-ADDON.md docs/release-notes/RELEASE-NOTES-1.3.0.md Resources/FusionMyFreeCAD/layout-v3.json Resources/FusionMyFreeCAD/layout-manifest.json
-git commit -m "Prepare FusionMyFreeCAD 1.3.0"
+git add package.xml README.md CHANGELOG.md docs/user-guide/INSTALL-FREECAD-ADDON.md docs/release-notes/RELEASE-NOTES-1.3.0.md Resources/FMF/layout-v3.json Resources/FMF/layout-manifest.json
+git commit -m "Prepare FMF 1.3.0"
 git push origin main
 ```
 

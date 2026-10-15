@@ -1,4 +1,4 @@
-"""One-click Datum plane helpers for FusionMyFreeCAD.
+"""One-click Datum plane helpers for FMF.
 
 In Autodesk Fusion, creating a midplane, plane at an angle, or tangent plane is a
 direct 1-click operation from the Construct menu. In native FreeCAD PartDesign,
@@ -14,7 +14,7 @@ from __future__ import annotations
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from fusion_common import notify, transaction
+from fmf_common import notify, transaction
 
 
 def _active_body(document=None):
@@ -183,11 +183,11 @@ def _notify_datum(text: str, error: bool = False) -> None:
 
 
 class DatumMidplaneCommand:
-    """``FusionMyFreeCAD_DatumMidplane`` ribbon command."""
+    """``FMF_DatumMidplane`` ribbon command."""
 
     def GetResources(self):
         return {
-            "Pixmap": "FusionMyFreeCAD_DatumMidplane",
+            "Pixmap": "FMF_DatumMidplane",
             "MenuText": "Midplane",
             "ToolTip": ("Create a 1-click datum midplane centered between two selected faces."),
         }
@@ -201,4 +201,4 @@ class DatumMidplaneCommand:
 
 def register(add_command=None):
     register_with = add_command or Gui.addCommand
-    register_with("FusionMyFreeCAD_DatumMidplane", DatumMidplaneCommand())
+    register_with("FMF_DatumMidplane", DatumMidplaneCommand())

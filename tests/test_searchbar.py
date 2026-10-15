@@ -18,7 +18,7 @@ def _search_helpers():
     return namespace
 
 
-def test_pad_is_searchable_by_native_and_fusion_names():
+def test_pad_is_searchable_by_native_and_fmf_names():
     helpers = _search_helpers()
     group = {
         "text": "Extrude",
