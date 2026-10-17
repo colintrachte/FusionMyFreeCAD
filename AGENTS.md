@@ -24,3 +24,10 @@
   that path is not present on every development machine.
 - **Addon Mod Path:** `%APPDATA%\FreeCAD\v1-1\Mod\FMF` (PowerShell: `$env:APPDATA\FreeCAD\v1-1\Mod\FMF`, Linux: `~/.local/share/FreeCAD/Mod/FMF`)
 - **Local Dev Deploy:** `powershell -ExecutionPolicy Bypass -File .\tools\install-dev.ps1`
+
+## Repository Privacy
+- Never commit personal absolute paths, user-profile names, private email addresses, credentials,
+  conversation exports, or machine-specific workspace names. Use portable environment variables or
+  placeholders such as `<fmf-repo>`, `<upstream-reference>`, and `<user-home>`.
+- Run `python tools/check_repository_privacy.py` before committing. CI and the release workflow run
+  the same check and report only the finding category and location, never the matched value.

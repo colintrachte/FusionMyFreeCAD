@@ -40,6 +40,9 @@ jobs:
       - name: Check formatting
         run: ruff format --check .
 
+      - name: Check tracked files for private machine details and secrets
+        run: python tools/check_repository_privacy.py
+
       - name: Validate behavior-sensitive command mappings
         run: python tools/validate_layout_contracts.py
 
