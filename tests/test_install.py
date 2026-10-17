@@ -124,9 +124,7 @@ def test_previous_brand_state_and_preferences_are_carried_forward(env, bootstrap
 
     bootstrap._migrate_previous_brand_data()
 
-    assert json.loads(Path(bootstrap.STATE_PATH).read_text("utf-8")) == {
-        "marker": "previous"
-    }
+    assert json.loads(Path(bootstrap.STATE_PATH).read_text("utf-8")) == {"marker": "previous"}
     assert env.param(bootstrap.PREFERENCE_ROOT).GetBool("SetShortcuts") is False
     assert previous_state.is_file()
 

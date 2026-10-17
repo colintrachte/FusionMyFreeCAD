@@ -457,9 +457,7 @@ def repair_document(document=None) -> dict:
 
     for repair in repaired:
         App.Console.PrintMessage(
-            "FMF reattached {} to {}.\n".format(
-                _describe(repair), repair["replacement"]
-            )
+            "FMF reattached {} to {}.\n".format(_describe(repair), repair["replacement"])
         )
     for finding in plan["suggestions"]:
         App.Console.PrintWarning(

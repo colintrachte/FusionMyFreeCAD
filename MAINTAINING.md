@@ -4,7 +4,7 @@ This guide is for human maintainers changing, testing, or preparing releases of 
 The repository contains the current cross-platform FreeCAD add-on plus an older manual prototype
 kept as a troubleshooting baseline. The root add-on is the only supported release path.
 
-The root package currently identifies itself as development version **1.8.0**. GitHub's latest
+The root package currently identifies itself as version **1.9.0**. GitHub's latest
 published release remains **1.4.0**; the intervening changelog entries and locally built archives
 describe work on `main`, not additional public releases. Do not describe a development archive as
 downloadable until the release workflow has published and verified it.

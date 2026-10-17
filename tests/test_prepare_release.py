@@ -79,15 +79,18 @@ def test_prepare_updates_current_metadata_and_creates_editable_notes(tmp_path):
         assert '"layoutVersion": "1.3.0"' in (root / "Resources/FMF" / name).read_text(
             encoding="utf-8"
         )
-    assert "Version **1.3.0**" in (root / "README.md").read_text(encoding="utf-8")
-    assert "FMF-1.3.0.zip" in (root / "README.md").read_text(encoding="utf-8")
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    assert "Version **1.3.0**" in readme
+    assert "FMF-1.3.0.zip" in readme
+    assert "v1.1.0" not in readme
+    assert "FusionMyFreeCAD/releases/tag/v1.3.0" in readme
     install = (root / "docs/user-guide/INSTALL-FREECAD-ADDON.md").read_text(encoding="utf-8")
     assert "FMF-1.3.0.zip" in install
     assert "Version 1.2.0 replaced the retired installer." in install
     assert "## 1.3.0 — 2026-09-01" in (root / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "TODO" in (root / "docs/release-notes/RELEASE-NOTES-1.3.0.md").read_text(
-        encoding="utf-8"
-    )
+    notes = (root / "docs/release-notes/RELEASE-NOTES-1.3.0.md").read_text(encoding="utf-8")
+    assert "TODO" in notes
+    assert "colintrachte/FusionMyFreeCAD/blob/v1.3.0" in notes
 
     assert helper.prepare(root, "1.3.0", "2026-09-01") == []
 

@@ -35,9 +35,7 @@ def main() -> int:
         )
 
     if missing:
-        App.Console.PrintError(
-            "FMF command smoke check failed:\n  " + "\n  ".join(missing) + "\n"
-        )
+        App.Console.PrintError("FMF command smoke check failed:\n  " + "\n  ".join(missing) + "\n")
         return 1
     App.Console.PrintMessage("FMF command smoke check passed.\n")
     return 0

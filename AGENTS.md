@@ -2,7 +2,7 @@
 
 ## Version Authority
 - **Never increment or otherwise change FMF's main project/release version without the
-  user's explicit prior approval.** The current 1.8.0 version is accepted and must not be rolled
+  user's explicit prior approval.** The current 1.9.0 version is accepted and must not be rolled
   back merely because it was previously incremented without consultation.
 - Do not infer permission for a future project-version bump from a feature request, bug fix,
   documentation update, package build, deployment, or release-preparation request. Ask first.

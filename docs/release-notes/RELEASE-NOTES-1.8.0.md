@@ -2,6 +2,8 @@
 
 - Added bounded structured startup diagnostics, session health states, vendor-load timing, UI
   snapshots, and menu commands for copying a support summary or opening the diagnostics folder.
+- Runtime diagnostics now include installed signals, event filters, adaptive usage connections,
+  pending deferred work, and teardown failures, making enable/disable leaks easier to diagnose.
 - FMF no longer reports activation healthy until the Ribbon is visibly usable; failed activation
   is logged and automatically rolls back to the native interface.
 - FMF-owned workbenches and panels consistently use FMF names, and the FreeCAD Preferences page is

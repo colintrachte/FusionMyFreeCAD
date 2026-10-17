@@ -2,10 +2,43 @@
 
 All notable user-visible changes to FMF are recorded here.
 
+## 1.9.0 — 2026-10-17
+
+### Clean release baseline
+
+- Published the complete FMF-owned workbench family as the new supported release baseline after
+  retiring the older release line. FMF Design, Part, Sketch, and Surface remain separate from the
+  stock workbenches and can be enabled or disabled without unregistering FreeCAD's interface.
+- Rewrote the public repository history to remove personal machine paths and private commit-email
+  addresses. CI and release builds now reject tracked personal paths, known private addresses,
+  private-key markers, and common credential formats.
+
+### Lifecycle diagnostics
+
+- Runtime status now reports owned workbench signals, task-dialog event filters, adaptive usage
+  callbacks, pending deferred work, displaced shortcuts, and cleanup failures.
+- Disabling FMF reports teardown failures instead of silently ignoring them, making leaked runtime
+  services diagnosable without weakening the native-interface fallback.
+
+### Release reliability
+
+- Fixed the release-preparation helper so every release link is updated and generated links use the
+  canonical `FusionMyFreeCAD` repository name.
+- Release validation covers metadata, layout contracts, privacy, formatting, tests, bundled-code
+  undefined names, and the installable archive before publication.
+
+### Upgrade notes
+
+- Replace the entire existing `Mod/FMF` folder; do not merge it with an older version.
+- Restart FreeCAD after updating. Existing FMF preferences and compatible panel customization are
+  migrated automatically.
+
 ## 1.8.0 — 2026-10-09
 
 ### Regression hardening
 
+- Runtime status now reports owned signal connections, event filters, adaptive usage callbacks,
+  pending deferred work, and cleanup failures so enable/disable leaks are diagnosable.
 - FMF-owned workbenches and ribbon panels now consistently use the FMF name: **FMF Design**,
   **FMF Part**, **FMF Sketch**, and **FMF Surface**. Saved workbench IDs, panel customization,
   adaptive pins, usage history, and autoload preferences from development builds are migrated.

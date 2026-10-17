@@ -67,16 +67,12 @@ def runtime(env, bootstrap):
 
 @pytest.fixture(scope="session")
 def layout():
-    return json.loads(
-        (ROOT / "Resources" / "FMF" / "layout-v3.json").read_text("utf-8")
-    )
+    return json.loads((ROOT / "Resources" / "FMF" / "layout-v3.json").read_text("utf-8"))
 
 
 @pytest.fixture(scope="session")
 def manifest():
-    return json.loads(
-        (ROOT / "Resources" / "FMF" / "layout-manifest.json").read_text("utf-8")
-    )
+    return json.loads((ROOT / "Resources" / "FMF" / "layout-manifest.json").read_text("utf-8"))
 
 
 @pytest.fixture(scope="session")

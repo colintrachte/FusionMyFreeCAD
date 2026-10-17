@@ -73,18 +73,14 @@ class FMFPartWorkbench(_FMFWorkbench):
             importlib.import_module("CompoundTools._CommandCompoundFilter")
             importlib.import_module("CompoundTools._CommandExplodeCompound")
         except ImportError as error:
-            App.Console.PrintWarning(
-                "FMF: optional Part commands unavailable: {}\n".format(error)
-            )
+            App.Console.PrintWarning("FMF: optional Part commands unavailable: {}\n".format(error))
         try:
             bop = __import__("BOPTools")
             bop.importAll()
             bop.addCommands()
             part_gui.BOPTools = bop
         except Exception as error:
-            App.Console.PrintWarning(
-                "FMF: optional BOP commands unavailable: {}\n".format(error)
-            )
+            App.Console.PrintWarning("FMF: optional BOP commands unavailable: {}\n".format(error))
 
 
 class FMFSketchWorkbench(_FMFWorkbench):

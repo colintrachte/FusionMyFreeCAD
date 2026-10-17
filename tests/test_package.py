@@ -421,18 +421,12 @@ def test_mirror_with_constraints_sits_beside_the_native_mirror(layout, manifest)
     assert by_name["FMF_MirrorWithConstraints"][2] == "small"
     assert by_name["FMF_MirrorWithConstraints"][3] == "Mirror + Constraints"
     assert by_name["Sketcher_Symmetry"][2] == "large"
-    assert (
-        order.index("Sketcher_Symmetry") - order.index("FMF_MirrorWithConstraints") == 1
-    )
+    assert order.index("Sketcher_Symmetry") - order.index("FMF_MirrorWithConstraints") == 1
     assert "FMF_MirrorWithConstraints" in manifest["primaryCommands"]
     assert "FMF_AddMidline" in order
     assert by_name["FMF_AddMidline"][2] == "small"
     assert by_name["FMF_AddMidline"][3] == "Midline"
-    assert (
-        order.index("FMF_MirrorWithConstraints")
-        - order.index("FMF_AddMidline")
-        == 1
-    )
+    assert order.index("FMF_MirrorWithConstraints") - order.index("FMF_AddMidline") == 1
     assert "FMF_AddMidline" in manifest["primaryCommands"]
 
     constraints_panel = {
@@ -783,8 +777,7 @@ def test_fresh_extracted_archive_startup(tmp_path, env, monkeypatch):
     for name in [
         k
         for k in list(sys.modules.keys())
-        if k.startswith("fmf_")
-        or k in ("_fmf_my_freecad_runtime", "fmf_init_gui_extracted")
+        if k.startswith("fmf_") or k in ("_fmf_my_freecad_runtime", "fmf_init_gui_extracted")
     ]:
         sys.modules.pop(name, None)
 

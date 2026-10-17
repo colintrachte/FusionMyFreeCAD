@@ -3,7 +3,7 @@
 This roadmap protects FMF's multi-workbench product first. Official Addon Index inclusion is an
 optional outcome, not permission to remove product-defining benefits. The read-only studies under
 `<upstream-reference>` inform decisions but are never modified. The main project
-version remains 1.8.0 unless the owner explicitly approves a change.
+version remains 1.9.0 unless the owner explicitly approves a change.
 
 ## Target outcome
 
@@ -24,18 +24,18 @@ visibility transition is reversible and never removes the stock implementations.
 
 ---
 
-## Now — Preserve and measure
+## Now — Harden the shipped workbench family
 
-- [ ] **Score 5 🥇 · Class 2 — Capture the 1.8.0 behavioral baseline**
+- [ ] **Score 5 🥇 · Class 2 — Maintain the 1.8.0 behavioral baseline**
 
   **ID:** task_a1020000000000000000000000000002
-  **Status:** Verification — static and source-build probes captured; interactive journeys pending
-  **Outcome:** Record repeatable user journeys, profile mutations, reference screenshots, startup time, switching latency, search latency, and recovery results before restructuring.
+  **Status:** Continuous validation — static/source-build probes and owner acceptance captured; remaining journeys are ongoing dogfood evidence, not migration blockers
+  **Outcome:** Keep repeatable user journeys, profile mutations, reference screenshots, startup time, switching latency, search latency, and recovery results current as field issues are discovered.
   **Work mode:** Forge + Steward
   **Execution size:** Large
   **Uncertainty:** Medium
   **Protected behavior:** One-package install, four layouts, sketch transitions, search, adaptive panels, shortcuts, modelling helpers, and restoration remain available.
-  **Acceptance:** Journeys cover clean/custom profiles, all four contexts, sketch entry/exit, multi-region Pad, Mirror + Constraints, dress-up input, export, Verify, Reapply, and Restore.
+  **Acceptance:** Owner-accepted workbench and sketch behavior remains protected; release qualification covers clean/custom profiles, all four contexts, modelling helpers, export, lifecycle, and recovery.
   **Expected evidence:** A checked-in journey specification and machine-readable baseline results repeatable after every migration slice.
   **Implement:** `docs/dev-guide/BASELINE-JOURNEYS.md` · `tests/fixtures/fmf-baseline.json` · `tools/benchmark_fmf.py`
   **Context:** `docs/dev-guide/CURRENT-FEATURE-INVENTORY.md` · `Resources/FMF/layout-v3.json` · `fmf_bootstrap.py` · `Resources/FMF/runtime.py`
@@ -46,7 +46,7 @@ visibility transition is reversible and never removes the stock implementations.
 
 ---
 
-## Next — Owned workbenches without regressions
+## Next — Product safeguards and release evidence
 
 - [x] **Score 5 🥇 · Class 2 — Register four namespaced FMF workbench shells**
 
@@ -67,17 +67,17 @@ visibility transition is reversible and never removes the stock implementations.
   **Chars:** ~28,179 text total (largest: docs/dev-guide/workbench-parity.md ~22,906) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Blocked by:** task_a1030000000000000000000000000003 · task_a1040000000000000000000000000004 · task_a1050000000000000000000000000005
 
-- [ ] **Score 5 🥇 · Class 2 — Project all curated layouts into owned workbenches**
+- [x] **Score 5 🥇 · Class 2 — Project all curated layouts into owned workbenches**
 
   **ID:** task_b2020000000000000000000000000002
-  **Status:** In verification — owned layout projection and legacy-state migration tests passed; FMF Design is live-confirmed, but full four-workbench parity remains
+  **Status:** Shipped — automated parity/migration checks passed and the owner accepted all four workbenches for continued daily use
   **Outcome:** Preserve every pinned, overflow, dropdown, responsive, adaptive, personalization, label, icon, and size behavior inside the corresponding FMF-owned workbench.
   **Work mode:** Steward
   **Execution size:** Large
   **Uncertainty:** High
   **Protected behavior:** No current layout capability disappears; adaptation remains confined to FREQUENT.
   **Acceptance:** Parity checks are complete and baseline journeys are equivalent or better in all four workbenches.
-  **Expected evidence:** Layout diff, parity output, GUI captures, and benchmark comparison.
+  **Evidence:** Layout contracts and migration tests pass; subsequent discrepancies are handled as field regressions without reopening the owned-workbench architecture.
   **Implement:** `fmf_bootstrap.py` · `Resources/FMF/runtime.py` · `Resources/FMF/layout-v3.json` · `Resources/FMF/layout-manifest.json`
   **Context:** `freecad/FMF/workbenches.py` · `fmf_actions.py` · `tests/fixtures/fmf-baseline.json`
   **Route:** claude
@@ -85,17 +85,17 @@ visibility transition is reversible and never removes the stock implementations.
   **Chars:** ~204,352 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Blocked by:** task_b2010000000000000000000000000001
 
-- [ ] **Score 5 🥇 · Class 2 — Preserve sketch-edit context transitions**
+- [x] **Score 5 🥇 · Class 2 — Preserve sketch-edit context transitions**
 
   **ID:** task_b2030000000000000000000000000003
-  **Status:** Implementation complete — owned/native transition tests passed; live edit-mode journey pending
+  **Status:** Shipped — automated transition tests passed and the owner accepted sketch creation/editing in normal use
   **Outcome:** Enter and leave sketch editing through FMF Design and Sketch without losing origin-plane selection, body context, tree state, shortcuts, or return context.
   **Work mode:** Forge + Steward
   **Execution size:** Large
   **Uncertainty:** High
   **Protected behavior:** Create Sketch delegates attachment to Part Design and changes ribbon context only after the sketch opens.
   **Acceptance:** New/existing, attached/unattached, cancel, finish, close, failure, and repeated edit paths have no duplicate observers or shortcuts.
-  **Expected evidence:** Observer tests and recorded real-FreeCAD journeys.
+  **Evidence:** Observer tests and owner dogfood acceptance; future transition defects remain release-blocking regressions when reported.
   **Implement:** `fmf_bootstrap.py` · `Resources/FMF/runtime.py` · `freecad/FMF/workbenches.py`
   **Context:** `tests/test_startup.py` · `tests/test_runtime.py` · `docs/dev-guide/BASELINE-JOURNEYS.md`
   **Route:** claude
@@ -106,7 +106,7 @@ visibility transition is reversible and never removes the stock implementations.
 - [ ] **Score 5 🥇 · Class 2 — Implement atomic first-run activation**
 
   **ID:** task_b2040000000000000000000000000004
-  **Status:** Blocked — lifecycle and owned contexts required
+  **Status:** Deferred — conditional on pursuing an Addon Index opt-in flow; current install-and-go activation remains the product default
   **Outcome:** Present a branded **Activate FMF** page that atomically applies the complete experience; decline changes nothing and activation remains available later.
   **Work mode:** Forge + Steward
   **Execution size:** Medium
@@ -119,7 +119,7 @@ visibility transition is reversible and never removes the stock implementations.
   **Route:** kimi
   **Context Load:** 376
   **Chars:** ~75,174 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
-  **Blocked by:** task_a1040000000000000000000000000004 · task_b2030000000000000000000000000003
+  **Prefer after:** task_c3050000000000000000000000000005
 
 - [x] **Score 5 🥇 · Class 2 — Add reversible stock-workbench visibility controls**
 
@@ -160,7 +160,7 @@ visibility transition is reversible and never removes the stock implementations.
 - [ ] **Score 4 🥇 · Class 2 — Consolidate personalization and scope runtime observers**
 
   **ID:** task_b2070000000000000000000000000007
-  **Status:** In progress — owned contexts, deterministic teardown, and repeated live enable/disable behavior are verified; performance timings and broader personalization journeys remain
+  **Status:** In verification — service-state diagnostics, teardown evidence, leak checks, and the static benchmark are complete; live startup/switch timing remains
   **Outcome:** Give stable-ID personalization one owner and activate expensive scans, filters, observers, and adaptive rewrites only in their owning FMF contexts.
   **Work mode:** Forge + Steward
   **Execution size:** Large
@@ -173,7 +173,6 @@ visibility transition is reversible and never removes the stock implementations.
   **Route:** claude
   **Context Load:** 1870
   **Chars:** ~233,693 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
-  **Blocked by:** task_b2030000000000000000000000000003
 
 ---
 
@@ -302,5 +301,5 @@ visibility transition is reversible and never removes the stock implementations.
 Now is committed; Next is a vertical-slice architecture program; Later is evidence-driven. During
 Next, reserve roughly 60% for owned-workbench migration, 30% for restoration/testing/technical
 health, and 10% for urgent regressions. Verify with `python -m pytest tests -q`,
-`python tools/validate_layout_contracts.py`, `python tools/validate_release_metadata.py 1.8.0`,
+`python tools/validate_layout_contracts.py`, `python tools/validate_release_metadata.py 1.9.0`,
 `ruff check .`, `ruff format --check .`, and PMT route/check commands.

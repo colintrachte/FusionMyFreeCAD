@@ -5,7 +5,7 @@ packaging, architecture, or Addon Index refactor is not successful if it silentl
 these benefits. Intentional product changes require an explicit decision, updated documentation,
 and regression coverage.
 
-The inventory describes version 1.8.0. It distinguishes the user benefit from the present
+The inventory describes version 1.9.0. It distinguishes the user benefit from the present
 implementation so implementation details can change without losing the product.
 
 ## Product contract
@@ -105,7 +105,9 @@ Startup failures should not remove access to verification and recovery commands.
 - `fmf_bootstrap.py` records an initial baseline once and does not overwrite it during later
   updates.
 - `InitGui.py` registers recovery commands before installation and third-party runtime loading.
-- **Verify FMF** checks layout, baseline, bundled payload, and startup/runtime failures.
+- **Verify FMF** checks layout, baseline, bundled payload, startup/runtime failures, and the
+  ownership state of long-lived runtime services. The session status records signal connections,
+  event-filter installation, usage-tracking connections, pending deferred work, and problem counts.
 - **Reset FMF** restores FMF defaults and intentionally clears FMF panel personalization.
 - FMF owns four separate workbench identities: FMF Design, FMF Part, FMF Sketch, and FMF Surface.
   The curated ribbon is authoritative only in those workbenches.
@@ -114,8 +116,8 @@ Startup failures should not remove access to verification and recovery commands.
 - **Enable FMF** exposes the owned workbenches and preserves their saved layout and
   personalization. Stock workbench visibility is a separate reversible preference.
 - `tools/RestoreFMF.FCMacro` provides recovery after the add-on itself has been removed.
-- Startup steps fail independently and record actionable diagnostics instead of aborting the rest
-  of initialization.
+- Startup and teardown steps fail independently and record actionable diagnostics instead of
+  aborting the rest of initialization or silently hiding a leaked subscription.
 
 ### Preservation requirement
 

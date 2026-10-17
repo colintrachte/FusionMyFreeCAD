@@ -170,6 +170,7 @@ def test_displaced_shortcuts_reach_the_status_file(env, bootstrap, runtime):
 
     status = json.loads(Path(bootstrap.STATUS_PATH).read_text("utf-8"))
     assert status["displacedShortcuts"][0]["from"] == "Std_SomethingElse"
+    assert status["services"]["displacedShortcutCount"] == 1
     _valid, _checks, problems = bootstrap.verify()
     assert any("taken from Std_SomethingElse" in problem for problem in problems)
 
@@ -737,12 +738,33 @@ def test_runtime_uninstall_disconnects_live_services(env, runtime):
     FakeTimer.pump()
     assert env.main_window._fmf_my_freecad_connected is True
     assert runtime._task_accept_filter is not None
+    installed = runtime.runtime_service_state()
+    assert installed["workbenchSignalConnected"] is True
+    assert installed["taskAcceptFilterInstalled"] is True
 
     runtime.uninstall()
 
     assert env.main_window._fmf_my_freecad_connected is False
     assert env.main_window.workbenchActivated.handlers == []
     assert runtime._task_accept_filter is None
+    removed = runtime.runtime_service_state()
+    assert removed["workbenchSignalConnected"] is False
+    assert removed["taskAcceptFilterInstalled"] is False
+    assert removed["pendingDeferredTasks"] == []
+
+
+def test_runtime_uninstall_reports_a_signal_cleanup_failure(env, runtime, monkeypatch):
+    runtime.install()
+    FakeTimer.pump()
+
+    def fail_disconnect(_handler):
+        raise RuntimeError("simulated disconnect failure")
+
+    monkeypatch.setattr(env.main_window.workbenchActivated, "disconnect", fail_disconnect)
+    runtime.uninstall()
+
+    assert any("workbench activation signal" in problem for problem in runtime._problems)
+    assert any("simulated disconnect failure" in line for line in env.console.warnings)
 
 
 def test_every_action_is_asked_for_its_shortcut_once(env, runtime):

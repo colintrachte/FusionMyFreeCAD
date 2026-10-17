@@ -22,7 +22,7 @@ Multi-model work follows `docs/ai-harness.md` and `docs/roadmap.md`.
 
 - FMF is local and offline-capable, with four curated modelling contexts.
 - Preserve one-package setup, native command behavior, exact restoration, and modelling helpers.
-- `Upstream Reference` is read-only; the main version stays 1.8.0 without owner approval.
+- `Upstream Reference` is read-only; the main version stays 1.9.0 without owner approval.
 - Real FreeCAD GUI evidence is required for lifecycle and interaction claims.
 
 ---

@@ -859,8 +859,7 @@ def refresh_adaptive_panel(workbench):
         bootstrap.update_ribbon_hash()
         # Housekeeping, not something the user acts on -- keep it in the log only.
         App.Console.PrintLog(
-            "FMF updated FREQUENT for {}; it appears on the next "
-            "ribbon reload.\n".format(workbench)
+            "FMF updated FREQUENT for {}; it appears on the next ribbon reload.\n".format(workbench)
         )
         return True
     except (OSError, KeyError, TypeError, ValueError) as error:
@@ -976,6 +975,7 @@ def write_runtime_status(active_workbench=None):
             "availablePrimaryCommands": [command for command in expected if command in available],
             "commandsNotLoadedYet": [command for command in expected if command not in available],
             "displacedShortcuts": list(_displaced_shortcuts),
+            "services": runtime_service_state(),
             "problems": list(_problems),
         }
         with open(STATUS_PATH + ".tmp", "w", encoding="utf-8") as stream:
@@ -994,6 +994,43 @@ def schedule_status_write(delay=750):
         return
     _status_write_pending = True
     QtCore.QTimer.singleShot(delay, write_runtime_status)
+
+
+def runtime_service_state(main_window=None):
+    """Return observable ownership state for every long-lived runtime service."""
+    main_window = main_window if main_window is not None else Gui.getMainWindow()
+    actions = main_window.findChildren(_qaction_type()) if main_window is not None else ()
+    return {
+        "workbenchSignalConnected": bool(
+            main_window is not None and getattr(main_window, "_fmf_my_freecad_connected", False)
+        ),
+        "taskAcceptFilterInstalled": _task_accept_filter is not None,
+        "usageActionConnections": sum(
+            1 for action in actions if action.property("fmfUsageConnected")
+        ),
+        "pendingDeferredTasks": sorted(_deferred_tokens),
+        "problemCount": len(_problems),
+        "displacedShortcutCount": len(_displaced_shortcuts),
+    }
+
+
+def _record_lifecycle_event(operation, outcome, **details):
+    """Report runtime ownership changes without making lifecycle depend on logging."""
+    try:
+        import fmf_common as diagnostics
+
+        diagnostics.event("info", "runtime", operation, outcome, **details)
+    except Exception as error:
+        App.Console.PrintLog("FMF: runtime diagnostic event failed: {}\n".format(error))
+
+
+def _record_teardown_problem(service, error):
+    """Surface cleanup failures without scheduling new runtime work during teardown."""
+    text = "could not detach {}: {}".format(service, error)
+    App.Console.PrintWarning("FMF: {}\n".format(text))
+    if text not in _problems:
+        _problems.append(text)
+    _record_lifecycle_event("uninstall", "degraded", service=service, error=str(error))
 
 
 # ---------------------------------------------------------------------------
@@ -1034,6 +1071,7 @@ def install():
         "FMF {}: adaptive ribbon, smart dimensions, navigation cube, "
         "and shortcuts configured.\n".format(bootstrap.PACKAGE_VERSION)
     )
+    _record_lifecycle_event("install", "installed", services=runtime_service_state(main_window))
 
 
 def uninstall():
@@ -1044,16 +1082,17 @@ def uninstall():
     if main_window is not None and getattr(main_window, "_fmf_my_freecad_connected", False):
         try:
             main_window.workbenchActivated.disconnect(after_workbench_activation)
-        except Exception:
-            pass
+        except Exception as error:
+            _record_teardown_problem("workbench activation signal", error)
         main_window._fmf_my_freecad_connected = False
     application = QtWidgets.QApplication.instance()
     if application is not None and _task_accept_filter is not None:
         try:
             application.removeEventFilter(_task_accept_filter)
-        except Exception:
-            pass
+        except Exception as error:
+            _record_teardown_problem("task accept event filter", error)
         _task_accept_filter = None
+    _record_lifecycle_event("uninstall", "uninstalled", services=runtime_service_state(main_window))
 
 
 # Tests import this module for its logic and drive `install()` themselves.

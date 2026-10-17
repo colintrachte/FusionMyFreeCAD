@@ -7,9 +7,9 @@ or newer and Python 3.11 or newer, as declared in `package.xml`.
 
 1. Close FreeCAD.
 2. Back up your FreeCAD user-data directory if it contains a profile you care about.
-3. Download `FMF-1.8.0.zip` and its `.sha256` file from the
-   [1.8.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.8.0). The
-   repository's 1.8.0 development state has not yet been published as a release archive.
+3. Download `FMF-1.9.0.zip` and its `.sha256` file from the
+   [1.9.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.9.0). The
+   repository's 1.9.0 state is the first release published from the privacy-cleaned history.
 4. Optionally verify the archive against the published SHA-256 checksum.
 5. Open the archive and copy its top-level `FMF` folder into the `Mod` directory under
    your FreeCAD user-data directory.

@@ -877,8 +877,7 @@ def prepare():
         # Schema drift or a hand-edited file: fall back to the reinstall path
         # rather than raising during FreeCAD startup.
         App.Console.PrintWarning(
-            "FMF state is missing its backup location; "
-            "reinstalling from the baseline.\n"
+            "FMF state is missing its backup location; reinstalling from the baseline.\n"
         )
         state = None
 
@@ -939,9 +938,7 @@ def prepare():
     valid, checks, problems = _verify_layout(RIBBON_PATH, spec, candidates)
     if not valid:
         raise RuntimeError(
-            "FMF generated an invalid ribbon: {}; {}".format(
-                checks, "; ".join(problems)
-            )
+            "FMF generated an invalid ribbon: {}; {}".format(checks, "; ".join(problems))
         )
     state.update(
         {
@@ -970,8 +967,9 @@ def verify():
     checks["restorePointPresent"] = _read_baseline() is not None
     if not checks["restorePointPresent"]:
         problems.append(
-            "No restore baseline at {}. Disable FMF cannot recover the "
-            "original profile.".format(BASELINE_PATH)
+            "No restore baseline at {}. Disable FMF cannot recover the original profile.".format(
+                BASELINE_PATH
+            )
         )
     for label, relative in (
         ("bundledRibbon", ("bundled-addons", "FreeCAD-Ribbon", "InitGui.py")),
@@ -1305,9 +1303,7 @@ def disable():
         Gui.activateWorkbench(replacement)
     defer_ribbon_workbench_family(False)
     install_lifecycle_menu()
-    return "FMF is disabled. FMF settings remain available at {}.".format(
-        BASELINE_PATH
-    ), problems
+    return "FMF is disabled. FMF settings remain available at {}.".format(BASELINE_PATH), problems
 
 
 # ---------------------------------------------------------------------------
@@ -1465,9 +1461,7 @@ class EnableCommand:
             outcome = enable()
             _message(
                 "FMF enabled",
-                "FMF is enabled ({}). Restart FreeCAD to load its interface.".format(
-                    outcome
-                ),
+                "FMF is enabled ({}). Restart FreeCAD to load its interface.".format(outcome),
             )
         except Exception as error:
             _message("Could not enable FMF", str(error), True)
@@ -1991,9 +1985,7 @@ def reconcile_activation_preference():
         App.saveParameter()
         _observed_enabled = previous
         record_startup_failure("live activation preference", error)
-        App.Console.PrintError(
-            "FMF: live activation preference failed: {}\n".format(error)
-        )
+        App.Console.PrintError("FMF: live activation preference failed: {}\n".format(error))
     finally:
         _activation_transition = False
 

@@ -87,7 +87,7 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
             "## Status\n\n"
             f"Version **{version}** is available from\n"
             "[GitHub Releases](https://github.com/colintrachte/"
-            f"FMF/releases/tag/v{version}) as a\n"
+            f"FusionMyFreeCAD/releases/tag/v{version}) as a\n"
             "self-contained archive. FMF has not yet been submitted to FreeCAD's "
             "add-on index;\n"
             "catalog publication remains separate work.\n"
@@ -106,10 +106,10 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
             (r"/tag/v[0-9]+\.[0-9]+\.[0-9]+", f"/tag/v{target}"),
         )
         for pattern, replacement in replacements:
-            text, count = re.subn(pattern, replacement, text, count=1)
-            if count != 1:
+            text, count = re.subn(pattern, replacement, text)
+            if count < 1:
                 raise RuntimeError(
-                    f"Could not find exactly one release reference matching {pattern!r} in {path}"
+                    f"Could not find a release reference matching {pattern!r} in {path}"
                 )
         return text
 
@@ -150,9 +150,9 @@ def prepare(root: Path, version: str, release_date: str) -> list[Path]:
             f"`FMF-{version}.zip.sha256` from this release. Replace the entire "
             "existing `Mod/FMF` folder; do not merge it with an older version.\n\n"
             "See the [installation guide](https://github.com/colintrachte/"
-            f"FMF/blob/v{version}/docs/user-guide/INSTALL-FREECAD-ADDON.md) and "
+            f"FusionMyFreeCAD/blob/v{version}/docs/user-guide/INSTALL-FREECAD-ADDON.md) and "
             "[full changelog](https://github.com/colintrachte/"
-            f"FMF/blob/v{version}/CHANGELOG.md).\n",
+            f"FusionMyFreeCAD/blob/v{version}/CHANGELOG.md).\n",
             encoding="utf-8",
             newline="\n",
         )
