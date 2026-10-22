@@ -33,6 +33,7 @@
     "FMF_MirrorWithConstraints",
     "FMF_ParameterDock",
     "FMF_ParameterTable",
+    "FMF_RecentDocuments",
     "FMF_Reapply",
     "FMF_RepairReferences",
     "FMF_Restore",
@@ -529,6 +530,12 @@
               "small",
               "Studio View",
               "FMF_StudioViewport"
+            ],
+            "FMF_RecentDocuments": [
+              "General",
+              "small",
+              "Recent Documents",
+              "document-properties"
             ],
             "FMF_UpdateModel": [
               "General",

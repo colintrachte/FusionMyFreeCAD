@@ -449,6 +449,93 @@ FCBINDING_WORKBENCH_FAMILY_PATCH = (
     ),
 )
 
+# Workbench activation used to grow two pieces of Qt state without bound: it
+# appended another tooltip rule to the tab stylesheet and replaced the
+# application button's menu with a newly allocated child menu. A ribbon tab
+# change also called the workbench-activation handler after FreeCAD had already
+# emitted workbenchActivated. Keep these lifecycle fixes when refreshing the
+# vendored Ribbon sources.
+FCBINDING_UI_LATENCY_PATCH = (
+    (
+        "            if self.wbNameMapping[tabName] is not None:                \n"
+        "                Gui.activateWorkbench(self.wbNameMapping[tabName])\n"
+        "\n"
+        "            if tabActivated is True:\n"
+        "                self.onWbActivated()\n"
+        "                self.ApplicationMenus()           \n",
+        "            if self.wbNameMapping[tabName] is not None:\n"
+        "                targetWorkbench = self.wbNameMapping[tabName]\n"
+        "                if Gui.activeWorkbench().name() != targetWorkbench:\n"
+        "                    # workbenchActivated calls onWbActivated. Calling it again here\n"
+        "                    # rebuilt menus and walked every toolbar twice per switch.\n"
+        "                    Gui.activateWorkbench(targetWorkbench)\n"
+        "                elif tabActivated is True:\n"
+        "                    # A current-tab click emits no workbenchActivated signal, but it\n"
+        "                    # still needs the normal visibility synchronization.\n"
+        "                    self.onWbActivated()\n",
+    ),
+    (
+        "        styleSheet = self.tabBar().styleSheet()\n"
+        "        self.tabBar().setStyleSheet(styleSheet + \"\"\"\\n QToolTip {\n"
+        "                    background-color: #FFFFE1;\n"
+        "                    color: black;\n"
+        "                    border: black solid 1px;\n"
+        "                    border-radius: 2px;\n"
+        "                    }\"\"\")\n",
+        "        styleSheet = self.tabBar().styleSheet()\n"
+        "        tooltipStyle = \"\"\"\\n QToolTip {\n"
+        "                    background-color: #FFFFE1;\n"
+        "                    color: black;\n"
+        "                    border: black solid 1px;\n"
+        "                    border-radius: 2px;\n"
+        "                    }\"\"\"\n"
+        "        # FMF local change: do not append another copy on every activation.\n"
+        "        # Repeated copies force Qt to reparse and repolish an ever-growing sheet.\n"
+        "        if tooltipStyle not in styleSheet:\n"
+        "            self.tabBar().setStyleSheet(styleSheet + tooltipStyle)\n",
+    ),
+    (
+        "        # hide normal toolbars\n"
+        "        self.hideClassicToolbars()\n"
+        "        \n"
+        "        if self.CustomizeEnabled:\n"
+        "            self.on_Customize_Clicked()\n"
+        "            # Activate all commands\n"
+        "            self.activateButtons()\n"
+        "        \n"
+        "        # Emit a signal when switching to a new tab. Used to update the \"addcommands\" panel\n"
+        "        self.TabChanged.emit()\n",
+        "        # Emit a signal when switching to a new tab. Used to update the \"addcommands\" panel\n"
+        "        self.TabChanged.emit()\n",
+    ),
+    (
+        "    def ApplicationMenus(self):\n"
+        "        # Add a file menu\n"
+        "        ApplictionMenu = self.addFileMenu()\n"
+        "\n"
+        "        # add the menus from the menubar to the application button\n"
+        "        MenuBar = mw.menuBar()\n",
+        "    def ApplicationMenus(self):\n"
+        "        # add the menus from the menubar to the application button\n"
+        "        MenuBar = mw.menuBar()\n"
+        "        menuSignature = tuple(\n"
+        "            (child.objectName(), child.text()) for child in MenuBar.actions()\n"
+        "        )\n"
+        "        ApplictionMenu = getattr(self, \"_applicationMenu\", None)\n"
+        "        if (\n"
+        "            ApplictionMenu is not None\n"
+        "            and menuSignature == getattr(self, \"_applicationMenuSignature\", None)\n"
+        "        ):\n"
+        "            return\n"
+        "        if ApplictionMenu is None:\n"
+        "            ApplictionMenu = self.addFileMenu()\n"
+        "            self._applicationMenu = ApplictionMenu\n"
+        "        else:\n"
+        "            ApplictionMenu.clear()\n"
+        "        self._applicationMenuSignature = menuSignature\n",
+    ),
+)
+
 FCBINDING_OVERFLOW_PATCH = (
     (
         "                if (\n"
@@ -1655,7 +1742,8 @@ LOCAL_PATCHES = (
         + FCBINDING_DIVIDER_PATCH
         + FCBINDING_OVERFLOW_PATCH
         + FCBINDING_ACTIVATE_PATCH
-        + FCBINDING_WORKBENCH_FAMILY_PATCH,
+        + FCBINDING_WORKBENCH_FAMILY_PATCH
+        + FCBINDING_UI_LATENCY_PATCH,
     ),
     (
         ("FreeCAD-Ribbon", "CustomWidgets.py"),

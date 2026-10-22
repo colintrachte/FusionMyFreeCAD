@@ -61,6 +61,7 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
         "FMF_OpenDiagnostics",
         "FMF_ParameterDock",
         "FMF_ParameterTable",
+        "FMF_RecentDocuments",
         "FMF_Reapply",
         "FMF_RepairReferences",
         "FMF_Restore",
@@ -73,6 +74,40 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
     }
     assert bootstrap.startup_failures() == []
     assert len(env.selection_observers) == 2  # _PadSelectionObserver, _DressUpSelectionObserver
+
+
+def test_empty_startup_shows_freecads_native_start_page(env, bootstrap, monkeypatch):
+    _run_init_gui(env, bootstrap, monkeypatch)
+
+    FakeTimer.pump()
+
+    assert ("command", "Start_Start") in env.gui_events
+
+
+def test_startup_does_not_cover_an_open_document_with_the_start_page(
+    env, bootstrap, monkeypatch
+):
+    opened = env._new_document("OpenedProject")
+
+    _run_init_gui(env, bootstrap, monkeypatch)
+    FakeTimer.pump()
+
+    assert env.app.ActiveDocument is opened
+    assert ("command", "Start_Start") not in env.gui_events
+
+
+def test_recent_documents_command_delegates_to_the_native_start_page(env, bootstrap):
+    bootstrap.register_commands()
+    command = env.commands["FMF_RecentDocuments"]
+
+    assert command.IsActive() is True
+    command.Activated()
+    assert env.gui_events[-1] == ("command", "Start_Start")
+
+    env.registered_commands.remove("Start_Start")
+    assert command.IsActive() is False
+    command.Activated()
+    assert env.gui_events.count(("command", "Start_Start")) == 1
 
 
 def test_command_registration_is_idempotent(env, bootstrap, monkeypatch):
@@ -121,6 +156,12 @@ def test_owned_workbenches_register_without_replacing_native_workbenches(env, bo
     assert env.workbenches["FMFPartWorkbench"].MenuText == "FMF Part"
     assert env.workbenches["FMFSketchWorkbench"].MenuText == "FMF Sketch"
     assert env.workbenches["FMFSurfaceWorkbench"].MenuText == "FMF Surface"
+    assert [workbench.WorkbenchId for workbench in fmf_workbenches.WORKBENCH_CLASSES] == [
+        "FMFDesignWorkbench",
+        "FMFSketchWorkbench",
+        "FMFPartWorkbench",
+        "FMFSurfaceWorkbench",
+    ]
 
 
 def test_owned_workbench_registration_migrates_development_ids(env, bootstrap):
@@ -519,9 +560,9 @@ def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher
     ]
 
 
-def test_owned_sketch_edit_returns_to_the_fmf_workbench(env, bootstrap):
+def test_owned_sketch_edit_always_returns_to_fmf_design(env, bootstrap):
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
-    env.active_workbench = "FMFDesignWorkbench"
+    env.active_workbench = "FMFPartWorkbench"
     bootstrap.register_commands()
     observer = env.document_observers[0]
     sketch = FakeSketch()
@@ -534,6 +575,43 @@ def test_owned_sketch_edit_returns_to_the_fmf_workbench(env, bootstrap):
     observer.slotResetEdit(view_provider)
     FakeTimer.pump()
     assert env.active_workbench == "FMFDesignWorkbench"
+
+
+def test_untouched_document_created_for_sketch_is_discarded_when_another_opens(env, bootstrap):
+    bootstrap.register_commands()
+
+    env.commands["FMF_CreateSketch"].Activated()
+    auto_created = env.app.ActiveDocument
+    assert auto_created.Name in env.documents
+
+    opened = env._new_document("OpenedProject")
+
+    assert env.app.ActiveDocument is opened
+    assert auto_created.Name not in env.documents
+
+
+def test_edited_auto_created_document_is_not_discarded(env, bootstrap):
+    bootstrap.register_commands()
+
+    env.commands["FMF_CreateSketch"].Activated()
+    auto_created = env.app.ActiveDocument
+    auto_created.addObject("PartDesign::Feature", "UserFeature")
+
+    env._new_document("OpenedProject")
+
+    assert auto_created.Name in env.documents
+
+
+def test_saved_auto_created_document_is_not_discarded(env, bootstrap):
+    bootstrap.register_commands()
+
+    env.commands["FMF_CreateSketch"].Activated()
+    auto_created = env.app.ActiveDocument
+    auto_created.FileName = "saved.FCStd"
+
+    env._new_document("OpenedProject")
+
+    assert auto_created.Name in env.documents
 
 
 def test_create_sketch_with_preselection_skips_origin_plane_framing(env, bootstrap):

@@ -1481,12 +1481,15 @@ class CreateSketchCommand:
         return True
 
     def Activated(self):
+        created_document = App.ActiveDocument is None
         if App.ActiveDocument is None:
             App.newDocument()
         document = App.ActiveDocument
         if not any(obj.isDerivedFrom("PartDesign::Body") for obj in document.Objects):
             document.addObject("PartDesign::Body", "Body")
             document.recompute()
+        if created_document and _auto_created_document_observer is not None:
+            _auto_created_document_observer.track(document)
         had_selection = bool(getattr(Gui, "Selection", None) and Gui.Selection.getSelection())
         Gui.activateWorkbench(fmf_workbench_for("PartDesignWorkbench"))
         Gui.runCommand("PartDesign_NewSketch")
@@ -1501,6 +1504,42 @@ class CreateSketchCommand:
                 QtCore.QTimer.singleShot(0, _frame_origin_planes)
             except ImportError:
                 _frame_origin_planes()
+
+
+class RecentDocumentsCommand:
+    """Open FreeCAD's native Start page and its authoritative recent-file list."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": "document-properties",
+            "MenuText": "Recent Documents",
+            "ToolTip": "Show FreeCAD's Start page with recent documents",
+        }
+
+    def IsActive(self):
+        return "Start_Start" in Gui.listCommands()
+
+    def Activated(self):
+        if self.IsActive():
+            Gui.runCommand("Start_Start")
+
+
+def defer_start_page_if_empty():
+    """Show FreeCAD's native Start page once startup settles, unless a file opened."""
+    try:
+        from PySide import QtCore
+
+        def show():
+            try:
+                if App.listDocuments() or "Start_Start" not in Gui.listCommands():
+                    return
+                Gui.runCommand("Start_Start")
+            except Exception as error:
+                record_startup_failure("show native Start page", error)
+
+        QtCore.QTimer.singleShot(0, show)
+    except Exception as error:
+        record_startup_failure("show native Start page", error)
 
 
 def _default_camera_scale():
@@ -1582,13 +1621,12 @@ def _frame_origin_planes():
 
 
 class _SketchEditWorkbenchObserver:
-    """Enter Sketcher only after attachment selection actually starts editing."""
+    """Use Sketcher as a temporary editing context, then return to Design."""
 
     def slotInEdit(self, view_provider):
         obj = getattr(view_provider, "Object", None)
         if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
             return
-        self._return_workbench = active_workbench_name()
         # Switch after setEdit returns, not from inside this callback. Activating
         # a workbench rebuilds the ribbon and polls every command's IsActive();
         # doing that while FreeCAD is still mid-setEdit re-enters a half-built
@@ -1630,7 +1668,7 @@ class _SketchEditWorkbenchObserver:
         obj = getattr(view_provider, "Object", None)
         if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
             return
-        return_workbench = getattr(self, "_return_workbench", "")
+        return_workbench = fmf_workbench_for("PartDesignWorkbench")
         if return_workbench and return_workbench != active_workbench_name():
             try:
                 from PySide import QtCore
@@ -1709,6 +1747,75 @@ def register_preferences_page():
 
 _sketch_edit_observer = None
 _sketch_repair_observer = None
+_auto_created_document_observer = None
+
+
+class _AutoCreatedDocumentObserver:
+    """Discard only an untouched document that FMF created for Create Sketch."""
+
+    def __init__(self):
+        self._candidate = None
+
+    @staticmethod
+    def _snapshot(document):
+        objects = tuple(getattr(document, "Objects", ()))
+        get_undo_names = getattr(document, "getAvailableUndoNames", None)
+        undo_names = tuple(get_undo_names()) if callable(get_undo_names) else None
+        return (
+            getattr(document, "Name", ""),
+            getattr(document, "Label", None),
+            undo_names,
+            tuple(
+                (
+                    obj,
+                    getattr(obj, "Name", None),
+                    getattr(obj, "Label", None),
+                    tuple(getattr(obj, "State", ())),
+                    tuple(getattr(obj, "Group", ()))
+                    if obj.isDerivedFrom("PartDesign::Body")
+                    else None,
+                    getattr(obj, "Tip", None)
+                    if obj.isDerivedFrom("PartDesign::Body")
+                    else None,
+                )
+                for obj in objects
+            ),
+        )
+
+    def track(self, document):
+        self._candidate = {
+            "document": document,
+            "name": getattr(document, "Name", ""),
+            "snapshot": self._snapshot(document),
+        }
+
+    def _is_untouched(self, candidate):
+        document = candidate["document"]
+        return (
+            not getattr(document, "FileName", "")
+            and self._snapshot(document) == candidate["snapshot"]
+        )
+
+    def slotActiveDocument(self, document):
+        candidate = self._candidate
+        if candidate is None or document is candidate["document"]:
+            return
+        self._candidate = None
+        if not self._is_untouched(candidate):
+            return
+        try:
+            App.closeDocument(candidate["name"])
+        except Exception as error:
+            record_startup_failure("discard untouched auto-created document", error)
+
+    slotActivatedDocument = slotActiveDocument
+
+    def slotDeletedDocument(self, document):
+        if self._candidate is not None and document is self._candidate["document"]:
+            self._candidate = None
+
+    slotDeleteDocument = slotDeletedDocument
+    slotFinishInvDoc = slotDeletedDocument
 
 
 class _SketchRepairObserver:
@@ -2117,11 +2224,13 @@ class CopyDiagnosticsCommand:
 
 def register_commands():
     global _feature_commands_registered
+    global _auto_created_document_observer
     global _sketch_edit_observer, _sketch_repair_observer, _pad_selection_observer
     register_lifecycle_commands()
     if _feature_commands_registered:
         return
     Gui.addCommand("FMF_CreateSketch", CreateSketchCommand())
+    Gui.addCommand("FMF_RecentDocuments", RecentDocumentsCommand())
     Gui.addCommand("FMF_ParameterTable", ParameterTableCommand())
 
     if _sketch_edit_observer is None and hasattr(Gui, "addDocumentObserver"):
@@ -2130,6 +2239,9 @@ def register_commands():
     if _sketch_repair_observer is None and hasattr(App, "addDocumentObserver"):
         _sketch_repair_observer = _SketchRepairObserver()
         App.addDocumentObserver(_sketch_repair_observer)
+    if _auto_created_document_observer is None and hasattr(App, "addDocumentObserver"):
+        _auto_created_document_observer = _AutoCreatedDocumentObserver()
+        App.addDocumentObserver(_auto_created_document_observer)
     if (
         _pad_selection_observer is None
         and hasattr(Gui, "Selection")
@@ -2158,6 +2270,7 @@ def register_commands():
 
 def unregister_feature_observers():
     """Detach FMF observers and filters when disabling within a live session."""
+    global _auto_created_document_observer
     global _sketch_edit_observer, _sketch_repair_observer, _pad_selection_observer
     if _sketch_edit_observer is not None and hasattr(Gui, "removeDocumentObserver"):
         try:
@@ -2171,6 +2284,12 @@ def unregister_feature_observers():
         except Exception:
             pass
         _sketch_repair_observer = None
+    if _auto_created_document_observer is not None and hasattr(App, "removeDocumentObserver"):
+        try:
+            App.removeDocumentObserver(_auto_created_document_observer)
+        except Exception:
+            pass
+        _auto_created_document_observer = None
     if (
         _pad_selection_observer is not None
         and hasattr(Gui, "Selection")
@@ -2335,6 +2454,7 @@ def start():
             )
             _startup_step("UI mode synchronization", defer_ui_mode_sync)
             _startup_step("enabled UI validation", validate_enabled_ui)
+            _startup_step("Start page", defer_start_page_if_empty)
         else:
             _startup_step(
                 "SearchBar",

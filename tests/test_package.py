@@ -181,6 +181,28 @@ def test_bundled_ribbon_keeps_non_fmf_workbenches_visible():
     assert "_setFmfChromeVisible(False)" not in method_source
 
 
+def test_bundled_ribbon_workbench_activation_does_not_accumulate_ui_state():
+    source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    methods = {
+        node.name: ast.get_source_segment(source, node)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name in {"onUserChangedWorkbench", "onWbActivated", "ApplicationMenus"}
+    }
+
+    assert "Gui.activeWorkbench().name() != targetWorkbench" in methods[
+        "onUserChangedWorkbench"
+    ]
+    assert "self.onWbActivated()\n                self.ApplicationMenus()" not in methods[
+        "onUserChangedWorkbench"
+    ]
+    assert "if tooltipStyle not in styleSheet:" in methods["onWbActivated"]
+    assert "self._applicationMenu = ApplictionMenu" in methods["ApplicationMenus"]
+    assert "self._applicationMenuSignature" in methods["ApplicationMenus"]
+    assert methods["ApplicationMenus"].count("self.addFileMenu()") == 1
+
+
 def test_bundled_ribbon_customization_rejects_a_missing_replacement_panel():
     source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text(encoding="utf-8")
     assert "if newPanel is None:" in source

@@ -459,6 +459,13 @@
         "title": "UTILITIES",
         "commands": [
           [
+            "FMF_RecentDocuments",
+            "General",
+            "small",
+            "Recent Documents",
+            "document-properties"
+          ],
+          [
             "FMF_UpdateModel",
             "General",
             "small",

@@ -3616,21 +3616,17 @@ class ModernMenu(RibbonBar):
         if tabName is not None and tabName != "" and tabName != "test":
             # activate selected workbench
             tabName = tabName.replace("&", "")
-            if self.wbNameMapping[tabName] is not None:                
-                Gui.activateWorkbench(self.wbNameMapping[tabName])
+            if self.wbNameMapping[tabName] is not None:
+                targetWorkbench = self.wbNameMapping[tabName]
+                if Gui.activeWorkbench().name() != targetWorkbench:
+                    # workbenchActivated calls onWbActivated. Calling it again here
+                    # rebuilt menus and walked every toolbar twice per switch.
+                    Gui.activateWorkbench(targetWorkbench)
+                elif tabActivated is True:
+                    # A current-tab click emits no workbenchActivated signal, but it
+                    # still needs the normal visibility synchronization.
+                    self.onWbActivated()
 
-            if tabActivated is True:
-                self.onWbActivated()
-                self.ApplicationMenus()           
-        
-        # hide normal toolbars
-        self.hideClassicToolbars()
-        
-        if self.CustomizeEnabled:
-            self.on_Customize_Clicked()
-            # Activate all commands
-            self.activateButtons()
-        
         # Emit a signal when switching to a new tab. Used to update the "addcommands" panel
         self.TabChanged.emit()
         return
@@ -3683,12 +3679,16 @@ class ModernMenu(RibbonBar):
             )
         # Make sure that the tooltip has the correct color settings
         styleSheet = self.tabBar().styleSheet()
-        self.tabBar().setStyleSheet(styleSheet + """\n QToolTip {
+        tooltipStyle = """\n QToolTip {
                     background-color: #FFFFE1;
                     color: black;
                     border: black solid 1px;
                     border-radius: 2px;
-                    }""")
+                    }"""
+        # FMF local change: do not append another copy on every activation.
+        # Repeated copies force Qt to reparse and repolish an ever-growing sheet.
+        if tooltipStyle not in styleSheet:
+            self.tabBar().setStyleSheet(styleSheet + tooltipStyle)
 
         # ensure that workbench is already loaded
         workbench = Gui.activeWorkbench()
@@ -4230,11 +4230,23 @@ class ModernMenu(RibbonBar):
 
     # Function to create the application menu
     def ApplicationMenus(self):
-        # Add a file menu
-        ApplictionMenu = self.addFileMenu()
-
         # add the menus from the menubar to the application button
         MenuBar = mw.menuBar()
+        menuSignature = tuple(
+            (child.objectName(), child.text()) for child in MenuBar.actions()
+        )
+        ApplictionMenu = getattr(self, "_applicationMenu", None)
+        if (
+            ApplictionMenu is not None
+            and menuSignature == getattr(self, "_applicationMenuSignature", None)
+        ):
+            return
+        if ApplictionMenu is None:
+            ApplictionMenu = self.addFileMenu()
+            self._applicationMenu = ApplictionMenu
+        else:
+            ApplictionMenu.clear()
+        self._applicationMenuSignature = menuSignature
 
         # Set a stylesheet specific for the menubar. Otherwise the fontsize of the menus will not be applied
         StyleSheet_MenuBar = (

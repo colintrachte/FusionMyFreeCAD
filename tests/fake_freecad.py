@@ -166,6 +166,8 @@ class FakeBody(FakeObject):
 class FakeDocument:
     def __init__(self):
         self.Name = "Untitled"
+        self.Label = "Untitled"
+        self.FileName = ""
         self.Objects = []
         self.recomputes = 0
         self.transactions = []
@@ -1366,7 +1368,7 @@ class Environment:
         self.gui_events = []
         self.console = Console()
         self.main_window = FakeMainWindow()
-        self.registered_commands = ["Std_ViewFitAll", "Std_Measure"]
+        self.registered_commands = ["Std_ViewFitAll", "Std_Measure", "Start_Start"]
         self.active_workbench = "PartDesignWorkbench"
         self.task_dialog_active = False
         self.saved_parameters = 0
@@ -1396,6 +1398,7 @@ class Environment:
         app.Console = self.console
         app.ActiveDocument = None
         app.newDocument = self._new_document
+        app.closeDocument = self.close_document
         app.getDocument = lambda name: self.documents.get(name)
         app.listDocuments = lambda: dict(self.documents)
         app.addDocumentObserver = self.document_observers.append
@@ -1520,8 +1523,10 @@ class Environment:
         self._doc_counter = getattr(self, "_doc_counter", 0) + 1
         if name:
             doc.Name = name
+            doc.Label = name
         elif self._doc_counter > 1:
             doc.Name = f"Document_{self._doc_counter}"
+            doc.Label = doc.Name
         else:
             doc.Name = "Untitled"
         self.documents[doc.Name] = doc

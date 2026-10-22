@@ -122,8 +122,8 @@ class FMFSurfaceWorkbench(_FMFWorkbench):
 
 WORKBENCH_CLASSES = (
     FMFDesignWorkbench,
-    FMFPartWorkbench,
     FMFSketchWorkbench,
+    FMFPartWorkbench,
     FMFSurfaceWorkbench,
 )
 
