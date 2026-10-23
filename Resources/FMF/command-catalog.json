@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "entries": {
+    "PartDesign_Pad": {
+      "name": "Pad",
+      "aliases": ["Extrude", "Extrude Join", "Push Pull", "PD Pad"],
+      "shortcut": "E",
+      "explanation": "Adds material from a sketch inside the active Body."
+    },
+    "PartDesign_Pocket": {
+      "name": "Pocket",
+      "aliases": ["Extrude Cut", "Cut"],
+      "shortcut": "Shift+E"
+    },
+    "Part_Extrude": {
+      "name": "Extrude",
+      "aliases": ["Part Extrude"],
+      "explanation": "Creates a Part feature rather than a Part Design Body feature."
+    },
+    "PartDesign_Revolution": {"name": "Revolve", "aliases": ["Revolution"]},
+    "Part_Revolve": {"name": "Revolve", "aliases": ["Part Revolution"]},
+    "Part_CrossSections": {"name": "Cross Sections", "aliases": ["Surface Sections"]},
+    "PartDesign_Mirrored": {"name": "Mirror", "aliases": ["Mirror Feature"]},
+    "PartDesign_LinearPattern": {"name": "Linear Pattern", "aliases": ["Rectangular Pattern"]},
+    "PartDesign_PolarPattern": {"name": "Polar Pattern", "aliases": ["Circular Pattern"]},
+    "Sketcher_CreateLine": {"name": "Line", "aliases": ["Sketch Line"], "shortcut": "L"},
+    "Sketcher_CreateRectangle_Center": {"name": "Centered Rectangle", "aliases": ["Center Rectangle"], "shortcut": "R"},
+    "Sketcher_CreateCircle": {"name": "Circle", "aliases": ["Center Diameter Circle"], "shortcut": "C"},
+    "Sketcher_Dimension": {"name": "Dimension", "aliases": ["Sketch Dimension"], "shortcut": "D"},
+    "Sketcher_Trimming": {"name": "Trim", "aliases": ["Trim Edge"], "shortcut": "T"},
+    "Sketcher_Offset": {"name": "Offset", "aliases": ["Sketch Offset"], "shortcut": "O"},
+    "Sketcher_Projection": {"name": "Project", "aliases": ["External Projection", "Project Geometry"], "shortcut": "P"},
+    "Sketcher_ToggleConstruction": {"name": "Construction", "aliases": ["Normal Construction", "Construction Geometry"], "shortcut": "X"},
+    "Std_Measure": {"name": "Measure", "aliases": ["Inspect Measure"], "shortcut": "I"},
+    "preference:fmf-general": {
+      "kind": "preference",
+      "name": "FMF preferences",
+      "aliases": ["enable FMF", "disable FMF", "FMF settings"],
+      "target": "Mod/FMF"
+    },
+    "preference:navigation": {
+      "kind": "preference",
+      "name": "Navigation preferences",
+      "aliases": ["mouse controls", "navigation cube", "view cube"],
+      "target": "BaseApp/Preferences/View"
+    },
+    "help:shortcuts": {
+      "kind": "help",
+      "name": "FMF keyboard shortcuts",
+      "aliases": ["shortcut help", "key bindings"],
+      "target": "docs/user-guide/SHORTCUTS.md"
+    },
+    "object:document-tree": {
+      "kind": "object",
+      "name": "Document objects",
+      "aliases": ["model tree", "body features"],
+      "target": "active-document"
+    }
+  }
+}

@@ -9,7 +9,7 @@ SEARCH_BOX = ROOT / "bundled-addons" / "SearchBar" / "SearchBox.py"
 
 def _search_helpers():
     tree = ast.parse(SEARCH_BOX.read_text(encoding="utf-8"))
-    wanted = {"fmfSearchableText", "fmfResultText"}
+    wanted = {"fmfSearchableText", "fmfResultText", "fmfSearchScore"}
     functions = [
         node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in wanted
     ]
@@ -22,7 +22,8 @@ def test_pad_is_searchable_by_native_and_fmf_names():
     helpers = _search_helpers()
     group = {
         "text": "Extrude",
-        "toolTip": "<b>Pad</b><i>PartDesign_Pad</i>",
+        "toolTip": "Create a solid feature from the selected sketch",
+        "action": {"commandId": "PartDesign_Pad"},
     }
 
     searchable = helpers["fmfSearchableText"](group).lower()
@@ -35,7 +36,18 @@ def test_part_extrude_remains_distinct_from_part_design_pad():
     helpers = _search_helpers()
     group = {
         "text": "Extrude",
-        "toolTip": "<b>Extrude</b><i>Part_Extrude</i>",
+        "toolTip": "Extrude a Part shape",
+        "action": {"commandId": "Part_Extrude"},
     }
 
     assert helpers["fmfResultText"](group) == "Extrude (Part)"
+
+
+def test_product_alias_ranking_prefers_pad_for_extrude_join():
+    helpers = _search_helpers()
+    pad = {"text": "Pad", "toolTip": "", "action": {"commandId": "PartDesign_Pad"}}
+    part = {"text": "Extrude", "toolTip": "", "action": {"commandId": "Part_Extrude"}}
+
+    assert helpers["fmfSearchScore"]("extrude join", pad) < helpers["fmfSearchScore"](
+        "extrude join", part
+    )

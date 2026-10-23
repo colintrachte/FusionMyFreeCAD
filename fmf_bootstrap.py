@@ -16,6 +16,8 @@ from datetime import UTC, datetime
 import FreeCAD as App
 import FreeCADGui as Gui
 
+from fmf_actions import NativeActionAdapter, RibbonActionBindingRegistry
+
 ADDON_ROOT = os.path.dirname(os.path.abspath(__file__))
 RESOURCE_ROOT = os.path.join(ADDON_ROOT, "Resources", "FMF")
 PACKAGE_PATH = os.path.join(ADDON_ROOT, "package.xml")
@@ -39,6 +41,7 @@ BACKUP_ROOT = os.path.join(USER_ROOT, "FMF-Backups")
 BASELINE_PATH = os.path.join(BACKUP_ROOT, "baseline.json")
 PREFERENCE_ROOT = "User parameter:BaseApp/Preferences/Mod/FMF"
 WORKBENCH_PREFERENCE_ROOT = "User parameter:BaseApp/Preferences/Workbenches"
+ADDON_MANAGER_STOP_FILE = os.path.join(ADDON_ROOT, "ADDON_DISABLED")
 
 # Keep upgrade-only names assembled from fragments so the retired brand cannot
 # accidentally become a new public identifier. Existing installations still
@@ -87,7 +90,129 @@ def _read_package_version():
 PACKAGE_VERSION = _read_package_version()
 
 
+_ribbon_action_bindings = None
+_native_toolbar_visibility = None
+_addon_directory_watcher = None
+_addon_recovery_started = False
+_quit_hooked = False
+
+
+def _action_bindings():
+    """Return the process-wide registry used by the bundled ribbon renderer."""
+    global _ribbon_action_bindings
+    if _ribbon_action_bindings is None:
+        from PySide.QtGui import QAction
+
+        adapter = NativeActionAdapter(Gui, QAction)
+        _ribbon_action_bindings = RibbonActionBindingRegistry(adapter)
+    return _ribbon_action_bindings
+
+
+def bind_ribbon_button(command_id, button):
+    """Mirror native action state onto an FMF ribbon button."""
+    if not is_enabled():
+        return False
+    return _action_bindings().bind(command_id, button)
+
+
+def dispose_ribbon_action_bindings():
+    """Disconnect every ribbon/action callback owned by FMF."""
+    global _ribbon_action_bindings
+    if _ribbon_action_bindings is not None:
+        _ribbon_action_bindings.dispose()
+        _ribbon_action_bindings = None
+
+
+def ribbon_action_binding_count():
+    if _ribbon_action_bindings is None:
+        return 0
+    return _ribbon_action_bindings.count()
+
+
+def capture_native_toolbar_visibility():
+    """Remember this session's native toolbar visibility before Ribbon hides it."""
+    global _native_toolbar_visibility
+    if _native_toolbar_visibility is not None:
+        return dict(_native_toolbar_visibility)
+    from PySide import QtWidgets
+
+    snapshot = {}
+    for toolbar in Gui.getMainWindow().findChildren(QtWidgets.QToolBar):
+        name = toolbar.objectName() if hasattr(toolbar, "objectName") else ""
+        if name and name not in {"SearchBar", "SearchBarAtMouse"}:
+            snapshot[name] = bool(toolbar.isVisible())
+    _native_toolbar_visibility = snapshot
+    return dict(snapshot)
+
+
+def restore_native_toolbar_visibility():
+    """Restore only toolbar visibility captured before FMF changed the chrome."""
+    if _native_toolbar_visibility is None:
+        return False
+    from PySide import QtWidgets
+
+    for toolbar in Gui.getMainWindow().findChildren(QtWidgets.QToolBar):
+        name = toolbar.objectName() if hasattr(toolbar, "objectName") else ""
+        if name in _native_toolbar_visibility:
+            toolbar.setVisible(_native_toolbar_visibility[name])
+    return True
+
+
+def addon_disabled_by_manager():
+    return os.path.isfile(ADDON_MANAGER_STOP_FILE)
+
+
+def _on_about_to_quit():
+    """Prevent Qt from persisting FMF's intentionally hidden native toolbars."""
+    restore_native_toolbar_visibility()
+    dispose_ribbon_action_bindings()
+
+
+def _on_addon_directory_changed(_path=""):
+    """Restore usable native chrome when Addon Manager disables or removes FMF."""
+    global _addon_recovery_started
+    if os.path.isdir(ADDON_ROOT) and not addon_disabled_by_manager():
+        return
+    if _addon_recovery_started:
+        return
+    _addon_recovery_started = True
+    try:
+        disable()
+        restore_native_toolbar_visibility()
+        _restore_native_ui_now()
+    except Exception as error:
+        record_startup_failure("Addon Manager disable", error)
+
+
+def install_lifecycle_guards():
+    """Install one stop-file watcher and one shutdown persistence hook."""
+    global _addon_directory_watcher, _quit_hooked
+    from PySide import QtCore, QtWidgets
+
+    if _addon_directory_watcher is None and os.path.isdir(ADDON_ROOT):
+        watcher_type = getattr(QtCore, "QFileSystemWatcher", None)
+        if watcher_type is not None:
+            watcher = watcher_type()
+            if watcher.addPath(ADDON_ROOT):
+                watcher.directoryChanged.connect(_on_addon_directory_changed)
+                _addon_directory_watcher = watcher
+    if not _quit_hooked:
+        application = QtWidgets.QApplication.instance()
+        signal = getattr(application, "aboutToQuit", None)
+        if signal is not None:
+            signal.connect(_on_about_to_quit)
+            _quit_hooked = True
+
+
+STATUS_BAR_PREFERENCE = (
+    "User parameter:BaseApp/Preferences/MainWindow",
+    "StatusBar",
+    "Bool",
+)
+
+
 PREFERENCE_KEYS = (
+    STATUS_BAR_PREFERENCE,
     ("User parameter:BaseApp/Preferences/General", "AutoloadModule", "String"),
     ("User parameter:BaseApp/Preferences/View", "NavigationStyle", "String"),
     ("User parameter:BaseApp/Preferences/View", "ShowNaviCube", "Bool"),
@@ -297,20 +422,23 @@ def clear_startup_failures():
 # ---------------------------------------------------------------------------
 
 
+def _capture_preference(key):
+    path, name, kind = key
+    group = App.ParamGet(path)
+    names = getattr(group, "Get{}s".format(kind))()
+    return {
+        "path": path,
+        "name": name,
+        "kind": kind,
+        "existed": name in names,
+        "value": getattr(group, "Get{}".format(kind))(name),
+    }
+
+
 def _capture_preferences():
     captured = []
-    for path, name, kind in PREFERENCE_KEYS:
-        group = App.ParamGet(path)
-        names = getattr(group, "Get{}s".format(kind))()
-        captured.append(
-            {
-                "path": path,
-                "name": name,
-                "kind": kind,
-                "existed": name in names,
-                "value": getattr(group, "Get{}".format(kind))(name),
-            }
-        )
+    for key in PREFERENCE_KEYS:
+        captured.append(_capture_preference(key))
     return captured
 
 
@@ -824,6 +952,22 @@ def _migrate_baseline_from_state(state):
     return baseline
 
 
+def _extend_baseline_with_status_bar():
+    """Add the newly managed status-bar preference without recapturing old keys."""
+    baseline = _read_baseline()
+    if baseline is None:
+        return None
+    preferences = baseline.get("preferences", [])
+    wanted = STATUS_BAR_PREFERENCE[:2]
+    if any((entry.get("path"), entry.get("name")) == wanted for entry in preferences):
+        return baseline
+    preferences.append(_capture_preference(STATUS_BAR_PREFERENCE))
+    baseline["preferences"] = preferences
+    baseline["statusBarBaselineAddedAt"] = _now()
+    _atomic_json(BASELINE_PATH, baseline)
+    return baseline
+
+
 def _state_from_baseline(baseline, recovered):
     return {
         "schemaVersion": STATE_SCHEMA,
@@ -883,6 +1027,7 @@ def prepare():
 
     if state is not None:
         _migrate_baseline_from_state(state)
+    _extend_baseline_with_status_bar()
 
     if state is not None and state.get("packageVersion") == PACKAGE_VERSION:
         valid, _checks, _problems = _verify_layout(RIBBON_PATH, spec, candidates)
@@ -1284,9 +1429,15 @@ def disable():
     preferences = App.ParamGet(PREFERENCE_ROOT)
     preferences.RemString("AppliedVersion")
     preferences.SetBool("Enabled", False)
+    dispose_ribbon_action_bindings()
     set_owned_workbench_visibility(False)
     sync_start_workbench(False)
     runtime = sys.modules.get("_fmf_my_freecad_runtime")
+    if runtime is not None and hasattr(runtime, "restore_shortcuts"):
+        try:
+            runtime.restore_shortcuts(Gui.getMainWindow())
+        except Exception as error:
+            problems.append("Shortcut restoration: {}".format(error))
     if runtime is not None and hasattr(runtime, "uninstall"):
         try:
             runtime.uninstall()
@@ -1467,6 +1618,25 @@ class EnableCommand:
             _message("Could not enable FMF", str(error), True)
 
 
+class ReviewShortcutsCommand:
+    def GetResources(self):
+        return {
+            "Pixmap": "Std_DlgCustomize",
+            "MenuText": "Review FMF Shortcuts",
+            "ToolTip": "Preview occupied keys before applying the FMF shortcut preset",
+        }
+
+    def IsActive(self):
+        return is_enabled()
+
+    def Activated(self):
+        runtime = sys.modules.get("_fmf_my_freecad_runtime")
+        if runtime is None or not hasattr(runtime, "review_shortcuts"):
+            _message("FMF shortcuts", "FMF's runtime is not available yet.", True)
+            return
+        runtime.review_shortcuts()
+
+
 class CreateSketchCommand:
     def GetResources(self):
         return {
@@ -1488,8 +1658,8 @@ class CreateSketchCommand:
         if not any(obj.isDerivedFrom("PartDesign::Body") for obj in document.Objects):
             document.addObject("PartDesign::Body", "Body")
             document.recompute()
-        if created_document and _auto_created_document_observer is not None:
-            _auto_created_document_observer.track(document)
+        if created_document:
+            track_auto_created_document(document)
         had_selection = bool(getattr(Gui, "Selection", None) and Gui.Selection.getSelection())
         Gui.activateWorkbench(fmf_workbench_for("PartDesignWorkbench"))
         Gui.runCommand("PartDesign_NewSketch")
@@ -1522,24 +1692,6 @@ class RecentDocumentsCommand:
     def Activated(self):
         if self.IsActive():
             Gui.runCommand("Start_Start")
-
-
-def defer_start_page_if_empty():
-    """Show FreeCAD's native Start page once startup settles, unless a file opened."""
-    try:
-        from PySide import QtCore
-
-        def show():
-            try:
-                if App.listDocuments() or "Start_Start" not in Gui.listCommands():
-                    return
-                Gui.runCommand("Start_Start")
-            except Exception as error:
-                record_startup_failure("show native Start page", error)
-
-        QtCore.QTimer.singleShot(0, show)
-    except Exception as error:
-        record_startup_failure("show native Start page", error)
 
 
 def _default_camera_scale():
@@ -1623,10 +1775,14 @@ def _frame_origin_planes():
 class _SketchEditWorkbenchObserver:
     """Use Sketcher as a temporary editing context, then return to Design."""
 
+    def __init__(self):
+        self._transition_serial = 0
+
     def slotInEdit(self, view_provider):
         obj = getattr(view_provider, "Object", None)
         if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
             return
+        self._transition_serial += 1
         # Switch after setEdit returns, not from inside this callback. Activating
         # a workbench rebuilds the ribbon and polls every command's IsActive();
         # doing that while FreeCAD is still mid-setEdit re-enters a half-built
@@ -1668,12 +1824,29 @@ class _SketchEditWorkbenchObserver:
         obj = getattr(view_provider, "Object", None)
         if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
             return
+        self._transition_serial += 1
+        transition_serial = self._transition_serial
         return_workbench = fmf_workbench_for("PartDesignWorkbench")
         if return_workbench and return_workbench != active_workbench_name():
             try:
                 from PySide import QtCore
 
-                QtCore.QTimer.singleShot(0, lambda: Gui.activateWorkbench(return_workbench))
+                # FreeCAD queues its own post-Sketcher workbench update while
+                # slotResetEdit is running.  Activating Design on that same
+                # event-loop turn makes Ribbon process both transitions at
+                # once, which can leave Sketch and Design panels in one tab.
+                # Wait one additional turn so FreeCAD's transition finishes,
+                # then ignore this callback if another edit transition began.
+                def after_freecad_transition():
+                    def activate_design():
+                        if transition_serial != self._transition_serial:
+                            return
+                        if return_workbench != active_workbench_name():
+                            Gui.activateWorkbench(return_workbench)
+
+                    QtCore.QTimer.singleShot(0, activate_design)
+
+                QtCore.QTimer.singleShot(0, after_freecad_transition)
             except ImportError:
                 Gui.activateWorkbench(return_workbench)
         try:
@@ -1774,9 +1947,7 @@ class _AutoCreatedDocumentObserver:
                     tuple(getattr(obj, "Group", ()))
                     if obj.isDerivedFrom("PartDesign::Body")
                     else None,
-                    getattr(obj, "Tip", None)
-                    if obj.isDerivedFrom("PartDesign::Body")
-                    else None,
+                    getattr(obj, "Tip", None) if obj.isDerivedFrom("PartDesign::Body") else None,
                 )
                 for obj in objects
             ),
@@ -1796,7 +1967,13 @@ class _AutoCreatedDocumentObserver:
             and self._snapshot(document) == candidate["snapshot"]
         )
 
-    def slotActiveDocument(self, document):
+    def untouched_document(self):
+        candidate = self._candidate
+        if candidate is not None and self._is_untouched(candidate):
+            return candidate["document"]
+        return None
+
+    def slotActivateDocument(self, document):
         candidate = self._candidate
         if candidate is None or document is candidate["document"]:
             return
@@ -1808,7 +1985,9 @@ class _AutoCreatedDocumentObserver:
         except Exception as error:
             record_startup_failure("discard untouched auto-created document", error)
 
-    slotActivatedDocument = slotActiveDocument
+    # Compatibility aliases for older downstream bindings and existing macros.
+    slotActiveDocument = slotActivateDocument
+    slotActivatedDocument = slotActivateDocument
 
     def slotDeletedDocument(self, document):
         if self._candidate is not None and document is self._candidate["document"]:
@@ -1816,6 +1995,19 @@ class _AutoCreatedDocumentObserver:
 
     slotDeleteDocument = slotDeletedDocument
     slotFinishInvDoc = slotDeletedDocument
+
+
+def track_auto_created_document(document):
+    """Mark an FMF-created placeholder for silent disposal if left untouched."""
+    if _auto_created_document_observer is not None:
+        _auto_created_document_observer.track(document)
+
+
+def untouched_auto_created_document():
+    """Return FMF's untouched placeholder document, if one is still tracked."""
+    if _auto_created_document_observer is None:
+        return None
+    return _auto_created_document_observer.untouched_document()
 
 
 class _SketchRepairObserver:
@@ -1972,6 +2164,7 @@ def register_lifecycle_commands():
     # to resolve, but expose unambiguous enable/disable wording to users.
     Gui.addCommand("FMF_Restore", DisableCommand())
     Gui.addCommand("FMF_Enable", EnableCommand())
+    Gui.addCommand("FMF_ReviewShortcuts", ReviewShortcutsCommand())
     Gui.addCommand("FMF_OpenDiagnostics", OpenDiagnosticsCommand())
     Gui.addCommand("FMF_CopyDiagnostics", CopyDiagnosticsCommand())
     _lifecycle_commands_registered = True
@@ -1997,6 +2190,7 @@ def install_lifecycle_menu():
         if not is_enabled()
         else (
             ("Verify FMF", "FMF_Verify"),
+            ("Review FMF Shortcuts", "FMF_ReviewShortcuts"),
             ("Reset FMF", "FMF_Reapply"),
             ("Disable FMF", "FMF_Restore"),
         )
@@ -2270,6 +2464,7 @@ def register_commands():
 
 def unregister_feature_observers():
     """Detach FMF observers and filters when disabling within a live session."""
+    global _feature_commands_registered
     global _auto_created_document_observer
     global _sketch_edit_observer, _sketch_repair_observer, _pad_selection_observer
     if _sketch_edit_observer is not None and hasattr(Gui, "removeDocumentObserver"):
@@ -2312,6 +2507,10 @@ def unregister_feature_observers():
         fmf_parameters_dock.close_parameters_dock()
     except Exception:
         pass
+    # Commands may remain registered with FreeCAD, but the services installed
+    # alongside them were deliberately detached. A live re-enable must run the
+    # idempotent registration path again instead of treating this as installed.
+    _feature_commands_registered = False
 
 
 # ---------------------------------------------------------------------------
@@ -2353,6 +2552,9 @@ def _execute_module(module_name, path):
 
 def run_runtime():
     if "runtime" in _loaded:
+        runtime = sys.modules.get("_fmf_my_freecad_runtime")
+        if runtime is not None and hasattr(runtime, "install"):
+            runtime.install()
         return
     _execute_module("_fmf_my_freecad_runtime", RUNTIME)
     _loaded.add("runtime")
@@ -2432,11 +2634,13 @@ def start():
     register_preferences_page()
     install_lifecycle_menu()
     install_activation_monitor()
+    _startup_step("lifecycle guards", install_lifecycle_guards)
     _startup_step("owned workbench registration", register_owned_workbenches)
 
     diagnostics.start_session(is_enabled(), PACKAGE_VERSION, App.Version())
     try:
         if is_enabled():
+            _startup_step("native toolbar snapshot", capture_native_toolbar_visibility)
             _startup_step("feature command registration", register_commands)
             _startup_step("installation", prepare)
             _startup_step("runtime", run_runtime)
@@ -2454,7 +2658,6 @@ def start():
             )
             _startup_step("UI mode synchronization", defer_ui_mode_sync)
             _startup_step("enabled UI validation", validate_enabled_ui)
-            _startup_step("Start page", defer_start_page_if_empty)
         else:
             _startup_step(
                 "SearchBar",

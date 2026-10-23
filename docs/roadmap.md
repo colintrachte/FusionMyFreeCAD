@@ -26,7 +26,7 @@ visibility transition is reversible and never removes the stock implementations.
 
 ## Now — Harden the shipped workbench family
 
-- [ ] **Score 5 🥇 · Class 2 — Maintain the 1.8.0 behavioral baseline**
+- [ ] **Score 5 🥇 · Class 2 — Maintain the current shipped behavioral baseline**
 
   **ID:** task_a1020000000000000000000000000002
   **Status:** Continuous validation — static/source-build probes and owner acceptance captured; remaining journeys are ongoing dogfood evidence, not migration blockers
@@ -43,6 +43,22 @@ visibility transition is reversible and never removes the stock implementations.
   **Context Load:** 1236
   **Chars:** ~176,522 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
   **Prefer after:** task_a1010000000000000000000000000001
+
+- [ ] **Score 5 🥇 · Class 2 — Qualify native action fidelity and lifecycle guards**
+
+  **ID:** task_a1060000000000000000000000000006
+  **Status:** Implementation and automated verification complete; real-FreeCAD disposable-profile smoke check pending
+  **Outcome:** Bind FMF ribbon buttons to authoritative native action state without owning invocation, dispose every binding deterministically, restore captured native toolbar visibility before shutdown persistence, and recover immediately when Addon Manager writes `ADDON_DISABLED`.
+  **Work mode:** Forge + Steward
+  **Execution size:** Medium
+  **Uncertainty:** Medium
+  **Protected behavior:** Qt's native `setDefaultAction()` remains the invocation path; disabling FMF still switches workbench families without dismantling Ribbon.
+  **Acceptance:** Menu, shortcut, ribbon, and native-code state remain synchronized; disabled actions cannot be invoked; fifty rebuilds create no duplicate callbacks; widget/action destruction and FMF disable leave no stale binding; shutdown and Addon Manager disable preserve usable native chrome.
+  **Evidence:** Action-registry, renderer-hook, shutdown-visibility, stop-file, and teardown tests pass with the full suite; source-only FreeCAD reference checkout cannot provide the remaining live Qt runtime evidence.
+  **Implement:** `fmf_actions.py` · `fmf_bootstrap.py` · `bundled-addons/FreeCAD-Ribbon/FCBinding.py`
+  **Context:** `tests/test_actions.py` · `tests/test_startup.py` · `tests/test_package.py` · `docs/dev-guide/ACTIVATION-AND-RESTORATION.md`
+  **Read:** `<fmf-study>/ANALYTICAL_FOUNDATIONS_AND_BENCHMARKS.md` · `<fmf-study>/upstream_repos/NeoRibbon/freecad/NeoRibbon/bootstrap.py`
+  **Blocked by:** A real FreeCAD 1.1 GUI runtime for the disposable-profile smoke check
 
 ---
 
@@ -79,7 +95,7 @@ visibility transition is reversible and never removes the stock implementations.
   **Acceptance:** Parity checks are complete and baseline journeys are equivalent or better in all four workbenches.
   **Evidence:** Layout contracts and migration tests pass; subsequent discrepancies are handled as field regressions without reopening the owned-workbench architecture.
   **Implement:** `fmf_bootstrap.py` · `Resources/FMF/runtime.py` · `Resources/FMF/layout-v3.json` · `Resources/FMF/layout-manifest.json`
-  **Context:** `freecad/FMF/workbenches.py` · `fmf_actions.py` · `tests/fixtures/fmf-baseline.json`
+  **Context:** `fmf_workbenches.py` · `fmf_actions.py` · `tests/fixtures/fmf-baseline.json`
   **Route:** claude
   **Context Load:** 1430
   **Chars:** ~204,352 text total (largest: fmf_bootstrap.py ~61,806) — exceeds chatgpt's ~5,000-char inline-paste budget; that file can't go to chatgpt at all
@@ -96,7 +112,7 @@ visibility transition is reversible and never removes the stock implementations.
   **Protected behavior:** Create Sketch delegates attachment to Part Design and changes ribbon context only after the sketch opens.
   **Acceptance:** New/existing, attached/unattached, cancel, finish, close, failure, and repeated edit paths have no duplicate observers or shortcuts.
   **Evidence:** Observer tests and owner dogfood acceptance; future transition defects remain release-blocking regressions when reported.
-  **Implement:** `fmf_bootstrap.py` · `Resources/FMF/runtime.py` · `freecad/FMF/workbenches.py`
+  **Implement:** `fmf_bootstrap.py` · `Resources/FMF/runtime.py` · `fmf_workbenches.py`
   **Context:** `tests/test_startup.py` · `tests/test_runtime.py` · `docs/dev-guide/BASELINE-JOURNEYS.md`
   **Route:** claude
   **Context Load:** 868
@@ -114,7 +130,7 @@ visibility transition is reversible and never removes the stock implementations.
   **Protected behavior:** One package and one activation action produce the coherent experience.
   **Acceptance:** Activation completes or rolls back; interruption recovers; no version change occurs.
   **Expected evidence:** Transition tests, failure injection, and first-run walkthrough.
-  **Implement:** `freecad/FMF/activation.py` · `freecad/FMF/activation.ui` · `fmf_bootstrap.py`
+  **Implement:** `fmf_activation.py` · `Resources/FMF/activation.ui` · `fmf_bootstrap.py`
   **Context:** `docs/dev-guide/ACTIVATION-AND-RESTORATION.md` · `README.md`
   **Route:** kimi
   **Context Load:** 376
@@ -141,16 +157,16 @@ visibility transition is reversible and never removes the stock implementations.
 - [ ] **Score 5 🥇 · Class 2 — Make shortcut activation conflict-safe**
 
   **ID:** task_b2060000000000000000000000000006
-  **Status:** Defined
+  **Status:** In verification — conflict planning, cancel/accept, exact restoration, menu access, and diagnostics are automated; live FreeCAD keyboard verification remains
   **Outcome:** Retain one-action application of the full Fusion preset while previewing occupied bindings, supporting explicit resolution, and restoring prior bindings exactly.
   **Work mode:** Forge + Steward
   **Execution size:** Medium
   **Uncertainty:** Medium
   **Protected behavior:** The complete preset and Verify UI reporting remain available.
   **Acceptance:** Cancel changes nothing; accept applies chosen resolutions; Restore returns exact prior bindings.
-  **Expected evidence:** Conflict-matrix tests and real-FreeCAD keyboard verification.
-  **Implement:** `Resources/FMF/runtime.py` · `Resources/FMF/preferences.ui` · `fmf_bootstrap.py`
-  **Context:** `command-map.md` · `tests/test_runtime.py` · `tests/test_install.py`
+  **Evidence:** The shared catalog now produces a non-mutating plan; occupied keys are not changed until **FMF > Review FMF Shortcuts** is accepted; cancel is a no-op; the exact prior action bindings are persisted and restored. The debug pass added late-loaded-command snapshots, unnamed-action restoration, live disable restoration, and disable/re-enable service reinstallation coverage. Automated conflict-matrix and lifecycle tests pass. Real-FreeCAD keyboard verification remains.
+  **Implement:** `fmf_catalog.py` · `Resources/FMF/runtime.py` · `Resources/FMF/preferences.ui` · `fmf_bootstrap.py`
+  **Context:** `command-map.md` · `docs/dev-guide/COMMAND-CATALOG.md` · `tests/test_catalog.py` · `tests/test_runtime.py`
   **Read:** `<fmf-study>/upstream_repos/ToolSeek/freecad/ToolSeek/prefs.py`
   **Route:** paid-ai
   **Context Load:** 1100
@@ -168,7 +184,7 @@ visibility transition is reversible and never removes the stock implementations.
   **Protected behavior:** Decayed ranking, pins, order, reset, dress-up input, multi-region profiles, dock refresh, and recovery remain intact.
   **Acceptance:** State migrates without loss; installation/teardown is idempotent; no duplicate callbacks remain; startup/switching meet baseline.
   **Expected evidence:** Migration/lifecycle tests, callback counts, persistence tests, and timings.
-  **Implement:** `freecad/FMF/personalization.py` · `Resources/FMF/runtime.py` · `fmf_bootstrap.py` · `fmf_dressup_tools.py` · `fmf_parameters_dock.py`
+  **Implement:** `fmf_personalization.py` · `Resources/FMF/runtime.py` · `fmf_bootstrap.py` · `fmf_dressup_tools.py` · `fmf_parameters_dock.py`
   **Context:** `Resources/FMF/layout-manifest.json` · `tests/test_runtime.py` · `tests/test_install.py`
   **Route:** claude
   **Context Load:** 1870
@@ -181,14 +197,14 @@ visibility transition is reversible and never removes the stock implementations.
 - [ ] **Score 4 🥇 · Class 2 — Unify the command catalog and benchmark search**
 
   **ID:** task_c3010000000000000000000000000001
-  **Status:** Defined
+  **Status:** In verification — catalog contract, 32-query corpus, deterministic bakeoff, SearchBar alias integration, and provider decision are complete; live Qt latency/lifetime verification remains
   **Outcome:** Define one catalog for commands, Fusion aliases, shortcuts, availability, objects, preferences, and help; compare SearchBar and ToolSeek on 30 queries and retain one provider.
   **Work mode:** Forge
   **Execution size:** Large
   **Uncertainty:** High
   **Acceptance:** Results cover recall, top-three relevance, explanations, cold/warm latency, stability, coverage, and packaging impact.
-  **Expected evidence:** Versioned corpus, benchmark output, decision, and selected-provider tests.
-  **Implement:** `docs/dev-guide/COMMAND-CATALOG.md` · `tests/fixtures/search-corpus.json` · `tools/benchmark_search.py`
+  **Evidence:** The checked-in corpus reports the FMF ranker at 1.000 top-three success and 0 misses versus the substring baseline at 0.875 and 2 misses on the current machine. SearchBar remains the sole UI provider and consumes catalog aliases; toolbar command IDs now survive cache serialization, and a one-time schema refresh replaces stale pre-catalog caches. No ToolSeek runtime or dependency is shipped.
+  **Implement:** `fmf_catalog.py` · `Resources/FMF/command-catalog.json` · `bundled-addons/SearchBar/SearchBox.py` · `docs/dev-guide/COMMAND-CATALOG.md` · `tests/fixtures/search-corpus.json` · `tools/benchmark_search.py`
   **Context:** `bundled-addons/SearchBar/` · `command-map.md`
   **Read:** `<fmf-study>/upstream_repos/ToolSeek/freecad/ToolSeek/` · `<fmf-study>/THE_IDEAL_ARCHITECTURE.md`
   **Route:** paid-ai
@@ -207,7 +223,7 @@ visibility transition is reversible and never removes the stock implementations.
   **Protected behavior:** Repair References remains conservative; ambiguity is reported, never guessed.
   **Acceptance:** Provenance distinguishes exact/ambiguous/unavailable and direct/linked/patterned cases; diagnostic detection works without applying a fix.
   **Expected evidence:** Geometry fixtures, ambiguity cases, transaction tests, and a measured journey.
-  **Implement:** `freecad/FMF/selection_context.py` · `freecad/FMF/provenance.py` · `freecad/FMF/diagnostics.py`
+  **Implement:** `fmf_selection_context.py` · `fmf_provenance.py` · `fmf_diagnostics.py`
   **Context:** `fmf_repair_tools.py` · `fmf_sketch_tools.py` · `fmf_common.py`
   **Read:** `<fmf-study>/upstream_repos/FreeCAD-Nxt/freecad/nxt/tree/` · `<fmf-study>/THE_IDEAL_ARCHITECTURE.md`
   **Route:** paid-ai
@@ -225,8 +241,8 @@ visibility transition is reversible and never removes the stock implementations.
   **Uncertainty:** High
   **Acceptance:** Positions never rotate; negative fixtures do not misfire; measured command time improves without more errors.
   **Expected evidence:** Predicate tests and comparative journey results.
-  **Implement:** `freecad/FMF/context_actions.py`
-  **Context:** `docs/dev-guide/CURRENT-FEATURE-INVENTORY.md` · `freecad/FMF/selection_context.py` · `docs/dev-guide/BASELINE-JOURNEYS.md`
+  **Implement:** `fmf_context_actions.py`
+  **Context:** `docs/dev-guide/CURRENT-FEATURE-INVENTORY.md` · `fmf_selection_context.py` · `docs/dev-guide/BASELINE-JOURNEYS.md`
   **Read:** `<fmf-study>/upstream_repos/PieMenu/piemenu/`
   **Route:** paid-ai
   **Context Load:** 114
@@ -260,7 +276,7 @@ visibility transition is reversible and never removes the stock implementations.
   **Work mode:** Steward
   **Execution size:** Large
   **Uncertainty:** High
-  **Protected behavior:** The 1.8.0-compatible path remains until all gates pass.
+  **Protected behavior:** The current shipped path remains until all gates pass.
   **Acceptance:** Test novice Fusion migrants, experienced FreeCAD users, clean/custom profiles, claimed platforms, and the full install-to-reinstall lifecycle; no critical/high corruption or core regression remains.
   **Expected evidence:** Beta matrix, issue disposition, journey comparisons, restoration diffs, and readiness checklist.
   **Implement:** `docs/dev-guide/BETA-QUALIFICATION.md`

@@ -111,7 +111,14 @@ def test_existing_state_is_migrated_to_the_immutable_baseline(env, bootstrap):
     assert bootstrap.prepare() == "unchanged"
     baseline = json.loads(Path(bootstrap.BASELINE_PATH).read_text("utf-8"))
     assert baseline["backupRoot"] == str(backup_root)
-    assert baseline["preferences"] == original_preferences
+    assert baseline["preferences"][0] == original_preferences[0]
+    assert baseline["preferences"][1] == {
+        "path": bootstrap.STATUS_BAR_PREFERENCE[0],
+        "name": bootstrap.STATUS_BAR_PREFERENCE[1],
+        "kind": "Bool",
+        "existed": False,
+        "value": None,
+    }
     assert baseline["migratedFromState"] is True
 
 
@@ -303,20 +310,24 @@ def test_resetting_one_panel_preserves_other_panel_customization(installed):
 def test_restore_returns_the_profile_to_its_original_state(env, bootstrap):
     view = env.param("User parameter:BaseApp/Preferences/View")
     sketcher = env.param("User parameter:BaseApp/Preferences/Mod/Sketcher")
+    main_window = env.param("User parameter:BaseApp/Preferences/MainWindow")
     view.SetString("NavigationStyle", "PreviousStyle")
     sketcher.SetBool("MakeInternals", False)
+    main_window.SetBool("StatusBar", False)
     Path(bootstrap.RIBBON_DIR).mkdir(parents=True, exist_ok=True)
     Path(bootstrap.RIBBON_PATH).write_text('{"previous": true}', encoding="utf-8")
 
     bootstrap.prepare()
     view.SetString("NavigationStyle", "Gui::RevitNavigationStyle")
     sketcher.SetBool("MakeInternals", True)
+    main_window.SetBool("StatusBar", True)
 
     removed, problems = bootstrap.restore()
     assert problems == []
     assert json.loads(Path(bootstrap.RIBBON_PATH).read_text("utf-8")) == {"previous": True}
     assert view.GetString("NavigationStyle") == "PreviousStyle"
     assert sketcher.GetBool("MakeInternals") is False
+    assert main_window.GetBool("StatusBar") is False
     assert (Path(removed) / "FMF-addon-state.json").is_file()
 
 

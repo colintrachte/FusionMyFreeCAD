@@ -45,8 +45,8 @@
 - [x] **Score 5 🥇 · Class 2 — Introduce a native action adapter**
 
   **ID:** task_a1050000000000000000000000000005
-  **Status:** Shipped
-  **Outcome:** Resolve and invoke native actions while mirroring enabled/checkable/checked state with safe subscription disposal and no layout policy.
+  **Status:** Shipped — adapter foundation; renderer integration is tracked separately
+  **Outcome:** Resolve and invoke native actions and expose enabled/checkable/checked state with safe subscription disposal and no layout policy.
   **Work mode:** Forge + Steward
   **Execution size:** Medium
   **Uncertainty:** Medium

@@ -22,7 +22,8 @@ SKETCHER_GROUP = "User parameter:BaseApp/Preferences/Mod/Sketcher"
 def test_defaults_are_applied_on_first_run(env, runtime):
     assert runtime.apply_preferences() is True
     assert env.param(VIEW_GROUP).GetString("NavigationStyle") == "Gui::RevitNavigationStyle"
-    assert env.param(SHORTCUT_GROUP).GetString("PartDesign_Pad") == "E"
+    # Shortcut preferences remain untouched until the live conflict preview is accepted.
+    assert env.param(SHORTCUT_GROUP).GetString("PartDesign_Pad") is None
     assert env.param(SKETCHER_GROUP).GetBool("MakeInternals") is True
     assert env.param(SKETCHER_GROUP).GetBool("ShowCursorCoords") is True
     assert (
@@ -77,6 +78,20 @@ def test_ribbon_paths_are_reasserted_every_launch(env, runtime):
     assert env.param(RIBBON_GROUP).GetString("ConfigDir").endswith("RibbonUI_Data")
 
 
+def test_search_catalog_schema_refreshes_the_generated_cache_once(env, runtime):
+    cache = Path(env.app.getUserAppDataDir()) / "Cache_SearchBarMod"
+    cache.write_text("old cache", encoding="utf-8")
+
+    runtime.apply_preferences()
+
+    assert not cache.exists()
+    search = env.param("User parameter:BaseApp/Preferences/Mod/SearchBar")
+    assert search.GetInt("FMFCatalogSchema") == 1
+    cache.write_text("new cache", encoding="utf-8")
+    runtime.apply_preferences()
+    assert cache.read_text(encoding="utf-8") == "new cache"
+
+
 def test_opt_outs_are_respected(env, runtime):
     env.param(runtime.bootstrap.PREFERENCE_ROOT).SetBool("SetShortcuts", False)
     env.param(runtime.bootstrap.PREFERENCE_ROOT).SetBool("SetNavigation", False)
@@ -91,7 +106,7 @@ def test_reapply_restores_baseline_values_for_newly_disabled_groups(env, bootstr
     bootstrap.prepare()
     runtime.apply_preferences()
     assert env.param(VIEW_GROUP).GetString("NavigationStyle") == "Gui::RevitNavigationStyle"
-    assert env.param(SHORTCUT_GROUP).GetString("PartDesign_Pad") == "E"
+    assert env.param(SHORTCUT_GROUP).GetString("PartDesign_Pad") == "Ctrl+P"
 
     preferences = env.param(runtime.bootstrap.PREFERENCE_ROOT)
     preferences.SetBool("SetNavigation", False)
@@ -123,11 +138,13 @@ def test_starter_design_is_off_by_default(env, runtime):
     assert env.app.ActiveDocument is None
 
 
-def test_starter_design_can_be_enabled(env, runtime):
+def test_starter_design_can_be_enabled_and_is_tracked_for_disposal(env, bootstrap, runtime):
+    bootstrap.register_commands()
     env.param(runtime.bootstrap.PREFERENCE_ROOT).SetBool("CreateStarterDesign", True)
     runtime.ensure_starter_design()
     assert env.app.ActiveDocument is not None
     assert env.app.ActiveDocument.Objects[0].TypeId == "PartDesign::Body"
+    assert bootstrap.untouched_auto_created_document() is env.app.ActiveDocument
 
 
 # ---------------------------------------------------------------------------
@@ -147,25 +164,76 @@ def test_shortcuts_are_assigned_to_the_fmf_commands(env, runtime):
     assert actions["Sketcher_CreateLine"].shortcut().toString() == "L"
 
 
-def test_a_displaced_shortcut_is_recorded_and_reported(env, runtime):
-    """Taking a binding from another action used to happen silently."""
+def test_an_unapproved_shortcut_conflict_changes_nothing(env, runtime):
     actions = _actions(env, ("PartDesign_Pad", ""), ("Std_SomethingElse", "E"))
     runtime.reconcile_actions(env.main_window)
 
+    assert actions["Std_SomethingElse"].shortcut().toString() == "E"
+    assert actions["PartDesign_Pad"].shortcut().toString() == ""
+    assert runtime._displaced_shortcuts == []
+    assert runtime._pending_shortcut_conflicts == [
+        {"sequence": "E", "from": "Std_SomethingElse", "to": "PartDesign_Pad"}
+    ]
+    assert any("No shortcuts were changed" in message for message in env.console.messages)
+
+
+def test_shortcut_preview_cancel_is_a_no_op(env, runtime):
+    actions = _actions(env, ("PartDesign_Pad", ""), ("Std_SomethingElse", "E"))
+    assert runtime.review_shortcuts(lambda lines: False, env.main_window) is False
+    assert actions["Std_SomethingElse"].shortcut().toString() == "E"
+    assert actions["PartDesign_Pad"].shortcut().toString() == ""
+
+
+def test_shortcut_preview_accept_and_restore_are_exact(env, runtime):
+    actions = _actions(env, ("PartDesign_Pad", "Alt+E"), ("Std_SomethingElse", "E"))
+    seen = []
+
+    assert runtime.review_shortcuts(lambda lines: seen.extend(lines) or True, env.main_window)
+    assert seen == ["E: Std_SomethingElse → PartDesign_Pad"]
     assert actions["Std_SomethingElse"].shortcut().toString() == ""
     assert actions["PartDesign_Pad"].shortcut().toString() == "E"
     assert runtime._displaced_shortcuts == [
         {"sequence": "E", "from": "Std_SomethingElse", "to": "PartDesign_Pad"}
     ]
-    # Per-shortcut detail goes to the log; the Report view gets one summary line.
-    assert any("moved the E shortcut" in line for line in env.console.log)
-    assert any("reassigned 1 keyboard shortcut" in message for message in env.console.messages)
+
+    assert runtime.restore_shortcuts(env.main_window)
+    assert actions["Std_SomethingElse"].shortcut().toString() == "E"
+    assert actions["PartDesign_Pad"].shortcut().toString() == "Alt+E"
+
+
+def test_late_loaded_shortcut_target_is_added_to_the_restore_snapshot(env, runtime):
+    actions = _actions(env, ("Sketcher_CreateLine", "Ctrl+L"))
+    runtime.reconcile_actions(env.main_window)
+    assert actions["Sketcher_CreateLine"].shortcut().toString() == "L"
+
+    late = FakeAction("PartDesign_Pad", "Alt+E")
+    env.main_window.actions.append(late)
+    runtime.reconcile_actions(env.main_window)
+    assert late.shortcut().toString() == "E"
+
+    assert runtime.restore_shortcuts(env.main_window)
+    assert actions["Sketcher_CreateLine"].shortcut().toString() == "Ctrl+L"
+    assert late.shortcut().toString() == "Alt+E"
+
+
+def test_unnamed_conflict_is_applied_and_restored_by_its_label(env, runtime):
+    target = FakeAction("PartDesign_Pad", "")
+    unnamed = FakeAction("", "E", text="Assembly View")
+    env.main_window.actions = [target, unnamed]
+
+    assert runtime.review_shortcuts(lambda _lines: True, env.main_window)
+    assert unnamed.shortcut().toString() == ""
+    assert target.shortcut().toString() == "E"
+
+    assert runtime.restore_shortcuts(env.main_window)
+    assert unnamed.shortcut().toString() == "E"
+    assert target.shortcut().toString() == ""
 
 
 def test_displaced_shortcuts_reach_the_status_file(env, bootstrap, runtime):
     bootstrap.prepare()
     _actions(env, ("PartDesign_Pad", ""), ("Std_SomethingElse", "E"))
-    runtime.reconcile_actions(env.main_window)
+    runtime.review_shortcuts(lambda _lines: True, env.main_window)
     runtime.write_runtime_status("PartDesignWorkbench")
 
     status = json.loads(Path(bootstrap.STATUS_PATH).read_text("utf-8"))
@@ -739,6 +807,7 @@ def test_runtime_uninstall_disconnects_live_services(env, runtime):
     assert env.main_window._fmf_my_freecad_connected is True
     assert runtime._task_accept_filter is not None
     installed = runtime.runtime_service_state()
+    assert installed["ribbonActionBindings"] == 0
     assert installed["workbenchSignalConnected"] is True
     assert installed["taskAcceptFilterInstalled"] is True
 

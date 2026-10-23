@@ -46,18 +46,54 @@ from PySide.QtGui import (
 
 
 def fmfSearchableText(group):
-    """Return visible and native command vocabulary for a cached result."""
-    return "{} {}".format(group["text"], group.get("toolTip", ""))
+    """Return visible, native, and FMF discovery vocabulary for a result."""
+    import re
+
+    tooltip = group.get("toolTip", "")
+    match = re.search(r"<i>([^<]+)</i>", tooltip)
+    command_id = group.get("action", {}).get("commandId", "") or (
+        match.group(1) if match else ""
+    )
+    try:
+        from fmf_catalog import entry_map
+
+        entry = entry_map().get(command_id)
+    except (ImportError, OSError, ValueError):
+        entry = None
+    aliases = " ".join(entry.aliases) if entry else ""
+    return "{} {} {}".format(group["text"], tooltip, aliases)
 
 
 def fmfResultText(group):
-    """Disambiguate FMF's shared Fusion-style Extrude caption."""
+    """Disambiguate commands whose Fusion discovery terms overlap."""
     tooltip = group.get("toolTip", "")
-    if "PartDesign_Pad" in tooltip:
+    command_id = group.get("action", {}).get("commandId", "")
+    if command_id == "PartDesign_Pad" or "PartDesign_Pad" in tooltip:
         return "Pad / Extrude (Part Design)"
-    if "Part_Extrude" in tooltip:
+    if command_id == "Part_Extrude" or "Part_Extrude" in tooltip:
         return "Extrude (Part)"
     return group["text"]
+
+
+def fmfSearchScore(userInput, group):
+    """Rank catalog commands while preserving SearchBar-only result types."""
+    import re
+
+    tooltip = group.get("toolTip", "")
+    match = re.search(r"<i>([^<]+)</i>", tooltip)
+    command_id = group.get("action", {}).get("commandId", "") or (
+        match.group(1) if match else ""
+    )
+    try:
+        from fmf_catalog import entry_map, score
+
+        entry = entry_map().get(command_id)
+        value = score(userInput, entry) if entry else None
+    except (ImportError, OSError, ValueError):
+        value = None
+    # Python's sort is stable. Equal fallback scores retain SearchBar's native
+    # object, preference, help, and tree ordering.
+    return value if value is not None else 10000
 
 from SearchBoxLight import SearchBoxLight
 import Parameters_SearchBar as Parameters
@@ -453,7 +489,8 @@ class SearchBox(QLineEdit):
 
         def filterGroups(groups):
             groups = (filterGroup(group) for group in groups)
-            return [group for group in groups if group is not None]
+            groups = [group for group in groups if group is not None]
+            return sorted(groups, key=lambda group: fmfSearchScore(userInput, group))
 
         self.mdl = QStandardItemModel()
         self.mdl.appendColumn([])

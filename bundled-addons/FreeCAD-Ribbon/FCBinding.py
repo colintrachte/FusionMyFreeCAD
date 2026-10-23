@@ -3593,6 +3593,22 @@ class ModernMenu(RibbonBar):
             return False
         return active in self.ribbonStructure.get("authoritativeWorkbenches", [])
 
+    def _fmfBindNativeAction(self, commandName, button):
+        """Attach FMF lifecycle tracking without replacing QAction invocation."""
+        if button is None or not self._fmfAuthoritativeWorkbenchActive():
+            return button
+        try:
+            import fmf_bootstrap
+
+            fmf_bootstrap.bind_ribbon_button(commandName, button)
+        except (ImportError, AttributeError, RuntimeError, TypeError) as error:
+            if Parameters.DEBUG_MODE is True:
+                StandardFunctions.Print(
+                    "FMF action binding failed for {}: {}".format(commandName, error),
+                    "Warning",
+                )
+        return button
+
     def _setFmfChromeVisible(self, visible):
         """Keep the vendored ribbon scoped to FMF-owned workbenches."""
         dock = mw.findChild(QDockWidget, "Ribbon")
@@ -5329,7 +5345,7 @@ class ModernMenu(RibbonBar):
                     # Set the commandName as objectName as backup
                     Button.setObjectName(CommandName)
                     
-                    return Button
+                    return self._fmfBindNativeAction(CommandName, Button)
 
                 # If the command is None, it is probally a command from a FreeCAD dropdow button.
                 # Try to get its QAction and create a button from it.
@@ -5373,7 +5389,9 @@ class ModernMenu(RibbonBar):
                                                             Button.addAction(action)
                                                             Button.setDefaultAction(action)
 
-                                                        return Button
+                                                        return self._fmfBindNativeAction(
+                                                            CommandName, Button
+                                                        )
                     
             except Exception as e:
                 if Parameters.DEBUG_MODE is True:
@@ -5399,7 +5417,7 @@ class ModernMenu(RibbonBar):
                 # Set the commandName as objectName as backup
                 Button.setObjectName(CommandName)
                 Button.setToolTip(CommandName)
-                return Button
+                return self._fmfBindNativeAction(CommandName, Button)
             except Exception as e:
                 if Parameters.DEBUG_MODE is True:
                     StandardFunctions.Print(

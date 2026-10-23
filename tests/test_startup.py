@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import sys
 import types
 from pathlib import Path
 
 from fake_freecad import (
     ROOT,
+    FakeAction,
     FakeLineSegment,
     FakeObject,
     FakeSketch,
@@ -64,6 +66,7 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
         "FMF_RecentDocuments",
         "FMF_Reapply",
         "FMF_RepairReferences",
+        "FMF_ReviewShortcuts",
         "FMF_Restore",
         "FMF_RestoreViewport",
         "FMF_SmartOffset",
@@ -76,23 +79,141 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
     assert len(env.selection_observers) == 2  # _PadSelectionObserver, _DressUpSelectionObserver
 
 
-def test_empty_startup_shows_freecads_native_start_page(env, bootstrap, monkeypatch):
+def test_shutdown_restores_native_toolbar_visibility_without_disabling_fmf(env, bootstrap):
+    class Toolbar(env.qtwidgets.QToolBar):
+        def __init__(self, name, visible):
+            self.name = name
+            self.visible = visible
+
+        def objectName(self):
+            return self.name
+
+        def isVisible(self):
+            return self.visible
+
+        def setVisible(self, visible):
+            self.visible = bool(visible)
+
+    shown = Toolbar("File", True)
+    hidden = Toolbar("Macro", False)
+    env.main_window.widgets.extend((shown, hidden))
+    bootstrap.capture_native_toolbar_visibility()
+    shown.visible = False
+    hidden.visible = True
+
+    bootstrap.install_lifecycle_guards()
+    env.qtwidgets.QApplication.instance().aboutToQuit.emit()
+
+    assert shown.visible is True
+    assert hidden.visible is False
+    assert bootstrap.is_enabled() is True
+
+
+def test_addon_manager_stop_file_uses_the_disable_and_native_recovery_path(
+    env, bootstrap, monkeypatch, tmp_path
+):
+    stop_file = tmp_path / "ADDON_DISABLED"
+    stop_file.write_text("", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(bootstrap, "ADDON_MANAGER_STOP_FILE", str(stop_file))
+    monkeypatch.setattr(bootstrap, "disable", lambda: calls.append("disable"))
+    monkeypatch.setattr(
+        bootstrap,
+        "restore_native_toolbar_visibility",
+        lambda: calls.append("toolbars"),
+    )
+    monkeypatch.setattr(bootstrap, "_restore_native_ui_now", lambda: calls.append("native-ui"))
+
+    bootstrap._on_addon_directory_changed()
+    bootstrap._on_addon_directory_changed()
+
+    assert calls == ["disable", "toolbars", "native-ui"]
+
+
+def test_disable_disposes_ribbon_action_bindings(env, bootstrap, monkeypatch):
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+    bootstrap.prepare()
+    disposed = []
+    monkeypatch.setattr(bootstrap, "dispose_ribbon_action_bindings", lambda: disposed.append(True))
+    monkeypatch.setattr(bootstrap, "_restore_native_ui_now", lambda: None)
+    monkeypatch.setattr(bootstrap, "install_lifecycle_menu", lambda: None)
+
+    _message, problems = bootstrap.disable()
+
+    assert problems == []
+    assert disposed == [True]
+
+
+def test_disable_restores_the_live_shortcut_snapshot(env, bootstrap, runtime, monkeypatch):
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+    bootstrap.prepare()
+    target = FakeAction("PartDesign_Pad", "Alt+E")
+    owner = FakeAction("Std_SomethingElse", "E")
+    env.main_window.actions = [target, owner]
+    runtime.review_shortcuts(lambda _lines: True, env.main_window)
+    monkeypatch.setitem(sys.modules, "_fmf_my_freecad_runtime", runtime)
+    monkeypatch.setattr(bootstrap, "_restore_native_ui_now", lambda: None)
+    monkeypatch.setattr(bootstrap, "install_lifecycle_menu", lambda: None)
+
+    _message, problems = bootstrap.disable()
+
+    assert problems == []
+    assert target.shortcut().toString() == "Alt+E"
+    assert owner.shortcut().toString() == "E"
+
+
+def test_live_reenable_reinstalls_runtime_and_feature_observers(
+    env, bootstrap, runtime, monkeypatch
+):
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+    bootstrap.prepare()
+    bootstrap.register_commands()
+    runtime.install()
+    monkeypatch.setitem(sys.modules, "_fmf_my_freecad_runtime", runtime)
+    bootstrap._loaded.add("runtime")
+    monkeypatch.setattr(bootstrap, "prepare", lambda: "unchanged")
+    monkeypatch.setattr(bootstrap, "load_vendor", lambda *_args: None)
+    monkeypatch.setattr(bootstrap, "_restore_native_ui_now", lambda: None)
+    monkeypatch.setattr(bootstrap, "install_lifecycle_menu", lambda: None)
+
+    _message, problems = bootstrap.disable()
+    assert problems == []
+    assert env.main_window._fmf_my_freecad_connected is False
+    assert bootstrap._feature_commands_registered is False
+
+    bootstrap.enable()
+    assert env.main_window._fmf_my_freecad_connected is True
+    assert bootstrap._feature_commands_registered is True
+    assert len(env.selection_observers) == 2
+
+
+def test_empty_startup_does_not_override_freecads_start_page_choice(env, bootstrap, monkeypatch):
     _run_init_gui(env, bootstrap, monkeypatch)
 
     FakeTimer.pump()
 
-    assert ("command", "Start_Start") in env.gui_events
+    assert ("command", "Start_Start") not in env.gui_events
 
 
-def test_startup_does_not_cover_an_open_document_with_the_start_page(
-    env, bootstrap, monkeypatch
-):
+def test_startup_does_not_cover_an_open_document_with_the_start_page(env, bootstrap, monkeypatch):
     opened = env._new_document("OpenedProject")
 
     _run_init_gui(env, bootstrap, monkeypatch)
     FakeTimer.pump()
 
     assert env.app.ActiveDocument is opened
+    assert ("command", "Start_Start") not in env.gui_events
+
+
+def test_startup_does_not_force_start_page_over_its_untouched_starter(env, bootstrap):
+    bootstrap.register_commands()
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("CreateStarterDesign", True)
+    runtime = env.load_runtime()
+    runtime.ensure_starter_design()
+    FakeTimer.pump()
+
+    assert len(env.documents) == 1
+    assert bootstrap.untouched_auto_created_document() is env.app.ActiveDocument
     assert ("command", "Start_Start") not in env.gui_events
 
 
@@ -296,6 +417,56 @@ def test_owned_mode_disable_switches_to_native_without_removing_layout(env, boot
     assert Path(bootstrap.RIBBON_PATH).read_bytes() == ribbon_before
 
 
+def test_status_bar_is_visible_while_enabled_and_restored_on_disable(env, bootstrap, monkeypatch):
+    main_window = env.param("User parameter:BaseApp/Preferences/MainWindow")
+    main_window.SetBool("StatusBar", False)
+    bootstrap.prepare()
+    runtime = env.load_runtime()
+
+    runtime.apply_preferences()
+
+    assert main_window.GetBool("StatusBar") is True
+    assert env.main_window.status_bar_visible is True
+
+    monkeypatch.setattr(bootstrap, "_restore_native_ui_now", lambda: None)
+    monkeypatch.setattr(bootstrap, "install_lifecycle_menu", lambda: None)
+    _message, problems = bootstrap.disable()
+
+    assert problems == []
+    assert main_window.GetBool("StatusBar") is False
+
+
+def test_existing_baseline_captures_status_bar_before_unchanged_upgrade(env, bootstrap):
+    main_window = env.param("User parameter:BaseApp/Preferences/MainWindow")
+    main_window.SetBool("StatusBar", False)
+    bootstrap.prepare()
+    baseline_path = Path(bootstrap.BASELINE_PATH)
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    baseline["preferences"] = [
+        entry
+        for entry in baseline["preferences"]
+        if (entry["path"], entry["name"]) != bootstrap.STATUS_BAR_PREFERENCE[:2]
+    ]
+    baseline.pop("statusBarBaselineAddedAt", None)
+    baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
+
+    assert bootstrap.prepare() == "unchanged"
+
+    migrated = json.loads(baseline_path.read_text(encoding="utf-8"))
+    status_entry = next(
+        entry
+        for entry in migrated["preferences"]
+        if (entry["path"], entry["name"]) == bootstrap.STATUS_BAR_PREFERENCE[:2]
+    )
+    assert status_entry == {
+        "path": bootstrap.STATUS_BAR_PREFERENCE[0],
+        "name": bootstrap.STATUS_BAR_PREFERENCE[1],
+        "kind": "Bool",
+        "existed": True,
+        "value": False,
+    }
+
+
 def test_preferences_toggle_switches_workbench_families_live(env, bootstrap, monkeypatch):
     preferences = env.param(bootstrap.PREFERENCE_ROOT)
     preferences.SetBool("UseOwnedWorkbenches", True)
@@ -388,6 +559,7 @@ def test_disabled_startup_registers_only_lifecycle_commands(env, bootstrap, monk
         "FMF_CopyDiagnostics",
         "FMF_OpenDiagnostics",
         "FMF_Reapply",
+        "FMF_ReviewShortcuts",
         "FMF_Restore",
         "FMF_Verify",
     }
@@ -577,6 +749,40 @@ def test_owned_sketch_edit_always_returns_to_fmf_design(env, bootstrap):
     assert env.active_workbench == "FMFDesignWorkbench"
 
 
+def test_sketch_exit_waits_for_freecads_queued_workbench_transition(env, bootstrap):
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+    env.active_workbench = "FMFSketchWorkbench"
+    bootstrap.register_commands()
+    observer = env.document_observers[0]
+    view_provider = types.SimpleNamespace(Object=FakeSketch())
+
+    observer.slotResetEdit(view_provider)
+
+    # FMF must not rebuild Ribbon on the same queued turn in which FreeCAD is
+    # still completing its native Sketcher-exit transition.
+    FakeTimer.pump(rounds=1)
+    assert env.active_workbench == "FMFSketchWorkbench"
+
+    env.gui.activateWorkbench("PartDesignWorkbench")
+    FakeTimer.pump(rounds=1)
+    assert env.active_workbench == "FMFDesignWorkbench"
+
+
+def test_stale_sketch_exit_does_not_interrupt_a_new_sketch_edit(env, bootstrap):
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+    env.active_workbench = "FMFSketchWorkbench"
+    bootstrap.register_commands()
+    observer = env.document_observers[0]
+    view_provider = types.SimpleNamespace(Object=FakeSketch())
+
+    observer.slotResetEdit(view_provider)
+    FakeTimer.pump(rounds=1)
+    observer.slotInEdit(view_provider)
+    FakeTimer.pump()
+
+    assert env.active_workbench == "FMFSketchWorkbench"
+
+
 def test_untouched_document_created_for_sketch_is_discarded_when_another_opens(env, bootstrap):
     bootstrap.register_commands()
 
@@ -588,6 +794,19 @@ def test_untouched_document_created_for_sketch_is_discarded_when_another_opens(e
 
     assert env.app.ActiveDocument is opened
     assert auto_created.Name not in env.documents
+
+
+def test_untouched_starter_document_is_discarded_when_a_project_opens(env, bootstrap):
+    bootstrap.register_commands()
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("CreateStarterDesign", True)
+    runtime = env.load_runtime()
+    runtime.ensure_starter_design()
+    starter = env.app.ActiveDocument
+
+    opened = env._new_document("OpenedProject")
+
+    assert env.app.ActiveDocument is opened
+    assert starter.Name not in env.documents
 
 
 def test_edited_auto_created_document_is_not_discarded(env, bootstrap):
@@ -871,6 +1090,8 @@ def test_the_preferences_page_covers_every_switch_the_runtime_reads(bootstrap):
     }
     # AppliedVersion is internal bookkeeping, not a user-facing switch.
     read_by_runtime.discard("AppliedVersion")
+    read_by_runtime.discard("ShortcutPresetApproval")
+    read_by_runtime.discard("ShortcutPriorState")
 
     tree = ET.parse(bootstrap.PREFERENCES_UI)
     entries = {

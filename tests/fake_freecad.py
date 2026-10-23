@@ -1124,6 +1124,7 @@ class FakeApplication:
     def __init__(self):
         self.filters = []
         self.focus_widget = None
+        self.aboutToQuit = Signal()
 
     def installEventFilter(self, event_filter):
         self.filters.append(event_filter)
@@ -1198,6 +1199,7 @@ class FakeMainWindow:
         self.workbenchActivated = Signal()
         self._menu_shown = False
         self.status_messages = []
+        self.status_bar_visible = False
         self._stylesheet = ""
         self._maximized = False
         self._central_widget = FakeQtWidget()
@@ -1270,6 +1272,9 @@ class FakeMainWindow:
         window = self
 
         class StatusBar:
+            def show(self):
+                window.status_bar_visible = True
+
             def showMessage(self, text, _timeout=0):
                 window.status_messages.append(text)
 
@@ -1281,6 +1286,17 @@ def _qt_modules():
 
     qtcore = types.ModuleType("PySide.QtCore")
     qtcore.QTimer = FakeTimer
+
+    class FakeFileSystemWatcher:
+        def __init__(self):
+            self.paths = []
+            self.directoryChanged = Signal()
+
+        def addPath(self, path):
+            self.paths.append(path)
+            return True
+
+    qtcore.QFileSystemWatcher = FakeFileSystemWatcher
     qtcore.QObject = FakeQtObject
     qtcore.QEvent = types.SimpleNamespace(
         KeyPress="key-press",
@@ -1537,9 +1553,12 @@ class Environment:
         doc = self.documents.get(doc_or_name) if isinstance(doc_or_name, str) else doc_or_name
         self.app.ActiveDocument = doc
         for obs in list(self.document_observers):
-            if hasattr(obs, "slotActiveDocument"):
+            callback = getattr(obs, "slotActivateDocument", None)
+            if callback is None:
+                callback = getattr(obs, "slotActiveDocument", None)
+            if callback is not None:
                 try:
-                    obs.slotActiveDocument(doc)
+                    callback(doc)
                 except Exception:
                     pass
 

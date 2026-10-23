@@ -146,6 +146,7 @@ def toolbarResultsProvider():
                             if mac.text():
                                 action = {
                                     "handler": "subTool",
+                                    "commandId": mac.objectName(),
                                     "workbenches": toolbarIsInWorkbenches,
                                     "toolbar": toolbarName,
                                     "tool": text,
@@ -163,6 +164,7 @@ def toolbarResultsProvider():
                     # The default action of a menu changes dynamically, instead of triggering the last action, just show the menu.
                     action = {
                         "handler": "tool",
+                        "commandId": act.objectName() if act is not None else tbt.objectName(),
                         "workbenches": toolbarIsInWorkbenches,
                         "toolbar": toolbarName,
                         "tool": text,

@@ -476,19 +476,19 @@ FCBINDING_UI_LATENCY_PATCH = (
     ),
     (
         "        styleSheet = self.tabBar().styleSheet()\n"
-        "        self.tabBar().setStyleSheet(styleSheet + \"\"\"\\n QToolTip {\n"
+        '        self.tabBar().setStyleSheet(styleSheet + """\\n QToolTip {\n'
         "                    background-color: #FFFFE1;\n"
         "                    color: black;\n"
         "                    border: black solid 1px;\n"
         "                    border-radius: 2px;\n"
-        "                    }\"\"\")\n",
+        '                    }""")\n',
         "        styleSheet = self.tabBar().styleSheet()\n"
-        "        tooltipStyle = \"\"\"\\n QToolTip {\n"
+        '        tooltipStyle = """\\n QToolTip {\n'
         "                    background-color: #FFFFE1;\n"
         "                    color: black;\n"
         "                    border: black solid 1px;\n"
         "                    border-radius: 2px;\n"
-        "                    }\"\"\"\n"
+        '                    }"""\n'
         "        # FMF local change: do not append another copy on every activation.\n"
         "        # Repeated copies force Qt to reparse and repolish an ever-growing sheet.\n"
         "        if tooltipStyle not in styleSheet:\n"
@@ -503,9 +503,9 @@ FCBINDING_UI_LATENCY_PATCH = (
         "            # Activate all commands\n"
         "            self.activateButtons()\n"
         "        \n"
-        "        # Emit a signal when switching to a new tab. Used to update the \"addcommands\" panel\n"
+        '        # Emit a signal when switching to a new tab. Used to update the "addcommands" panel\n'
         "        self.TabChanged.emit()\n",
-        "        # Emit a signal when switching to a new tab. Used to update the \"addcommands\" panel\n"
+        '        # Emit a signal when switching to a new tab. Used to update the "addcommands" panel\n'
         "        self.TabChanged.emit()\n",
     ),
     (
@@ -521,10 +521,10 @@ FCBINDING_UI_LATENCY_PATCH = (
         "        menuSignature = tuple(\n"
         "            (child.objectName(), child.text()) for child in MenuBar.actions()\n"
         "        )\n"
-        "        ApplictionMenu = getattr(self, \"_applicationMenu\", None)\n"
+        '        ApplictionMenu = getattr(self, "_applicationMenu", None)\n'
         "        if (\n"
         "            ApplictionMenu is not None\n"
-        "            and menuSignature == getattr(self, \"_applicationMenuSignature\", None)\n"
+        '            and menuSignature == getattr(self, "_applicationMenuSignature", None)\n'
         "        ):\n"
         "            return\n"
         "        if ApplictionMenu is None:\n"
@@ -566,17 +566,52 @@ SEARCH_BOX_FMF_PATCH = (
         ")\n\nfrom SearchBoxLight import SearchBoxLight\n",
         ")\n\n\n"
         "def fmfSearchableText(group):\n"
-        '    """Return visible and native command vocabulary for a cached result."""\n'
-        '    return "{} {}".format(group["text"], group.get("toolTip", ""))\n'
+        '    """Return visible, native, and FMF discovery vocabulary for a result."""\n'
+        "    import re\n"
+        "\n"
+        '    tooltip = group.get("toolTip", "")\n'
+        '    match = re.search(r"<i>([^<]+)</i>", tooltip)\n'
+        '    command_id = group.get("action", {}).get("commandId", "") or (\n'
+        '        match.group(1) if match else ""\n'
+        "    )\n"
+        "    try:\n"
+        "        from fmf_catalog import entry_map\n"
+        "\n"
+        "        entry = entry_map().get(command_id)\n"
+        "    except (ImportError, OSError, ValueError):\n"
+        "        entry = None\n"
+        '    aliases = " ".join(entry.aliases) if entry else ""\n'
+        '    return "{} {} {}".format(group["text"], tooltip, aliases)\n'
         "\n\n"
         "def fmfResultText(group):\n"
-        '    """Disambiguate FMF\'s shared Fusion-style Extrude caption."""\n'
+        '    """Disambiguate commands whose Fusion discovery terms overlap."""\n'
         '    tooltip = group.get("toolTip", "")\n'
-        '    if "PartDesign_Pad" in tooltip:\n'
+        '    command_id = group.get("action", {}).get("commandId", "")\n'
+        '    if command_id == "PartDesign_Pad" or "PartDesign_Pad" in tooltip:\n'
         '        return "Pad / Extrude (Part Design)"\n'
-        '    if "Part_Extrude" in tooltip:\n'
+        '    if command_id == "Part_Extrude" or "Part_Extrude" in tooltip:\n'
         '        return "Extrude (Part)"\n'
         '    return group["text"]\n'
+        "\n\n"
+        "def fmfSearchScore(userInput, group):\n"
+        '    """Rank catalog commands while preserving SearchBar-only result types."""\n'
+        "    import re\n"
+        "\n"
+        '    tooltip = group.get("toolTip", "")\n'
+        '    match = re.search(r"<i>([^<]+)</i>", tooltip)\n'
+        '    command_id = group.get("action", {}).get("commandId", "") or (\n'
+        '        match.group(1) if match else ""\n'
+        "    )\n"
+        "    try:\n"
+        "        from fmf_catalog import entry_map, score\n"
+        "\n"
+        "        entry = entry_map().get(command_id)\n"
+        "        value = score(userInput, entry) if entry else None\n"
+        "    except (ImportError, OSError, ValueError):\n"
+        "        value = None\n"
+        "    # Python's sort is stable. Equal fallback scores retain SearchBar's native\n"
+        "    # object, preference, help, and tree ordering.\n"
+        "    return value if value is not None else 10000\n"
         "\n"
         "from SearchBoxLight import SearchBoxLight\n",
     ),
@@ -592,6 +627,25 @@ SEARCH_BOX_FMF_PATCH = (
     (
         '                        QStandardItem(group["icon"] or genericToolIcon, group["text"]),\n',
         '                        QStandardItem(group["icon"] or genericToolIcon, fmfResultText(group)),\n',
+    ),
+    (
+        "            return [group for group in groups if group is not None]\n",
+        "            groups = [group for group in groups if group is not None]\n"
+        "            return sorted(groups, key=lambda group: fmfSearchScore(userInput, group))\n",
+    ),
+)
+
+
+SEARCH_RESULTS_COMMAND_ID_PATCH = (
+    (
+        '                                action = {\n                                    "handler": "subTool",\n',
+        '                                action = {\n                                    "handler": "subTool",\n'
+        '                                    "commandId": mac.objectName(),\n',
+    ),
+    (
+        '                    action = {\n                        "handler": "tool",\n',
+        '                    action = {\n                        "handler": "tool",\n'
+        '                        "commandId": act.objectName() if act is not None else tbt.objectName(),\n',
     ),
 )
 
@@ -1731,6 +1785,10 @@ LOCAL_PATCHES = (
     (
         ("SearchBar", "SearchBox.py"),
         SEARCH_BOX_FMF_PATCH,
+    ),
+    (
+        ("SearchBar", "ResultsToolbar.py"),
+        SEARCH_RESULTS_COMMAND_ID_PATCH,
     ),
     (
         ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "panel.py"),

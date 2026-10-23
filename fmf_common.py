@@ -29,6 +29,7 @@ RUNTIME_MODULES: tuple[str, ...] = (
     "InitGui.py",
     "fmf_actions.py",
     "fmf_bootstrap.py",
+    "fmf_catalog.py",
     "fmf_common.py",
     "fmf_datum_tools.py",
     "fmf_dressup_tools.py",

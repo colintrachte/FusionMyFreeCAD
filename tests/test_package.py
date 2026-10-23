@@ -61,6 +61,7 @@ def test_required_files_are_present():
         ROOT / "InitGui.py",
         ROOT / "fmf_actions.py",
         ROOT / "fmf_bootstrap.py",
+        ROOT / "fmf_catalog.py",
         ROOT / "fmf_workbenches.py",
         ROOT / "fmf_sketch_tools.py",
         ROOT / "LICENSE",
@@ -191,12 +192,11 @@ def test_bundled_ribbon_workbench_activation_does_not_accumulate_ui_state():
         and node.name in {"onUserChangedWorkbench", "onWbActivated", "ApplicationMenus"}
     }
 
-    assert "Gui.activeWorkbench().name() != targetWorkbench" in methods[
-        "onUserChangedWorkbench"
-    ]
-    assert "self.onWbActivated()\n                self.ApplicationMenus()" not in methods[
-        "onUserChangedWorkbench"
-    ]
+    assert "Gui.activeWorkbench().name() != targetWorkbench" in methods["onUserChangedWorkbench"]
+    assert (
+        "self.onWbActivated()\n                self.ApplicationMenus()"
+        not in methods["onUserChangedWorkbench"]
+    )
     assert "if tooltipStyle not in styleSheet:" in methods["onWbActivated"]
     assert "self._applicationMenu = ApplictionMenu" in methods["ApplicationMenus"]
     assert "self._applicationMenuSignature" in methods["ApplicationMenus"]
@@ -512,6 +512,13 @@ def test_ribbon_honours_the_authoritative_workbench_list():
     source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
     assert 'workbenchName in Dict.get("authoritativeWorkbenches", [])' in source
     assert "ListToolbars: list = []" in source
+
+
+def test_authoritative_ribbon_buttons_use_the_fmf_action_binding_bridge():
+    source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
+    assert "def _fmfBindNativeAction" in source
+    assert "fmf_bootstrap.bind_ribbon_button(commandName, button)" in source
+    assert "return self._fmfBindNativeAction(CommandName, Button)" in source
 
 
 def test_ribbon_surfaces_overflow_commands_at_declared_width_tiers():

@@ -99,10 +99,10 @@
       <item>
        <widget class="Gui::PrefCheckBox" name="setShortcuts">
         <property name="toolTip">
-         <string>Apply the Fusion shortcut set (L, R, C, D, E, H, T, O, P, X). Any conflicting shortcut is taken from the other command; Verify UI lists what changed.</string>
+         <string>Enable the FMF shortcut preset (L, R, C, D, E, H, T, O, P, X). Use FMF &gt; Review FMF Shortcuts to preview and approve occupied bindings before anything is reassigned.</string>
         </property>
         <property name="text">
-         <string>Apply Fusion keyboard shortcuts</string>
+         <string>Enable FMF keyboard shortcuts</string>
         </property>
         <property name="checked">
          <bool>true</bool>

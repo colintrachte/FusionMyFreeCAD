@@ -19,12 +19,14 @@ except ImportError:  # pragma: no cover - older FreeCAD bindings
 try:
     import fmf_bootstrap as bootstrap
     from fmf_actions import NativeActionAdapter
+    from fmf_catalog import plan_shortcuts
 except ImportError:  # pragma: no cover - executed outside the add-on directory
     _ADDON_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if _ADDON_ROOT not in sys.path:
         sys.path.insert(0, _ADDON_ROOT)
     import fmf_bootstrap as bootstrap
     from fmf_actions import NativeActionAdapter
+    from fmf_catalog import plan_shortcuts
 
 
 SHORTCUTS = {
@@ -72,6 +74,7 @@ _usage_write_pending = False
 _status_write_pending = False
 _problems = []
 _displaced_shortcuts = []
+_pending_shortcut_conflicts = []
 _last_workbench = ""
 _task_accept_filter = None
 _deferred_tokens = {}
@@ -161,16 +164,40 @@ def _run(label, function):
 
 
 def _apply_structural():
-    """Point the bundled Ribbon at this profile's generated layout.
+    """Keep the native UI anchors and bundled Ribbon paths valid.
 
     These are not user-facing preferences; they are paths the bundled add-on needs
     in order to find its own data, so they are re-asserted at every launch.
     """
+    # FreeCAD anchors notification popups to a tray button in its status bar.
+    # Leaving notifications enabled while that bar is hidden gives the anchor
+    # stale geometry and can place popups over the middle of the model view.
+    App.ParamGet("User parameter:BaseApp/Preferences/MainWindow").SetBool("StatusBar", True)
+    Gui.getMainWindow().statusBar().show()
+
     ribbon = App.ParamGet("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon")
     ribbon_dir = os.path.join(App.getUserAppDataDir(), "RibbonUI_Data")
     ribbon.SetString("ConfigDir", ribbon_dir)
     ribbon.SetString("RibbonStructure", os.path.join(ribbon_dir, "RibbonStructure.json"))
     ribbon.SetString("BackupFolder", os.path.join(ribbon_dir, "Backups"))
+    _refresh_search_catalog_cache()
+
+
+def _refresh_search_catalog_cache():
+    """Regenerate cached SearchBar records when FMF's catalog contract changes."""
+    search = App.ParamGet("User parameter:BaseApp/Preferences/Mod/SearchBar")
+    schema = 1
+    if search.GetInt("FMFCatalogSchema", 0) == schema:
+        return
+    cache_path = os.path.join(App.getUserAppDataDir(), "Cache_SearchBarMod")
+    try:
+        os.remove(cache_path)
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        _record_problem("SearchBar catalog cache could not be refreshed: {}".format(error))
+        return
+    search.SetInt("FMFCatalogSchema", schema)
 
 
 def _apply_defaults():
@@ -242,10 +269,9 @@ def _apply_defaults():
     search.SetBool("ShowChangeDialog", False)
     search.SetString("DoNotShowAgain", "1.8")
 
-    if PREFERENCES.GetBool("SetShortcuts", True):
-        shortcut_group = App.ParamGet("User parameter:BaseApp/Preferences/Shortcut")
-        for command, shortcut in SHORTCUTS.items():
-            shortcut_group.SetString(command, shortcut)
+    # Shortcuts are applied from the live QAction inventory.  Writing them here
+    # would overwrite occupied bindings before the conflict preview can show
+    # the user what is about to change.
 
 
 def _restore_opted_out_defaults():
@@ -360,6 +386,7 @@ def ensure_starter_design():
         body = document.addObject("PartDesign::Body", "Body")
         body.Label = "Part"
         document.recompute()
+        bootstrap.track_auto_created_document(document)
     Gui.activateWorkbench(bootstrap.fmf_workbench_for("PartDesignWorkbench"))
     return True
 
@@ -873,11 +900,8 @@ def refresh_adaptive_panel(workbench):
 
 
 def reconcile_actions(main_window=None):
-    """Connect usage tracking and enforce the Fusion shortcut set.
-
-    Any shortcut taken from another action is recorded so Verify UI can tell the
-    user exactly what changed instead of leaving them to discover it.
-    """
+    """Connect usage tracking and apply only an approved shortcut plan."""
+    global _pending_shortcut_conflicts
     main_window = main_window if main_window is not None else Gui.getMainWindow()
     if main_window is None:
         return False
@@ -887,14 +911,8 @@ def reconcile_actions(main_window=None):
     # PartDesign again -- and all of it on the thread that draws the window.
     actions = main_window.findChildren(_qaction_type())
     by_name = {}
-    by_shortcut = {}
     for action in actions:
-        name = action.objectName()
-        if name:
-            by_name[name] = action
-        held = _portable(action.shortcut().toString())
-        if held:
-            by_shortcut.setdefault(held, []).append(action)
+        by_name.setdefault(_action_locator(action), action)
     adaptive_commands = {
         command
         for workbench in load_manifest().get("adaptivePins", {})
@@ -909,43 +927,168 @@ def reconcile_actions(main_window=None):
         action.triggered.connect(lambda checked=False, name=command: record_usage(name))
 
     if not PREFERENCES.GetBool("SetShortcuts", True):
+        restore_shortcuts(main_window)
         return True
 
-    context = _application_shortcut_context()
-    newly_displaced = []
-    for command, shortcut in SHORTCUTS.items():
-        target = ACTIONS.resolve(command)
-        if target is None:
-            continue
-        wanted = _portable(shortcut)
-        for action in by_shortcut.get(wanted, ()):
-            if action is target:
-                continue
-            action.setShortcut(QtGui.QKeySequence())
-            entry = {
-                "sequence": wanted,
-                "from": action.objectName() or action.text() or "(unnamed action)",
-                "to": command,
-            }
-            if entry not in _displaced_shortcuts:
-                _displaced_shortcuts.append(entry)
-                newly_displaced.append(entry)
-                # Per-shortcut detail stays in the log; Verify UI lists them too.
-                App.Console.PrintLog(
-                    "FMF moved the {} shortcut from {} to {}.\n".format(
-                        entry["sequence"], entry["from"], entry["to"]
-                    )
-                )
-        target.setShortcut(QtGui.QKeySequence(shortcut))
-        target.setShortcutContext(context)
-    if newly_displaced:
+    plan = _shortcut_plan(actions)
+    _pending_shortcut_conflicts = [_conflict_dict(item) for item in plan.conflicts]
+    if plan.conflicts and PREFERENCES.GetString("ShortcutPresetApproval", "") != (
+        _shortcut_plan_fingerprint(plan)
+    ):
         App.Console.PrintMessage(
-            "FMF reassigned {} keyboard shortcut{} from other commands "
-            "(run Verify FMF to see which).\n".format(
-                len(newly_displaced), "" if len(newly_displaced) == 1 else "s"
+            "FMF found {} occupied shortcut{}; use Review FMF Shortcuts to preview them. "
+            "No shortcuts were changed.\n".format(
+                len(plan.conflicts), "" if len(plan.conflicts) == 1 else "s"
             )
         )
+        schedule_status_write()
+        return True
+    _apply_shortcut_plan(plan, by_name)
     return True
+
+
+def _shortcut_plan(actions):
+    records = [
+        {
+            "id": _action_locator(action),
+            "name": action.text() or action.objectName() or "(unnamed action)",
+            "shortcut": _portable(action.shortcut().toString()),
+        }
+        for action in actions
+    ]
+    desired = {command: _portable(sequence) for command, sequence in SHORTCUTS.items()}
+    return plan_shortcuts(desired, records)
+
+
+def _action_locator(action):
+    """Return a restorable identity for native and unnamed Qt actions."""
+    name = action.objectName()
+    if name:
+        return name
+    text = action.text() or "(unnamed action)"
+    return "@text:" + text
+
+
+def _action_map(actions):
+    """Index actions by command ID and by the label fallback used in plans."""
+    result = {}
+    for action in actions:
+        result.setdefault(_action_locator(action), action)
+    return result
+
+
+def _conflict_dict(conflict):
+    return {
+        "sequence": conflict.sequence,
+        "from": conflict.owner_id or conflict.owner_name,
+        "to": conflict.target_id,
+    }
+
+
+def _shortcut_plan_fingerprint(plan):
+    payload = {
+        "assignments": sorted(plan.assignments.items()),
+        "conflicts": [(item.sequence, item.owner_id, item.target_id) for item in plan.conflicts],
+    }
+    return json.dumps(payload, separators=(",", ":"), sort_keys=True)
+
+
+def _apply_shortcut_plan(plan, by_name=None):
+    """Apply one accepted plan and persist its exact pre-change bindings."""
+    global _displaced_shortcuts, _pending_shortcut_conflicts
+    main_window = Gui.getMainWindow()
+    actions = main_window.findChildren(_qaction_type()) if main_window is not None else []
+    by_name = by_name or _action_map(actions)
+    encoded_prior = PREFERENCES.GetString("ShortcutPriorState", "")
+    try:
+        saved_prior = json.loads(encoded_prior) if encoded_prior else {}
+    except (TypeError, ValueError):
+        _record_problem("shortcut restore state was invalid and was rebuilt")
+        saved_prior = {}
+    for locator, shortcut in plan.prior.items():
+        saved_prior.setdefault(locator, shortcut)
+    PREFERENCES.SetString("ShortcutPriorState", json.dumps(saved_prior, sort_keys=True))
+    shortcut_group = App.ParamGet("User parameter:BaseApp/Preferences/Shortcut")
+    displaced = []
+    for conflict in plan.conflicts:
+        owner = by_name.get(conflict.owner_id)
+        if owner is not None:
+            owner.setShortcut(QtGui.QKeySequence())
+        if not conflict.owner_id.startswith("@text:"):
+            shortcut_group.SetString(conflict.owner_id, "")
+        displaced.append(_conflict_dict(conflict))
+    context = _application_shortcut_context()
+    for command, shortcut in plan.assignments.items():
+        target = by_name.get(command) or ACTIONS.resolve(command)
+        if target is None:
+            continue
+        target.setShortcut(QtGui.QKeySequence(shortcut))
+        target.setShortcutContext(context)
+        shortcut_group.SetString(command, shortcut)
+    _displaced_shortcuts = displaced
+    _pending_shortcut_conflicts = []
+    App.saveParameter()
+    schedule_status_write()
+    return True
+
+
+def restore_shortcuts(main_window=None):
+    """Restore the exact live bindings captured before preset acceptance."""
+    global _displaced_shortcuts, _pending_shortcut_conflicts
+    encoded = PREFERENCES.GetString("ShortcutPriorState", "")
+    if not encoded:
+        return False
+    try:
+        prior = json.loads(encoded)
+    except (TypeError, ValueError):
+        _record_problem("shortcut restore state is invalid")
+        return False
+    main_window = main_window if main_window is not None else Gui.getMainWindow()
+    actions = main_window.findChildren(_qaction_type()) if main_window is not None else []
+    by_name = _action_map(actions)
+    shortcut_group = App.ParamGet("User parameter:BaseApp/Preferences/Shortcut")
+    for command, shortcut in prior.items():
+        action = by_name.get(command)
+        if action is not None:
+            action.setShortcut(QtGui.QKeySequence(shortcut))
+        if not command.startswith("@text:"):
+            shortcut_group.SetString(command, shortcut)
+    PREFERENCES.RemString("ShortcutPriorState")
+    PREFERENCES.RemString("ShortcutPresetApproval")
+    _displaced_shortcuts = []
+    _pending_shortcut_conflicts = []
+    App.saveParameter()
+    schedule_status_write()
+    return True
+
+
+def review_shortcuts(confirm=None, main_window=None):
+    """Preview conflicts and apply only after an explicit confirmation."""
+    main_window = main_window if main_window is not None else Gui.getMainWindow()
+    actions = main_window.findChildren(_qaction_type()) if main_window is not None else []
+    plan = _shortcut_plan(actions)
+    lines = [
+        "{}: {} → {}".format(item.sequence, item.owner_name, item.target_id)
+        for item in plan.conflicts
+    ]
+    if confirm is None:
+        text = "Apply the complete FMF shortcut preset?"
+        if lines:
+            text += "\n\nThese occupied bindings will move:\n" + "\n".join(lines)
+        else:
+            text += "\n\nNo occupied bindings were found."
+        answer = QtWidgets.QMessageBox.question(main_window, "Review FMF Shortcuts", text)
+        accepted = answer == QtWidgets.QMessageBox.Yes
+    else:
+        accepted = bool(confirm(lines))
+    if not accepted:
+        return False
+    by_name = _action_map(actions)
+    applied = _apply_shortcut_plan(plan, by_name)
+    if applied:
+        PREFERENCES.SetString("ShortcutPresetApproval", _shortcut_plan_fingerprint(plan))
+        App.saveParameter()
+    return applied
 
 
 # ---------------------------------------------------------------------------
@@ -1008,9 +1151,11 @@ def runtime_service_state(main_window=None):
         "usageActionConnections": sum(
             1 for action in actions if action.property("fmfUsageConnected")
         ),
+        "ribbonActionBindings": bootstrap.ribbon_action_binding_count(),
         "pendingDeferredTasks": sorted(_deferred_tokens),
         "problemCount": len(_problems),
         "displacedShortcutCount": len(_displaced_shortcuts),
+        "pendingShortcutConflictCount": len(_pending_shortcut_conflicts),
     }
 
 
