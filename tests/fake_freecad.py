@@ -27,6 +27,21 @@ class ParameterGroup:
 
     def __init__(self):
         self.values = {"String": {}, "Bool": {}, "Int": {}, "Float": {}, "Unsigned": {}}
+        self.observers = []
+
+    def Attach(self, observer):
+        if observer in self.observers:
+            raise RuntimeError("Object is already attached.")
+        self.observers.append(observer)
+
+    def Detach(self, observer):
+        if observer in self.observers:
+            self.observers.remove(observer)
+
+    def _set(self, kind, key, value):
+        self.values[kind][key] = value
+        for observer in tuple(self.observers):
+            observer.onChange(self, kind, key, str(value))
 
     def __getattr__(self, name):
         if (
@@ -41,7 +56,7 @@ class ParameterGroup:
             return lambda key, default=None: self.values[kind].get(key, default)
         if name.startswith("Set") and name[3:] in self.values:
             kind = name[3:]
-            return lambda key, value: self.values[kind].__setitem__(key, value)
+            return lambda key, value: self._set(kind, key, value)
         if name.startswith("Rem") and name[3:] in self.values:
             kind = name[3:]
             return lambda key: self.values[kind].pop(key, None)

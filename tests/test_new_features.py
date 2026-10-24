@@ -19,6 +19,7 @@ from fake_freecad import (
     FakeConstraint,
     FakeLineSegment,
     FakeSketch,
+    FakeTimer,
 )
 
 
@@ -555,6 +556,34 @@ def test_parameters_dock_observer_and_gap_handling(env):
     # Close document
     obs.slotFinishInvDoc(doc1)
     assert dock.get_bound_document() is None
+
+
+def test_parameters_dock_coalesces_recompute_refreshes_and_skips_unchanged_rows(env):
+    env.install()
+    import fmf_parameters_dock
+
+    doc = env._new_document("Doc")
+    dock = fmf_parameters_dock.show_parameters_dock()
+    sheet = fmf_parameters_dock.get_or_create_parameters_sheet(doc)
+    refreshes = {"count": 0}
+    original = dock.refresh_parameters
+
+    def counted_refresh():
+        refreshes["count"] += 1
+        original()
+
+    dock.refresh_parameters = counted_refresh
+    dock.on_object_recomputed(sheet)
+    dock.on_object_recomputed(sheet)
+
+    assert refreshes["count"] == 0
+    FakeTimer.pump()
+    assert refreshes["count"] == 1
+
+    table = dock.table
+    rows = table._rows
+    dock.refresh_parameters()
+    assert table._rows is rows
 
 
 def test_datum_tools_error_and_rollback_paths(env):

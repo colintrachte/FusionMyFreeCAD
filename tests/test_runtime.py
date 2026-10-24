@@ -258,6 +258,49 @@ def test_usage_tracking_connects_once_per_action(env, runtime):
     assert len(actions["PartDesign_Revolution"].triggered.handlers) == 1
 
 
+def test_deferred_reconciliation_reuses_action_inventory_until_generation_changes(env, runtime):
+    env.main_window.actions = [FakeAction("PartDesign_Pad", "")]
+    real_find = env.main_window.findChildren
+    scans = {"count": 0}
+
+    def find_children(kind):
+        if kind is FakeAction:
+            scans["count"] += 1
+        return real_find(kind)
+
+    env.main_window.findChildren = find_children
+
+    runtime.reconcile_actions()
+    runtime.reconcile_actions()
+    assert scans["count"] == 1
+
+    env.registered_commands.append("Late_Command")
+    runtime.reconcile_actions()
+    assert scans["count"] == 2
+
+
+def test_deleted_cached_action_forces_one_inventory_refresh(env, runtime):
+    class DeletableAction(FakeAction):
+        deleted = False
+
+        def objectName(self):
+            if self.deleted:
+                raise RuntimeError("Internal C++ object already deleted")
+            return super().objectName()
+
+    stale = DeletableAction("PartDesign_Pad", "")
+    env.main_window.actions = [stale]
+    runtime.reconcile_actions()
+
+    replacement = FakeAction("PartDesign_Pad", "")
+    stale.deleted = True
+    env.main_window.actions = [replacement]
+
+    runtime.reconcile_actions()
+
+    assert replacement.shortcut().toString() == "E"
+
+
 # ---------------------------------------------------------------------------
 # Deferral instead of fixed startup delays
 # ---------------------------------------------------------------------------
@@ -533,6 +576,22 @@ def test_refresh_is_idempotent(env, bootstrap, runtime):
     bootstrap.prepare()
     runtime.refresh_adaptive_panel("PartDesignWorkbench")
     assert runtime.refresh_adaptive_panel("PartDesignWorkbench") is False
+
+
+def test_unchanged_refresh_skips_ribbon_json_parsing(env, bootstrap, runtime, monkeypatch):
+    bootstrap.prepare()
+    runtime.refresh_adaptive_panel("PartDesignWorkbench")
+    real_load = runtime.json.load
+    loads = {"count": 0}
+
+    def counted_load(stream):
+        loads["count"] += 1
+        return real_load(stream)
+
+    monkeypatch.setattr(runtime.json, "load", counted_load)
+
+    assert runtime.refresh_adaptive_panel("PartDesignWorkbench") is False
+    assert loads["count"] == 0
 
 
 def test_sketcher_slot_swap_keeps_non_candidates_in_place(env, bootstrap, runtime):

@@ -3633,15 +3633,22 @@ class ModernMenu(RibbonBar):
             # activate selected workbench
             tabName = tabName.replace("&", "")
             if self.wbNameMapping[tabName] is not None:
-                targetWorkbench = self.wbNameMapping[tabName]
-                if Gui.activeWorkbench().name() != targetWorkbench:
-                    # workbenchActivated calls onWbActivated. Calling it again here
-                    # rebuilt menus and walked every toolbar twice per switch.
-                    Gui.activateWorkbench(targetWorkbench)
-                elif tabActivated is True:
-                    # A current-tab click emits no workbenchActivated signal, but it
-                    # still needs the normal visibility synchronization.
-                    self.onWbActivated()
+                Gui.activateWorkbench(self.wbNameMapping[tabName])
+
+            if tabActivated is True:
+                # Do not remove this explicit synchronization as a performance
+                # shortcut. FreeCAD can emit its Sketcher-exit workbench signal
+                # before Ribbon has finished selecting the matching category.
+                self.onWbActivated()
+                self.ApplicationMenus()
+
+        # These calls intentionally repeat work also performed by onWbActivated.
+        # They finish the tab-driven transition after FreeCAD's signal handlers.
+        self.hideClassicToolbars()
+
+        if self.CustomizeEnabled:
+            self.on_Customize_Clicked()
+            self.activateButtons()
 
         # Emit a signal when switching to a new tab. Used to update the "addcommands" panel
         self.TabChanged.emit()
@@ -5977,10 +5984,12 @@ class ModernMenu(RibbonBar):
 
                                     # Get the actions and add them one by one
                                     QuickAction = self.returnCustomDropDown(key, dict=Dict)
+                                    QuickAction = [action for action in QuickAction if len(action) > 0]
+                                    if not QuickAction:
+                                        continue
                                     menu = QMenu()
                                     for action in QuickAction:
-                                        if len(action) > 0:
-                                            menu.addAction(action[0])
+                                        menu.addAction(action[0])
                                     button.setMenu(menu)
                                     # # Set the default action
                                     button.setDefaultAction(QuickAction[0][0])                                

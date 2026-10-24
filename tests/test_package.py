@@ -182,7 +182,7 @@ def test_bundled_ribbon_keeps_non_fmf_workbenches_visible():
     assert "_setFmfChromeVisible(False)" not in method_source
 
 
-def test_bundled_ribbon_workbench_activation_does_not_accumulate_ui_state():
+def test_bundled_ribbon_workbench_activation_preserves_transition_synchronization():
     source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     methods = {
@@ -192,11 +192,11 @@ def test_bundled_ribbon_workbench_activation_does_not_accumulate_ui_state():
         and node.name in {"onUserChangedWorkbench", "onWbActivated", "ApplicationMenus"}
     }
 
-    assert "Gui.activeWorkbench().name() != targetWorkbench" in methods["onUserChangedWorkbench"]
-    assert (
-        "self.onWbActivated()\n                self.ApplicationMenus()"
-        not in methods["onUserChangedWorkbench"]
-    )
+    user_change = methods["onUserChangedWorkbench"]
+    assert "Gui.activateWorkbench(self.wbNameMapping[tabName])" in user_change
+    assert "self.onWbActivated()\n                self.ApplicationMenus()" in user_change
+    assert "self.hideClassicToolbars()" in user_change
+    assert "self.on_Customize_Clicked()" in user_change
     assert "if tooltipStyle not in styleSheet:" in methods["onWbActivated"]
     assert "self._applicationMenu = ApplictionMenu" in methods["ApplicationMenus"]
     assert "self._applicationMenuSignature" in methods["ApplicationMenus"]
@@ -519,6 +519,12 @@ def test_authoritative_ribbon_buttons_use_the_fmf_action_binding_bridge():
     assert "def _fmfBindNativeAction" in source
     assert "fmf_bootstrap.bind_ribbon_button(commandName, button)" in source
     assert "return self._fmfBindNativeAction(CommandName, Button)" in source
+
+
+def test_empty_custom_dropdown_does_not_take_down_the_ribbon():
+    source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
+    assert "QuickAction = [action for action in QuickAction if len(action) > 0]" in source
+    assert "if not QuickAction:\n                                        continue" in source
 
 
 def test_ribbon_surfaces_overflow_commands_at_declared_width_tiers():

@@ -25,6 +25,16 @@
 - **Addon Mod Path:** `%APPDATA%\FreeCAD\v1-1\Mod\FMF` (PowerShell: `$env:APPDATA\FreeCAD\v1-1\Mod\FMF`, Linux: `~/.local/share/FreeCAD/Mod/FMF`)
 - **Local Dev Deploy:** `powershell -ExecutionPolicy Bypass -File .\tools\install-dev.ps1`
 
+## Ribbon Workbench-Transition Guardrail
+- In `FreeCAD-Ribbon/FCBinding.py`, the repeated `onWbActivated()`, `ApplicationMenus()`,
+  `hideClassicToolbars()`, and customization synchronization inside
+  `onUserChangedWorkbench()` are intentional. Do not remove or skip them as a performance
+  optimization. FreeCAD may emit its Sketcher-exit workbench signal before Ribbon finishes
+  selecting the destination category; suppressing the second synchronization pass can merge
+  Sketch and Design panels into one corrupted ribbon tab.
+- Performance work may cache idempotent data used by those calls, but must preserve the full
+  transition sequence and the regression contract in `tests/test_package.py`.
+
 ## Repository Privacy
 - Never commit personal absolute paths, user-profile names, private email addresses, credentials,
   conversation exports, or machine-specific workspace names. Use portable environment variables or

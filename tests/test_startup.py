@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import types
 from pathlib import Path
@@ -479,7 +480,6 @@ def test_preferences_toggle_switches_workbench_families_live(env, bootstrap, mon
     bootstrap.register_owned_workbenches()
     bootstrap.install_activation_monitor()
     preferences.SetBool("Enabled", False)
-    bootstrap.reconcile_activation_preference()
 
     disabled = set(env.param(bootstrap.WORKBENCH_PREFERENCE_ROOT).GetString("Disabled").split(","))
     assert not set(bootstrap.OWNED_TO_NATIVE_WORKBENCH.values()) & disabled
@@ -488,7 +488,6 @@ def test_preferences_toggle_switches_workbench_families_live(env, bootstrap, mon
     assert env.active_workbench == "PartDesignWorkbench"
 
     preferences.SetBool("Enabled", True)
-    bootstrap.reconcile_activation_preference()
 
     disabled = set(env.param(bootstrap.WORKBENCH_PREFERENCE_ROOT).GetString("Disabled").split(","))
     assert set(bootstrap.OWNED_TO_NATIVE_WORKBENCH.values()) <= disabled
@@ -563,9 +562,24 @@ def test_disabled_startup_registers_only_lifecycle_commands(env, bootstrap, monk
         "FMF_Restore",
         "FMF_Verify",
     }
-    assert calls == ["SearchBar", "FreeCAD_Ribbon"]
+    assert calls == []
     assert env.selection_observers == []
     assert env.document_observers == []
+
+
+def test_activation_preference_observer_is_installed_once_and_detached_on_shutdown(env, bootstrap):
+    preferences = env.param(bootstrap.PREFERENCE_ROOT)
+
+    bootstrap.install_activation_monitor()
+    bootstrap.install_activation_monitor()
+
+    assert preferences.observers == [bootstrap._activation_monitor]
+
+    bootstrap.install_lifecycle_guards()
+    env.qtwidgets.QApplication.instance().aboutToQuit.emit()
+
+    assert preferences.observers == []
+    assert bootstrap._activation_monitor is None
 
 
 def test_enabled_ui_validation_keeps_a_visible_ribbon_enabled(env, bootstrap):
@@ -688,6 +702,28 @@ def test_startup_diagnostics_do_not_write_until_flushed(env, bootstrap, monkeypa
     diagnostics.flush_diagnostics()
     assert log_path.is_file()
     assert json.loads(status_path.read_text(encoding="utf-8"))["state"] == "starting"
+
+
+def test_startup_diagnostics_flush_events_as_one_batch(env, bootstrap, monkeypatch, tmp_path):
+    import fmf_common as diagnostics
+
+    log_path = tmp_path / "events.jsonl"
+    monkeypatch.setattr(diagnostics, "DIAGNOSTICS_DIR", str(tmp_path))
+    monkeypatch.setattr(diagnostics, "LOG_PATH", str(log_path))
+    rotations = {"count": 0}
+    monkeypatch.setattr(
+        diagnostics,
+        "_rotate_diagnostics",
+        lambda: rotations.__setitem__("count", rotations["count"] + 1),
+    )
+
+    diagnostics.start_session(True, "1.9.0", ("1", "1", "1"))
+    diagnostics.event("info", "startup", "installation", "completed")
+    diagnostics.flush_diagnostics()
+
+    events = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+    assert rotations["count"] == 1
+    assert [event["operation"] for event in events] == ["session", "installation"]
 
 
 def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher(env, bootstrap):
@@ -977,6 +1013,21 @@ def test_a_failing_runtime_does_not_stop_the_bundled_addons(env, bootstrap, monk
     _run_init_gui(env, bootstrap, monkeypatch, stub_vendors=False)
     assert loaded == ["SearchBar", "FreeCAD_Ribbon"]
     assert [entry["step"] for entry in bootstrap.startup_failures()] == ["runtime"]
+
+
+def test_ribbon_cache_is_scoped_to_fmf_workbenches(env, bootstrap, monkeypatch):
+    loaded = []
+    monkeypatch.delenv(bootstrap.RIBBON_CACHE_WORKBENCHES_ENV, raising=False)
+    monkeypatch.setattr(bootstrap, "prepare", lambda: "unchanged")
+    monkeypatch.setattr(bootstrap, "run_runtime", lambda: None)
+    monkeypatch.setattr(bootstrap, "load_vendor", lambda name, _dir: loaded.append(name))
+
+    bootstrap.enable()
+
+    assert loaded == ["SearchBar", "FreeCAD_Ribbon"]
+    assert os.environ[bootstrap.RIBBON_CACHE_WORKBENCHES_ENV].split(",") == list(
+        bootstrap.OWNED_TO_NATIVE_WORKBENCH.values()
+    )
 
 
 def test_startup_failures_are_cleared_on_a_clean_launch(env, bootstrap, monkeypatch):

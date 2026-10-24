@@ -67,6 +67,7 @@ OWNED_TO_NATIVE_WORKBENCH = {
     "FMFSurfaceWorkbench": "SurfaceWorkbench",
 }
 NATIVE_TO_OWNED_WORKBENCH = {native: owned for owned, native in OWNED_TO_NATIVE_WORKBENCH.items()}
+RIBBON_CACHE_WORKBENCHES_ENV = "FREECAD_RIBBON_CACHE_WORKBENCHES"
 LEGACY_OWNED_WORKBENCH = {
     "FusionDesignWorkbench": "FMFDesignWorkbench",
     "FusionPartWorkbench": "FMFPartWorkbench",
@@ -166,6 +167,7 @@ def _on_about_to_quit():
     """Prevent Qt from persisting FMF's intentionally hidden native toolbars."""
     restore_native_toolbar_visibility()
     dispose_ribbon_action_bindings()
+    uninstall_activation_monitor()
 
 
 def _on_addon_directory_changed(_path=""):
@@ -1405,6 +1407,10 @@ def enable():
     outcome = prepare()
     run_runtime()
     load_vendor("SearchBar", os.path.join(ADDON_ROOT, "bundled-addons", "SearchBar"))
+    # First-run Ribbon cache creation otherwise activates every installed
+    # workbench.  FMF owns four curated contexts; loading unrelated workbenches
+    # here adds large startup cost and can block on third-party workbenches.
+    os.environ[RIBBON_CACHE_WORKBENCHES_ENV] = ",".join(OWNED_TO_NATIVE_WORKBENCH.values())
     load_vendor("FreeCAD_Ribbon", os.path.join(ADDON_ROOT, "bundled-addons", "FreeCAD-Ribbon"))
     active = active_workbench_name()
     replacement = NATIVE_TO_OWNED_WORKBENCH.get(active)
@@ -2262,9 +2268,20 @@ def restore_disabled_native_ui():
     QtCore.QTimer.singleShot(0, restore_and_record)
 
 
+_activation_parameter_group = None
 _activation_monitor = None
 _observed_enabled = None
 _activation_transition = False
+
+
+class _ActivationPreferenceObserver:
+    """Bridge FreeCAD parameter notifications into FMF's activation state machine."""
+
+    def onChange(self, _group, name, *details):
+        # FreeCAD currently reports ``(group, name)`` while older bindings and
+        # the parameter API's documented shape include the value type first.
+        if name == "Enabled" or (details and details[0] == "Enabled"):
+            reconcile_activation_preference()
 
 
 def reconcile_activation_preference():
@@ -2292,17 +2309,27 @@ def reconcile_activation_preference():
 
 
 def install_activation_monitor():
-    """Watch the Preferences checkbox and apply it without restarting FreeCAD."""
-    global _activation_monitor, _observed_enabled
+    """Observe the Preferences checkbox without keeping an idle timer alive."""
+    global _activation_parameter_group, _activation_monitor, _observed_enabled
     if _activation_monitor is not None:
         return
-    from PySide import QtCore
-
     _observed_enabled = is_enabled()
-    _activation_monitor = QtCore.QTimer(Gui.getMainWindow())
-    _activation_monitor.setInterval(250)
-    _activation_monitor.timeout.connect(reconcile_activation_preference)
-    _activation_monitor.start()
+    _activation_parameter_group = App.ParamGet(PREFERENCE_ROOT)
+    _activation_monitor = _ActivationPreferenceObserver()
+    _activation_parameter_group.Attach(_activation_monitor)
+
+
+def uninstall_activation_monitor():
+    """Detach the long-lived parameter observer during application teardown."""
+    global _activation_parameter_group, _activation_monitor
+    if _activation_monitor is None:
+        return
+    try:
+        _activation_parameter_group.Detach(_activation_monitor)
+    except Exception:
+        pass
+    _activation_parameter_group = None
+    _activation_monitor = None
 
 
 def validate_enabled_ui():
@@ -2659,18 +2686,6 @@ def start():
             _startup_step("UI mode synchronization", defer_ui_mode_sync)
             _startup_step("enabled UI validation", validate_enabled_ui)
         else:
-            _startup_step(
-                "SearchBar",
-                load_vendor,
-                "SearchBar",
-                os.path.join(ADDON_ROOT, "bundled-addons", "SearchBar"),
-            )
-            _startup_step(
-                "FreeCAD Ribbon",
-                load_vendor,
-                "FreeCAD_Ribbon",
-                os.path.join(ADDON_ROOT, "bundled-addons", "FreeCAD-Ribbon"),
-            )
             _startup_step("native UI restoration", restore_disabled_native_ui)
     except BaseException as error:
         App.Console.PrintError("FMF startup failed: {}\n".format(error))

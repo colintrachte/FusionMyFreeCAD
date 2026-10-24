@@ -77,18 +77,50 @@ def _write_event(level: str, subsystem: str, operation: str, outcome: str, **det
     try:
         os.makedirs(DIAGNOSTICS_DIR, exist_ok=True)
         _rotate_diagnostics()
-        record = {
-            "at": _diagnostic_time(),
-            "sessionId": SESSION_ID,
-            "level": level,
-            "subsystem": subsystem,
-            "operation": operation,
-            "outcome": outcome,
-            "packageVersion": details.pop("packageVersion", None),
-            "details": details,
-        }
         with open(LOG_PATH, "a", encoding="utf-8") as stream:
-            stream.write(json.dumps(record, default=str, separators=(",", ":")) + "\n")
+            stream.write(
+                json.dumps(
+                    _event_record(level, subsystem, operation, outcome, details),
+                    default=str,
+                    separators=(",", ":"),
+                )
+                + "\n"
+            )
+    except Exception:
+        pass
+
+
+def _event_record(level, subsystem, operation, outcome, details):
+    details = dict(details)
+    return {
+        "at": _diagnostic_time(),
+        "sessionId": SESSION_ID,
+        "level": level,
+        "subsystem": subsystem,
+        "operation": operation,
+        "outcome": outcome,
+        "packageVersion": details.pop("packageVersion", None),
+        "details": details,
+    }
+
+
+def _write_events(records) -> None:
+    """Append a buffered startup event batch with one rotation check and open."""
+    if not records:
+        return
+    try:
+        os.makedirs(DIAGNOSTICS_DIR, exist_ok=True)
+        _rotate_diagnostics()
+        with open(LOG_PATH, "a", encoding="utf-8") as stream:
+            for arguments, details in records:
+                stream.write(
+                    json.dumps(
+                        _event_record(*arguments, details),
+                        default=str,
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                )
     except Exception:
         pass
 
@@ -155,10 +187,9 @@ def flush_diagnostics() -> None:
     records = tuple(_BUFFERED_RECORDS)
     _BUFFERED_RECORDS.clear()
     _BUFFERING = False
+    _write_events([(arguments, details) for kind, arguments, details in records if kind == "event"])
     for kind, arguments, details in records:
-        if kind == "event":
-            _write_event(*arguments, **details)
-        else:
+        if kind == "status":
             _write_status(*arguments, **details)
 
 

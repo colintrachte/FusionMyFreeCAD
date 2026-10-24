@@ -18,14 +18,12 @@ except ImportError:  # pragma: no cover - older FreeCAD bindings
 
 try:
     import fmf_bootstrap as bootstrap
-    from fmf_actions import NativeActionAdapter
     from fmf_catalog import plan_shortcuts
 except ImportError:  # pragma: no cover - executed outside the add-on directory
     _ADDON_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if _ADDON_ROOT not in sys.path:
         sys.path.insert(0, _ADDON_ROOT)
     import fmf_bootstrap as bootstrap
-    from fmf_actions import NativeActionAdapter
     from fmf_catalog import plan_shortcuts
 
 
@@ -78,6 +76,9 @@ _pending_shortcut_conflicts = []
 _last_workbench = ""
 _task_accept_filter = None
 _deferred_tokens = {}
+_action_inventory_cache = {}
+_usage_action_connections = 0
+_adaptive_refresh_fingerprints = {}
 
 
 def _record_problem(text):
@@ -92,7 +93,14 @@ def _qaction_type():
     return getattr(QtGui, "QAction", None) or QtWidgets.QAction
 
 
-ACTIONS = NativeActionAdapter(Gui, _qaction_type())
+def _action_inventory(main_window, force=False):
+    """Return a cached QAction population for the active command generation."""
+    command_generation = tuple(sorted(Gui.listCommands()))
+    key = (id(main_window), _last_workbench, command_generation)
+    if force or key not in _action_inventory_cache:
+        _action_inventory_cache.clear()
+        _action_inventory_cache[key] = tuple(main_window.findChildren(_qaction_type()))
+    return _action_inventory_cache[key]
 
 
 def _application_shortcut_context():
@@ -767,6 +775,17 @@ def adaptive_selection(workbench):
     }
 
 
+def _adaptive_refresh_fingerprint(workbench):
+    """Describe the inputs that can change an adaptive ribbon projection."""
+    stat = os.stat(RIBBON_PATH)
+    selections = adaptive_selection(workbench)
+    return (
+        stat.st_mtime_ns,
+        stat.st_size,
+        tuple((panel, tuple(commands)) for panel, commands in sorted(selections.items())),
+    )
+
+
 def _rewrite_slots(ribbon, workbench, panel_name, group, promoted):
     """Permute adaptive candidates inside the slots they already occupy."""
     toolbar = ribbon["workbenches"][workbench]["toolbars"][panel_name]
@@ -857,6 +876,9 @@ def refresh_adaptive_panel(workbench):
     if not groups or not os.path.isfile(RIBBON_PATH):
         return False
     try:
+        fingerprint = _adaptive_refresh_fingerprint(workbench)
+        if _adaptive_refresh_fingerprints.get(workbench) == fingerprint:
+            return False
         with open(RIBBON_PATH, encoding="utf-8") as stream:
             ribbon = json.load(stream)
         changed = False
@@ -876,6 +898,7 @@ def refresh_adaptive_panel(workbench):
                 rewritten = _rewrite_slots(ribbon, workbench, panel_name, group, promoted)
             changed = rewritten or changed
         if not changed:
+            _adaptive_refresh_fingerprints[workbench] = _adaptive_refresh_fingerprint(workbench)
             return False
         temporary = RIBBON_PATH + ".tmp"
         with open(temporary, "w", encoding="utf-8") as stream:
@@ -884,6 +907,7 @@ def refresh_adaptive_panel(workbench):
         # Keep the recorded digest current so a future mismatch means a genuine
         # edit from outside the add-on rather than our own adaptive rewrite.
         bootstrap.update_ribbon_hash()
+        _adaptive_refresh_fingerprints[workbench] = _adaptive_refresh_fingerprint(workbench)
         # Housekeeping, not something the user acts on -- keep it in the log only.
         App.Console.PrintLog(
             "FMF updated FREQUENT for {}; it appears on the next ribbon reload.\n".format(workbench)
@@ -901,7 +925,8 @@ def refresh_adaptive_panel(workbench):
 
 def reconcile_actions(main_window=None):
     """Connect usage tracking and apply only an approved shortcut plan."""
-    global _pending_shortcut_conflicts
+    global _pending_shortcut_conflicts, _usage_action_connections
+    explicit_window = main_window is not None
     main_window = main_window if main_window is not None else Gui.getMainWindow()
     if main_window is None:
         return False
@@ -909,10 +934,14 @@ def reconcile_actions(main_window=None):
     # meant thirteen sweeps of a tree with thousands of actions in it, twice
     # per sketch -- entering an edit activates Sketcher and leaving activates
     # PartDesign again -- and all of it on the thread that draws the window.
-    actions = main_window.findChildren(_qaction_type())
-    by_name = {}
-    for action in actions:
-        by_name.setdefault(_action_locator(action), action)
+    actions = _action_inventory(main_window, force=explicit_window)
+    try:
+        by_name = _action_map(actions)
+    except RuntimeError:
+        # Ribbon rebuilds can delete QAction wrappers without changing FreeCAD's
+        # command registry. Refresh only when a cached wrapper proves stale.
+        actions = _action_inventory(main_window, force=True)
+        by_name = _action_map(actions)
     adaptive_commands = {
         command
         for workbench in load_manifest().get("adaptivePins", {})
@@ -925,6 +954,7 @@ def reconcile_actions(main_window=None):
             continue
         action.setProperty("fmfUsageConnected", True)
         action.triggered.connect(lambda checked=False, name=command: record_usage(name))
+        _usage_action_connections += 1
 
     if not PREFERENCES.GetBool("SetShortcuts", True):
         restore_shortcuts(main_window)
@@ -996,9 +1026,10 @@ def _shortcut_plan_fingerprint(plan):
 def _apply_shortcut_plan(plan, by_name=None):
     """Apply one accepted plan and persist its exact pre-change bindings."""
     global _displaced_shortcuts, _pending_shortcut_conflicts
-    main_window = Gui.getMainWindow()
-    actions = main_window.findChildren(_qaction_type()) if main_window is not None else []
-    by_name = by_name or _action_map(actions)
+    if by_name is None:
+        main_window = Gui.getMainWindow()
+        actions = main_window.findChildren(_qaction_type()) if main_window is not None else []
+        by_name = _action_map(actions)
     encoded_prior = PREFERENCES.GetString("ShortcutPriorState", "")
     try:
         saved_prior = json.loads(encoded_prior) if encoded_prior else {}
@@ -1019,7 +1050,7 @@ def _apply_shortcut_plan(plan, by_name=None):
         displaced.append(_conflict_dict(conflict))
     context = _application_shortcut_context()
     for command, shortcut in plan.assignments.items():
-        target = by_name.get(command) or ACTIONS.resolve(command)
+        target = by_name.get(command)
         if target is None:
             continue
         target.setShortcut(QtGui.QKeySequence(shortcut))
@@ -1139,18 +1170,19 @@ def schedule_status_write(delay=750):
     QtCore.QTimer.singleShot(delay, write_runtime_status)
 
 
-def runtime_service_state(main_window=None):
+def runtime_service_state(main_window=None, deep=False):
     """Return observable ownership state for every long-lived runtime service."""
     main_window = main_window if main_window is not None else Gui.getMainWindow()
-    actions = main_window.findChildren(_qaction_type()) if main_window is not None else ()
+    usage_connections = _usage_action_connections
+    if deep and main_window is not None:
+        actions = main_window.findChildren(_qaction_type())
+        usage_connections = sum(1 for action in actions if action.property("fmfUsageConnected"))
     return {
         "workbenchSignalConnected": bool(
             main_window is not None and getattr(main_window, "_fmf_my_freecad_connected", False)
         ),
         "taskAcceptFilterInstalled": _task_accept_filter is not None,
-        "usageActionConnections": sum(
-            1 for action in actions if action.property("fmfUsageConnected")
-        ),
+        "usageActionConnections": usage_connections,
         "ribbonActionBindings": bootstrap.ribbon_action_binding_count(),
         "pendingDeferredTasks": sorted(_deferred_tokens),
         "problemCount": len(_problems),
@@ -1223,6 +1255,7 @@ def uninstall():
     """Disconnect live services so disabling FMF takes effect before restart."""
     global _task_accept_filter
     _deferred_tokens.clear()
+    _action_inventory_cache.clear()
     main_window = Gui.getMainWindow()
     if main_window is not None and getattr(main_window, "_fmf_my_freecad_connected", False):
         try:

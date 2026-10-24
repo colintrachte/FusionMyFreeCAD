@@ -108,6 +108,8 @@ if QtWidgets is not None:
             super().__init__("Parameters", parent)
             self.setObjectName("FMF_ParametersDock")
             self._updating = False
+            self._refresh_pending = False
+            self._last_rows = None
             active_doc = getattr(App, "ActiveDocument", None)
             self._bound_doc_name: str | None = (
                 getattr(active_doc, "Name", None) if active_doc else None
@@ -191,6 +193,8 @@ if QtWidgets is not None:
         def bind_to_document(self, doc):
             """Bind dock to a document and refresh rows."""
             new_name = getattr(doc, "Name", None) if doc else None
+            if new_name != self._bound_doc_name:
+                self._last_rows = None
             self._bound_doc_name = new_name
             self._update_title()
             self.refresh_parameters()
@@ -218,58 +222,87 @@ if QtWidgets is not None:
             )("Spreadsheet::Sheet"):
                 bound_doc = self.get_bound_document()
                 if bound_doc and obj in getattr(bound_doc, "Objects", []):
+                    self.schedule_refresh()
+
+        def schedule_refresh(self):
+            """Coalesce spreadsheet recompute bursts into one visible-dock refresh."""
+            if self._refresh_pending or not self.isVisible():
+                return
+            self._refresh_pending = True
+
+            def refresh_once():
+                self._refresh_pending = False
+                if self.isVisible():
                     self.refresh_parameters()
+
+            QtCore.QTimer.singleShot(0, refresh_once)
 
         def refresh_parameters(self):
             """Populate table from bound document's Parameters sheet with gap tolerance."""
+            self._refresh_pending = False
             doc = self.get_bound_document()
             self._update_title()
             if doc is None:
-                self.table.setRowCount(0)
+                if self._last_rows != ():
+                    self.table.setRowCount(0)
+                    self._last_rows = ()
                 return
 
             sheet = get_or_create_parameters_sheet(doc)
             if sheet is None:
-                self.table.setRowCount(0)
+                if self._last_rows != ():
+                    self.table.setRowCount(0)
+                    self._last_rows = ()
+                return
+
+            rows = []
+            max_empty_streak = 5
+            empty_streak = 0
+            row_sheet = 2
+            max_scan_row = 200
+            while row_sheet <= max_scan_row and empty_streak < max_empty_streak:
+                name_val = getattr(sheet, "get", lambda c: None)(f"A{row_sheet}")
+                if name_val is not None and str(name_val).strip():
+                    empty_streak = 0
+                    rows.append(
+                        (
+                            row_sheet,
+                            str(name_val),
+                            str(getattr(sheet, "get", lambda c: None)(f"B{row_sheet}") or ""),
+                            str(getattr(sheet, "get", lambda c: None)(f"C{row_sheet}") or ""),
+                        )
+                    )
+                else:
+                    empty_streak += 1
+                row_sheet += 1
+            rows = tuple(rows)
+            if rows == self._last_rows:
                 return
 
             self._updating = True
             try:
                 self.table.setRowCount(0)
-                max_empty_streak = 5
-                empty_streak = 0
-                row_sheet = 2
-                max_scan_row = 200
+                for row_sheet, name_val, expr_val, notes_val in rows:
+                    r = self.table.rowCount()
+                    self.table.insertRow(r)
 
-                while row_sheet <= max_scan_row and empty_streak < max_empty_streak:
-                    name_val = getattr(sheet, "get", lambda c: None)(f"A{row_sheet}")
-                    if name_val is not None and str(name_val).strip():
-                        empty_streak = 0
-                        expr_val = getattr(sheet, "get", lambda c: None)(f"B{row_sheet}") or ""
-                        notes_val = getattr(sheet, "get", lambda c: None)(f"C{row_sheet}") or ""
+                    name_item = QtWidgets.QTableWidgetItem(name_val)
+                    name_item.setData(QtCore.Qt.UserRole, row_sheet)
+                    self.table.setItem(r, 0, name_item)
 
-                        r = self.table.rowCount()
-                        self.table.insertRow(r)
+                    expr_item = QtWidgets.QTableWidgetItem(expr_val)
+                    expr_item.setData(QtCore.Qt.UserRole, row_sheet)
+                    self.table.setItem(r, 1, expr_item)
 
-                        name_item = QtWidgets.QTableWidgetItem(str(name_val))
-                        name_item.setData(QtCore.Qt.UserRole, row_sheet)
-                        self.table.setItem(r, 0, name_item)
+                    eval_item = QtWidgets.QTableWidgetItem(expr_val)
+                    eval_item.setFlags(eval_item.flags() & ~QtCore.Qt.ItemIsEditable)
+                    eval_item.setData(QtCore.Qt.UserRole, row_sheet)
+                    self.table.setItem(r, 2, eval_item)
 
-                        expr_item = QtWidgets.QTableWidgetItem(str(expr_val))
-                        expr_item.setData(QtCore.Qt.UserRole, row_sheet)
-                        self.table.setItem(r, 1, expr_item)
-
-                        eval_item = QtWidgets.QTableWidgetItem(str(expr_val))
-                        eval_item.setFlags(eval_item.flags() & ~QtCore.Qt.ItemIsEditable)
-                        eval_item.setData(QtCore.Qt.UserRole, row_sheet)
-                        self.table.setItem(r, 2, eval_item)
-
-                        notes_item = QtWidgets.QTableWidgetItem(str(notes_val))
-                        notes_item.setData(QtCore.Qt.UserRole, row_sheet)
-                        self.table.setItem(r, 3, notes_item)
-                    else:
-                        empty_streak += 1
-                    row_sheet += 1
+                    notes_item = QtWidgets.QTableWidgetItem(notes_val)
+                    notes_item.setData(QtCore.Qt.UserRole, row_sheet)
+                    self.table.setItem(r, 3, notes_item)
+                self._last_rows = rows
             finally:
                 self._updating = False
 

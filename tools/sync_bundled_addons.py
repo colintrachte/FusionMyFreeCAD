@@ -422,6 +422,26 @@ FCBINDING_ACTIVATE_PATCH = (
     ),
 )
 
+# A dropdown can legitimately resolve to no native actions while FreeCAD is still
+# loading a workbench. Upstream indexes the empty result and takes down the whole
+# ribbon; FMF omits that unavailable button and lets the next rebuild discover it.
+FCBINDING_EMPTY_DROPDOWN_PATCH = (
+    (
+        "                                    QuickAction = self.returnCustomDropDown(key, dict=Dict)\n"
+        "                                    menu = QMenu()\n"
+        "                                    for action in QuickAction:\n"
+        "                                        if len(action) > 0:\n"
+        "                                            menu.addAction(action[0])\n",
+        "                                    QuickAction = self.returnCustomDropDown(key, dict=Dict)\n"
+        "                                    QuickAction = [action for action in QuickAction if len(action) > 0]\n"
+        "                                    if not QuickAction:\n"
+        "                                        continue\n"
+        "                                    menu = QMenu()\n"
+        "                                    for action in QuickAction:\n"
+        "                                        menu.addAction(action[0])\n",
+    ),
+)
+
 FCBINDING_WORKBENCH_FAMILY_PATCH = (
     (
         "    def onWbActivated(self):        \n"
@@ -451,29 +471,12 @@ FCBINDING_WORKBENCH_FAMILY_PATCH = (
 
 # Workbench activation used to grow two pieces of Qt state without bound: it
 # appended another tooltip rule to the tab stylesheet and replaced the
-# application button's menu with a newly allocated child menu. A ribbon tab
-# change also called the workbench-activation handler after FreeCAD had already
-# emitted workbenchActivated. Keep these lifecycle fixes when refreshing the
-# vendored Ribbon sources.
+# application button's menu with a newly allocated child menu. Keep those safe
+# lifecycle fixes when refreshing the vendored Ribbon sources. Do not suppress
+# the apparent duplicate onWbActivated/ApplicationMenus/toolbar synchronization
+# in onUserChangedWorkbench: FreeCAD's Sketcher-exit signal can precede Ribbon's
+# category selection, and removing that second pass merges two workbench panels.
 FCBINDING_UI_LATENCY_PATCH = (
-    (
-        "            if self.wbNameMapping[tabName] is not None:                \n"
-        "                Gui.activateWorkbench(self.wbNameMapping[tabName])\n"
-        "\n"
-        "            if tabActivated is True:\n"
-        "                self.onWbActivated()\n"
-        "                self.ApplicationMenus()           \n",
-        "            if self.wbNameMapping[tabName] is not None:\n"
-        "                targetWorkbench = self.wbNameMapping[tabName]\n"
-        "                if Gui.activeWorkbench().name() != targetWorkbench:\n"
-        "                    # workbenchActivated calls onWbActivated. Calling it again here\n"
-        "                    # rebuilt menus and walked every toolbar twice per switch.\n"
-        "                    Gui.activateWorkbench(targetWorkbench)\n"
-        "                elif tabActivated is True:\n"
-        "                    # A current-tab click emits no workbenchActivated signal, but it\n"
-        "                    # still needs the normal visibility synchronization.\n"
-        "                    self.onWbActivated()\n",
-    ),
     (
         "        styleSheet = self.tabBar().styleSheet()\n"
         '        self.tabBar().setStyleSheet(styleSheet + """\\n QToolTip {\n'
@@ -493,20 +496,6 @@ FCBINDING_UI_LATENCY_PATCH = (
         "        # Repeated copies force Qt to reparse and repolish an ever-growing sheet.\n"
         "        if tooltipStyle not in styleSheet:\n"
         "            self.tabBar().setStyleSheet(styleSheet + tooltipStyle)\n",
-    ),
-    (
-        "        # hide normal toolbars\n"
-        "        self.hideClassicToolbars()\n"
-        "        \n"
-        "        if self.CustomizeEnabled:\n"
-        "            self.on_Customize_Clicked()\n"
-        "            # Activate all commands\n"
-        "            self.activateButtons()\n"
-        "        \n"
-        '        # Emit a signal when switching to a new tab. Used to update the "addcommands" panel\n'
-        "        self.TabChanged.emit()\n",
-        '        # Emit a signal when switching to a new tab. Used to update the "addcommands" panel\n'
-        "        self.TabChanged.emit()\n",
     ),
     (
         "    def ApplicationMenus(self):\n"
@@ -1800,6 +1789,7 @@ LOCAL_PATCHES = (
         + FCBINDING_DIVIDER_PATCH
         + FCBINDING_OVERFLOW_PATCH
         + FCBINDING_ACTIVATE_PATCH
+        + FCBINDING_EMPTY_DROPDOWN_PATCH
         + FCBINDING_WORKBENCH_FAMILY_PATCH
         + FCBINDING_UI_LATENCY_PATCH,
     ),
