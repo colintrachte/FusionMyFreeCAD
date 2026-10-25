@@ -358,6 +358,10 @@ FMF_OWNED_FILES = (
     ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "fmf_layout_math.py"),
     ("FreeCAD-Ribbon", "Resources", "packages", "pyqtribbon_local", "fmf_widgets.py"),
     ("FreeCAD-Ribbon", "fmf_ribbon_support.py"),
+    *(
+        ("FreeCAD-Ribbon", "Resources", "FreeCAD Icons", "{}.svg".format(name))
+        for name in sorted(authored_icon_names())
+    ),
 )
 
 # Hooks into upstream's own modules for the draggable panel dividers. The widget
@@ -445,15 +449,13 @@ FCBINDING_EMPTY_DROPDOWN_PATCH = (
 FCBINDING_WORKBENCH_FAMILY_PATCH = (
     (
         "    def onWbActivated(self):        \n"
-        "        if not self._fmfAuthoritativeWorkbenchActive():\n"
-        "            self._setFmfChromeVisible(False)\n"
-        "            return\n"
-        "        self._setFmfChromeVisible(True)\n",
+        '        if len(mw.findChildren(QDockWidget, "Ribbon")) > 0:\n',
         "    def onWbActivated(self):        \n"
         "        # The Ribbon is the application chrome for every workbench. FMF only\n"
         "        # owns the layouts of its four namespaced workbenches; selecting a stock\n"
         "        # or unrelated workbench must never blank the entire Ribbon.\n"
-        "        self._setFmfChromeVisible(True)\n",
+        "        self._setFmfChromeVisible(True)\n"
+        '        if len(mw.findChildren(QDockWidget, "Ribbon")) > 0:\n',
     ),
     (
         "                    replacedPanel = self.currentCategory().replacePanel(objPanel, newPanel)\n",
@@ -477,6 +479,24 @@ FCBINDING_WORKBENCH_FAMILY_PATCH = (
 # in onUserChangedWorkbench: FreeCAD's Sketcher-exit signal can precede Ribbon's
 # category selection, and removing that second pass merges two workbench panels.
 FCBINDING_UI_LATENCY_PATCH = (
+    (
+        "            if tabActivated is True:\n"
+        "                self.onWbActivated()\n"
+        "                self.ApplicationMenus()           \n"
+        "        \n"
+        "        # hide normal toolbars\n",
+        "            if tabActivated is True:\n"
+        "                self.onWbActivated()\n"
+        "                self.ApplicationMenus()\n"
+        "\n"
+        "        # Do not remove this second synchronization pass as a performance\n"
+        "        # shortcut. FreeCAD can emit its Sketcher-exit workbench signal before\n"
+        "        # Ribbon has finished selecting the matching destination category.\n"
+        "        self.onWbActivated()\n"
+        "        self.ApplicationMenus()\n"
+        "\n"
+        "        # hide normal toolbars\n",
+    ),
     (
         "        styleSheet = self.tabBar().styleSheet()\n"
         '        self.tabBar().setStyleSheet(styleSheet + """\\n QToolTip {\n'
@@ -522,6 +542,277 @@ FCBINDING_UI_LATENCY_PATCH = (
         "        else:\n"
         "            ApplictionMenu.clear()\n"
         "        self._applicationMenuSignature = menuSignature\n",
+    ),
+)
+
+# Focus changes must not mutate top-level window or dock structure. Those writes
+# force Windows/Qt relayout work every time the user returns to FreeCAD.
+FCBINDING_FOCUS_PATCH = (
+    (
+        "        if event.type() == QEvent.Type.WindowActivate or event.type() == QEvent.Type.WindowDeactivate:\n"
+        "            mw = Gui.getMainWindow()\n"
+        '            DockWidget_Ribbon: QDockWidget = mw.findChild(QDockWidget, "Ribbon")\n'
+        "            if DockWidget_Ribbon is not None:\n"
+        '                RibbonBar: ModernMenu = mw.findChild(ModernMenu, "Ribbon")\n'
+        "                if DockWidget_Ribbon.isFloating() is False:\n"
+        "                    try:\n"
+        "                        DockWidget_Ribbon.setTitleBarWidget(QWidget())\n"
+        "                    except Exception:\n"
+        "                        pass       \n",
+        "",
+    ),
+    (
+        "        if event.type() == QEvent.Type.ApplicationActivated:\n"
+        "            mw = Gui.getMainWindow()\n"
+        "            mw.setWindowState(Qt.WindowState.WindowMaximized)\n"
+        "            Style = mw.style()\n"
+        '            RibbonBar: ModernMenu = mw.findChild(ModernMenu, "Ribbon")\n'
+        "            RestoreButton: QToolButton = RibbonBar.rightToolBar().findChildren(\n"
+        '                QToolButton, "RestoreButton"\n'
+        "            )[0]\n"
+        "            try:\n"
+        "                RestoreButton.setIcon(\n"
+        "                    Style.standardIcon(QStyle.StandardPixmap.SP_TitleBarNormalButton)\n"
+        "                )\n"
+        "            except Exception:\n"
+        "                pass\n"
+        "                                            \n"
+        "            return QObject.eventFilter(self, obj, event)\n",
+        "",
+    ),
+)
+
+
+FCBINDING_HOST_ISOLATION_PATCH = (
+    (
+        "            if self.wbNameMapping[tabName] is not None:                \n",
+        "            if self.wbNameMapping[tabName] is not None:\n",
+    ),
+    (
+        "        self.hideClassicToolbars()\n        \n        if self.CustomizeEnabled:\n",
+        "        self.hideClassicToolbars()\n\n        if self.CustomizeEnabled:\n",
+        2,
+    ),
+    (
+        "            self.activateButtons()\n"
+        "        \n"
+        '        # Emit a signal when switching to a new tab. Used to update the "addcommands" panel\n',
+        "            self.activateButtons()\n"
+        "\n"
+        '        # Emit a signal when switching to a new tab. Used to update the "addcommands" panel\n',
+    ),
+    (
+        "        self.CreateMenus()  # Create the menus\n"
+        "        self.createModernMenu()  # Create the ribbon\n",
+        "        self.CreateMenus()  # Create the menus\n"
+        "        self._fmfBuildingMenu = True\n"
+        "        self.createModernMenu()  # Create the ribbon\n"
+        "        self._fmfBuildingMenu = False\n",
+    ),
+    (
+        "    def onUserChangedWorkbench(self, tabActivated=True):\n"
+        '        """\n'
+        "        Import selected workbench toolbars to ModernMenu section.\n"
+        '        """                \n',
+        "    def onUserChangedWorkbench(self, tabActivated=True):\n"
+        '        """\n'
+        "        Import selected workbench toolbars to ModernMenu section.\n"
+        '        """                \n'
+        '        if getattr(self, "_fmfBuildingMenu", False):\n'
+        "            return\n",
+    ),
+    (
+        "            LatestVersion = StandardFunctions.ReturnXML_Value_Git(\n"
+        "                User=User, Repository=Repo, Branch=Branch, File=File, ElementName=ElementName, attribKey=attribKey, attribValue=attribValue, host=host\n"
+        "            )\n",
+        "            # FMF delegates updates to FreeCAD's Addon Manager. Never put DNS,\n"
+        "            # proxy, TLS, or repository availability on GUI-thread startup.\n"
+        "            LatestVersion = None\n",
+    ),
+    (
+        "        for Wb in self.WBtoLoadFirst:\n",
+        '        for Wb in ([] if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES") else self.WBtoLoadFirst):\n',
+    ),
+    (
+        '                            and CommandItem[1] != "Standard"\n'
+        "                        ):\n"
+        "                            # Activate the workbench if not loaded\n",
+        '                            and CommandItem[1] != "Standard"\n'
+        '                            and not os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES")\n'
+        "                        ):\n"
+        "                            # Activate the workbench if not loaded\n",
+        1,
+    ),
+    (
+        '                        and CommandItem[1] != "Standard"\n'
+        "                    ):\n"
+        "                        # Activate the workbench if not loaded\n",
+        '                        and CommandItem[1] != "Standard"\n'
+        '                        and not os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES")\n'
+        "                    ):\n"
+        "                        # Activate the workbench if not loaded\n",
+        1,
+    ),
+    (
+        "    def CreateButtonFromCommand(self, CommandName: str, ActivateWorkBench = True, Dict=ribbonStructure):\n"
+        '        if CommandName.endswith("_ddb") is False:\n',
+        "    def CreateButtonFromCommand(self, CommandName: str, ActivateWorkBench = True, Dict=ribbonStructure):\n"
+        '        if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES"):\n'
+        "            ActivateWorkBench = False\n"
+        '        if CommandName.endswith("_ddb") is False:\n',
+    ),
+    (
+        "                    ActivateWorkbench = True,\n"
+        "                    ):\n"
+        "\n"
+        "        if UpdateDict is True:\n",
+        "                    ActivateWorkbench = True,\n"
+        "                    ):\n"
+        "\n"
+        '        if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES"):\n'
+        "            ActivateWorkbench = False\n"
+        "\n"
+        "        if UpdateDict is True:\n",
+    ),
+    (
+        "                if len(QuickAction) == 0:\n",
+        '                if len(QuickAction) == 0 and not os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES"):\n',
+    ),
+)
+
+
+FCBINDING_ACTION_BINDING_PATCH = (
+    (
+        "    def onUserChangedWorkbench(self, tabActivated=True):\n",
+        "    def _fmfAuthoritativeWorkbenchActive(self):\n"
+        "        enabled = App.ParamGet(\n"
+        '            "User parameter:BaseApp/Preferences/Mod/FMF"\n'
+        '        ).GetBool("Enabled", True)\n'
+        "        if not enabled:\n"
+        "            return False\n"
+        "        try:\n"
+        "            active = Gui.activeWorkbench().name()\n"
+        "        except Exception:\n"
+        "            return False\n"
+        '        return active in self.ribbonStructure.get("authoritativeWorkbenches", [])\n'
+        "\n"
+        "    def _fmfBindNativeAction(self, commandName, button):\n"
+        '        """Attach FMF lifecycle tracking without replacing QAction invocation."""\n'
+        "        if button is None or not self._fmfAuthoritativeWorkbenchActive():\n"
+        "            return button\n"
+        "        try:\n"
+        "            import fmf_bootstrap\n"
+        "\n"
+        "            fmf_bootstrap.bind_ribbon_button(commandName, button)\n"
+        "        except (ImportError, AttributeError, RuntimeError, TypeError) as error:\n"
+        "            if Parameters.DEBUG_MODE is True:\n"
+        "                StandardFunctions.Print(\n"
+        '                    "FMF action binding failed for {}: {}".format(commandName, error),\n'
+        '                    "Warning",\n'
+        "                )\n"
+        "        return button\n"
+        "\n"
+        "    def _setFmfChromeVisible(self, visible):\n"
+        '        """Keep the vendored ribbon scoped to FMF-owned workbenches."""\n'
+        '        dock = mw.findChild(QDockWidget, "Ribbon")\n'
+        "        if dock is not None:\n"
+        "            dock.setVisible(visible)\n"
+        "        mw.menuBar().setVisible(not visible)\n"
+        "\n"
+        "    def onUserChangedWorkbench(self, tabActivated=True):\n",
+    ),
+    (
+        "                    return Button\n\n"
+        "                # If the command is None, it is probally a command from a FreeCAD dropdow button.\n",
+        "                    return self._fmfBindNativeAction(CommandName, Button)\n\n"
+        "                # If the command is None, it is probally a command from a FreeCAD dropdow button.\n",
+    ),
+    (
+        "                                                        return Button\n"
+        "                    \n"
+        "            except Exception as e:\n",
+        "                                                        return self._fmfBindNativeAction(\n"
+        "                                                            CommandName, Button\n"
+        "                                                        )\n"
+        "                    \n"
+        "            except Exception as e:\n",
+    ),
+    (
+        "                return Button\n            except Exception as e:\n",
+        "                return self._fmfBindNativeAction(CommandName, Button)\n"
+        "            except Exception as e:\n",
+    ),
+)
+
+
+SEARCHBAR_DISCOVERY_PATCH = (
+    (
+        "    activeWorkbench = Gui.activeWorkbench().name()\n\n",
+        "    activeWorkbench = Gui.activeWorkbench().name()\n\n"
+        '    if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES"):\n'
+        '        print("SearchBox: using commands already registered by FreeCAD; workbenches were not activated for discovery.")\n'
+        "        return\n\n",
+    ),
+)
+
+
+SEARCHBAR_EVENT_FILTER_PATCH = (
+    (
+        "tbr = None\n",
+        "tbr = None\n"
+        "_event_filter = None\n"
+        "_event_filter_targets = []\n"
+        "_workbench_signal_connected = False\n",
+    ),
+    (
+        "        global wax, sea, tbr, ChangeDialogLoaded\n",
+        "        global wax, sea, tbr, ChangeDialogLoaded, _event_filter\n",
+    ),
+    (
+        "                mw.installEventFilter(EventInspector_SB(mw))\n"
+        "                mw.centralWidget().installEventFilter(EventInspector_SB(mw))\n"
+        "                vp.installEventFilter(EventInspector_SB(mw))\n"
+        "                for child in vp.children():\n"
+        "                    child.installEventFilter(EventInspector_SB(mw))\n",
+        "                if _event_filter is None:\n"
+        "                    _event_filter = EventInspector_SB(mw)\n"
+        "                for target in (mw, mw.centralWidget(), vp, *vp.children()):\n"
+        "                    if target not in _event_filter_targets:\n"
+        "                        target.installEventFilter(_event_filter)\n"
+        "                        _event_filter_targets.append(target)\n",
+    ),
+    (
+        "SearchBar.addToolSearchBox()\n"
+        "Gui.getMainWindow().workbenchActivated.connect(SearchBar.addToolSearchBox)\n",
+        "def install():\n"
+        '    """Install one shared event filter and one workbench callback."""\n'
+        "    global _workbench_signal_connected\n"
+        "    SearchBar.addToolSearchBox()\n"
+        "    if not _workbench_signal_connected:\n"
+        "        Gui.getMainWindow().workbenchActivated.connect(SearchBar.addToolSearchBox)\n"
+        "        _workbench_signal_connected = True\n"
+        "\n\n"
+        "def uninstall():\n"
+        '    """Release SearchBar\'s long-lived callbacks and event filters."""\n'
+        "    global _event_filter, _workbench_signal_connected\n"
+        "    main_window = Gui.getMainWindow()\n"
+        "    if _workbench_signal_connected:\n"
+        "        try:\n"
+        "            main_window.workbenchActivated.disconnect(SearchBar.addToolSearchBox)\n"
+        "        except Exception:\n"
+        "            pass\n"
+        "        _workbench_signal_connected = False\n"
+        "    if _event_filter is not None:\n"
+        "        for target in tuple(_event_filter_targets):\n"
+        "            try:\n"
+        "                target.removeEventFilter(_event_filter)\n"
+        "            except RuntimeError:\n"
+        "                pass\n"
+        "        _event_filter_targets.clear()\n"
+        "        _event_filter.deleteLater()\n"
+        "        _event_filter = None\n"
+        "\n\n"
+        "install()\n",
     ),
 )
 
@@ -748,6 +1039,68 @@ CUSTOM_WIDGETS_DRAG_PATCH = (
 # needs, reporting to the console, instead of putting modal questions behind the
 # splash screen where they cannot be seen or dismissed.
 CACHE_FUNCTIONS_PATCH = (
+    (
+        "    if HideOnly is False:\n"
+        "        activeWorkbench = Gui.activeWorkbench().name()\n"
+        "        progressBar.show()\n",
+        "    if HideOnly is False:\n        progressBar.show()\n",
+    ),
+    (
+        "        WorkBench = Gui.getWorkbench(List_Workbenches[i][0])\n"
+        "        WorkBenchName = List_Workbenches[i][0]\n"
+        "        # Get the toolbar items\n"
+        "        ToolbarItems: dict = WorkBench.getToolbarItems()\n",
+        "        WorkBenchName = List_Workbenches[i][0]\n"
+        "        # Reuse the toolbar items captured above. Asking Python-defined\n"
+        "        # workbenches again can require FreeCAD's private __Workbench__.\n"
+        "        ToolbarItems: dict = List_Workbenches[i][3]\n",
+    ),
+    (
+        "            wbToolbars = Gui.getWorkbench(WorkBench[0]).listToolbars()\n",
+        "            wbToolbars = returnWorkBenchToolbars(WorkBench[0])\n",
+    ),
+    (
+        "    except Exception:\n"
+        "        Gui.activateWorkbench(WorkBenchName)\n"
+        "        wbToolbars: list = Gui.getWorkbench(WorkBenchName).listToolbars()\n"
+        "    return wbToolbars\n",
+        "    except Exception:\n"
+        "        try:\n"
+        "            wbToolbars = list(Gui.getWorkbench(WorkBenchName).listToolbars())\n"
+        "        except Exception:\n"
+        "            wbToolbars = []\n"
+        "    return wbToolbars\n",
+    ),
+    (
+        "    except Exception:\n"
+        "        Gui.activateWorkbench(WorkBenchName)\n"
+        "        Toolbars = Gui.getWorkbench(WorkBenchName).getToolbarItems()\n"
+        "        return Toolbars\n",
+        "    except Exception:\n"
+        "        try:\n"
+        "            return Gui.getWorkbench(WorkBenchName).getToolbarItems()\n"
+        "        except Exception:\n"
+        "            return {}\n",
+    ),
+    (
+        "        progressBar.show()\n"
+        "        lst = Gui.listWorkbenches()\n"
+        "        progressBar.setMaximum(len(lst) - 1 + maximum)\n",
+        "        progressBar.show()\n"
+        "        lst = Gui.listWorkbenches()\n"
+        '        if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES"):\n'
+        "            # FMF supplies curated manifests. Cache generation may inspect what\n"
+        "            # FreeCAD has already registered, but it must not activate workbenches\n"
+        "            # as a discovery mechanism: activation initializes unrelated host and\n"
+        "            # third-party code and emits user-visible transition signals.\n"
+        "            progressBar.setMaximum(maximum)\n"
+        "            progressBar.setValue(maximum)\n"
+        '            if FinishMessage != "":\n'
+        "                print(FinishMessage)\n"
+        "            return\n"
+        "        activeWorkbench = Gui.activeWorkbench().name()\n"
+        "        progressBar.setMaximum(len(lst) - 1 + maximum)\n",
+    ),
     (
         "import Serialize_Ribbon\n"
         "import webbrowser\n"
@@ -986,6 +1339,20 @@ STANDARD_FUNCTIONS_COLOUR_PATCH = (
         "def CompareIcons(icon1: QIcon, icon2: QIcon):\n"
         '    icon1 = Gui.getIcon("Std_OnlineHelp")\n'
         "    return (icon1.pixmap(icon1.actualSize(QSize(16,16))).toImage() == icon2.pixmap(icon2.actualSize(QSize(16,16))).toImage())\n",
+    ),
+)
+
+
+# FreeCAD's development command Part_PickCurveNet advertises the placeholder
+# pixmap "Test1", which does not exist and produces a warning during cache
+# inspection. Use a real upstream Part icon with the closest visual meaning.
+STANDARD_FUNCTIONS_ICON_PATCH = (
+    (
+        "            # Sketcher\n",
+        '            if CommandName == "Part_PickCurveNet":\n'
+        '                CommandInfo["pixmap"] = "Part_Spline_Parametric.svg"\n'
+        "\n"
+        "            # Sketcher\n",
     ),
 )
 
@@ -1278,6 +1645,17 @@ FCBINDING_INTEGRATION_PATCH = (
         "        width = mw.width()\n"
         "        return max(threshold for threshold in thresholds if width >= threshold)\n"
         "\n"
+        "    def _fmfReplacePanel(self, category, panel, replacement):\n"
+        '        """Replace one panel without leaving stale aliases in the category."""\n'
+        "        category.replaceWidget(panel, replacement)\n"
+        "        for key, candidate in list(category._panels.items()):\n"
+        "            if candidate is panel:\n"
+        "                category._panels.pop(key, None)\n"
+        "        category._panels[replacement.objectName()] = replacement\n"
+        "        panel.close()\n"
+        "        panel.deleteLater()\n"
+        "        return replacement\n"
+        "\n"
         "    def _rebuildResponsivePanels(self):\n"
         '        """Rebuild only width-aware panels after the window crosses a size tier."""\n'
         "        self._responsiveRebuildPending = False\n"
@@ -1306,10 +1684,8 @@ FCBINDING_INTEGRATION_PATCH = (
         "            )\n"
         "            if replacement is None:\n"
         "                continue\n"
-        "            category.replacePanel(panel, replacement)\n"
-        "            category._panels[replacement.title()] = replacement\n"
+        "            self._fmfReplacePanel(category, panel, replacement)\n"
         "            self.setPanelProperties(replacement)\n"
-        "            panel.close()\n"
         "\n"
         "    def resizeEvent(self, event):\n"
         "        super().resizeEvent(event)\n"
@@ -1471,10 +1847,8 @@ FCBINDING_INTEGRATION_PATCH = (
         "                enableSeparator=False,\n"
         "                ActivateButtons=True,\n"
         "            )\n"
-        "            self.currentCategory().replacePanel(panel, replacement)\n"
+        "            self._fmfReplacePanel(self.currentCategory(), panel, replacement)\n"
         "            self.setPanelProperties(replacement)\n"
-        "            self.currentCategory()._panels[replacement.objectName()] = replacement\n"
-        "            panel.close()\n"
         "            App.Console.PrintMessage(\n"
         '                "FMF reset the {} panel.\\n".format(replacement.title())\n'
         "            )\n"
@@ -1776,6 +2150,14 @@ LOCAL_PATCHES = (
         SEARCH_BOX_FMF_PATCH,
     ),
     (
+        ("SearchBar", "InitGui.py"),
+        SEARCHBAR_EVENT_FILTER_PATCH,
+    ),
+    (
+        ("SearchBar", "RefreshTools.py"),
+        SEARCHBAR_DISCOVERY_PATCH,
+    ),
+    (
         ("SearchBar", "ResultsToolbar.py"),
         SEARCH_RESULTS_COMMAND_ID_PATCH,
     ),
@@ -1791,7 +2173,10 @@ LOCAL_PATCHES = (
         + FCBINDING_ACTIVATE_PATCH
         + FCBINDING_EMPTY_DROPDOWN_PATCH
         + FCBINDING_WORKBENCH_FAMILY_PATCH
-        + FCBINDING_UI_LATENCY_PATCH,
+        + FCBINDING_UI_LATENCY_PATCH
+        + FCBINDING_FOCUS_PATCH
+        + FCBINDING_HOST_ISOLATION_PATCH
+        + FCBINDING_ACTION_BINDING_PATCH,
     ),
     (
         ("FreeCAD-Ribbon", "CustomWidgets.py"),
@@ -1803,7 +2188,7 @@ LOCAL_PATCHES = (
     ),
     (
         ("FreeCAD-Ribbon", "Standard_Functions_Ribbon.py"),
-        STANDARD_FUNCTIONS_COLOUR_PATCH,
+        STANDARD_FUNCTIONS_COLOUR_PATCH + STANDARD_FUNCTIONS_ICON_PATCH,
     ),
     (
         ("FreeCAD-Ribbon", "Parameters_Ribbon.py"),

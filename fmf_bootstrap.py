@@ -167,6 +167,7 @@ def _on_about_to_quit():
     """Prevent Qt from persisting FMF's intentionally hidden native toolbars."""
     restore_native_toolbar_visibility()
     dispose_ribbon_action_bindings()
+    _set_searchbar_service(False)
     uninstall_activation_monitor()
 
 
@@ -1398,6 +1399,19 @@ def defer_ui_mode_sync():
     QtCore.QTimer.singleShot(0, sync_ui_mode_to_active_workbench)
 
 
+def _set_searchbar_service(enabled):
+    """Start or stop the already-loaded bundled SearchBar services."""
+    module = sys.modules.get("_fmf_vendor_SearchBar")
+    callback = getattr(module, "install" if enabled else "uninstall", None)
+    if callback is not None:
+        callback()
+
+
+def _configure_ribbon_cache_scope():
+    """Keep Ribbon cache initialization inside FMF's curated workbenches."""
+    os.environ[RIBBON_CACHE_WORKBENCHES_ENV] = ",".join(OWNED_TO_NATIVE_WORKBENCH.values())
+
+
 def enable():
     """Enable FMF persistently and prepare its state for the next launch."""
     App.ParamGet(PREFERENCE_ROOT).SetBool("Enabled", True)
@@ -1407,10 +1421,11 @@ def enable():
     outcome = prepare()
     run_runtime()
     load_vendor("SearchBar", os.path.join(ADDON_ROOT, "bundled-addons", "SearchBar"))
+    _set_searchbar_service(True)
     # First-run Ribbon cache creation otherwise activates every installed
     # workbench.  FMF owns four curated contexts; loading unrelated workbenches
     # here adds large startup cost and can block on third-party workbenches.
-    os.environ[RIBBON_CACHE_WORKBENCHES_ENV] = ",".join(OWNED_TO_NATIVE_WORKBENCH.values())
+    _configure_ribbon_cache_scope()
     load_vendor("FreeCAD_Ribbon", os.path.join(ADDON_ROOT, "bundled-addons", "FreeCAD-Ribbon"))
     active = active_workbench_name()
     replacement = NATIVE_TO_OWNED_WORKBENCH.get(active)
@@ -1435,6 +1450,7 @@ def disable():
     preferences = App.ParamGet(PREFERENCE_ROOT)
     preferences.RemString("AppliedVersion")
     preferences.SetBool("Enabled", False)
+    _set_searchbar_service(False)
     dispose_ribbon_action_bindings()
     set_owned_workbench_visibility(False)
     sync_start_workbench(False)
@@ -1569,7 +1585,7 @@ def reapply():
 class DisableCommand:
     def GetResources(self):
         return {
-            "Pixmap": "Std_DlgCustomize",
+            "Pixmap": "applications-accessories",
             "MenuText": "Disable FMF",
             "ToolTip": "Disable FMF and return to the previous FreeCAD UI",
         }
@@ -1627,7 +1643,7 @@ class EnableCommand:
 class ReviewShortcutsCommand:
     def GetResources(self):
         return {
-            "Pixmap": "Std_DlgCustomize",
+            "Pixmap": "applications-accessories",
             "MenuText": "Review FMF Shortcuts",
             "ToolTip": "Preview occupied keys before applying the FMF shortcut preset",
         }
@@ -1785,6 +1801,18 @@ class _SketchEditWorkbenchObserver:
         self._transition_serial = 0
 
     def slotInEdit(self, view_provider):
+        def install_task_filter():
+            runtime = sys.modules.get("_fmf_my_freecad_runtime")
+            if runtime is not None and hasattr(runtime, "install_task_accept_filter"):
+                runtime.install_task_accept_filter()
+
+        try:
+            from PySide import QtCore
+
+            QtCore.QTimer.singleShot(0, install_task_filter)
+        except ImportError:
+            install_task_filter()
+
         obj = getattr(view_provider, "Object", None)
         if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
             return
@@ -2677,6 +2705,8 @@ def start():
                 "SearchBar",
                 os.path.join(ADDON_ROOT, "bundled-addons", "SearchBar"),
             )
+            _startup_step("SearchBar services", _set_searchbar_service, True)
+            _configure_ribbon_cache_scope()
             _startup_step(
                 "FreeCAD Ribbon",
                 load_vendor,

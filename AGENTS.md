@@ -34,6 +34,34 @@
   Sketch and Design panels into one corrupted ribbon tab.
 - Performance work may cache idempotent data used by those calls, but must preserve the full
   transition sequence and the regression contract in `tests/test_package.py`.
+- Responsive and reset-driven panel replacement must remove every dictionary entry that still
+  points to the old panel, then register the replacement by `objectName()`. Do not combine
+  `replacePanel()` with a second `_panels[...]` assignment: FMF panel display titles and object
+  names differ, so that pattern accumulates stale aliases and eventually renders duplicate panels.
+
+## Focus and Event-Filter Performance Guardrail
+- Ribbon focus handlers must not call `setWindowState()`, replace a dock title-bar widget, rebuild
+  panels, or otherwise mutate window structure on `ApplicationActivated`, `WindowActivate`, or
+  `WindowDeactivate`. Update window-state-dependent icons only from actual `WindowStateChange`.
+- SearchBar must retain one shared `EventInspector_SB`, install it at most once per watched object,
+  connect `workbenchActivated` once, and provide teardown for disable and shutdown. Never construct
+  an event filter inline inside a workbench-activation callback.
+- Preserve the structural contracts in `tests/test_package.py`. After changing Ribbon focus or
+  SearchBar lifecycle code, also run `tools/probe_focus_performance.py` in the built FreeCAD source
+  environment. The accepted baseline is one SearchBar filter, zero filters added by repeated
+  installation, zero focus-time title-bar replacements, and sub-2 ms p95 handler time.
+
+## FreeCAD Host-Isolation Guardrail
+- FMF startup and Ribbon cache generation must not activate native workbenches to discover
+  commands, perform network requests, or install event filters on `QApplication`. Keep task-panel
+  Enter handling scoped to the Tasks widget subtree.
+- Ribbon construction must suppress tab-change callbacks until all categories exist. Programmatic
+  tab insertion is not a user workbench choice and must never activate the tab's workbench.
+- Python-defined FMF workbenches do not expose FreeCAD's private `__Workbench__` field. Cache code
+  must reuse public data already collected and tolerate unavailable toolbar APIs.
+- Every FMF command `Pixmap` must name a real Qt/FreeCAD icon or an existing file. Preserve
+  authored icons during vendor sync and run `tools/probe_host_isolation.py` after changes to
+  startup, workbench discovery, Ribbon construction, event filters, or command icons.
 
 ## Repository Privacy
 - Never commit personal absolute paths, user-profile names, private email addresses, credentials,

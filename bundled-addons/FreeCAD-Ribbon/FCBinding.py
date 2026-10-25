@@ -604,6 +604,7 @@ class ModernMenu(RibbonBar):
                             CommandItem[1] != "General"
                             and CommandItem[1] != "Global"
                             and CommandItem[1] != "Standard"
+                            and not os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES")
                         ):
                             # Activate the workbench if not loaded
                             Gui.activateWorkbench(CommandItem[1])
@@ -624,6 +625,7 @@ class ModernMenu(RibbonBar):
                         CommandItem[1] != "General"
                         and CommandItem[1] != "Global"
                         and CommandItem[1] != "Standard"
+                        and not os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES")
                     ):
                         # Activate the workbench if not loaded
                         Gui.activateWorkbench(CommandItem[1])
@@ -649,9 +651,9 @@ class ModernMenu(RibbonBar):
             attribValue = ""
             # host: str ="https://codeberg.org"
             host = "https://github.com"
-            LatestVersion = StandardFunctions.ReturnXML_Value_Git(
-                User=User, Repository=Repo, Branch=Branch, File=File, ElementName=ElementName, attribKey=attribKey, attribValue=attribValue, host=host
-            )
+            # FMF delegates updates to FreeCAD's Addon Manager. Never put DNS,
+            # proxy, TLS, or repository availability on GUI-thread startup.
+            LatestVersion = None
             print(translate("FreeCAD Ribbon", "Ribbon UI: Latest released version: ") + str(LatestVersion))
             # Get the current version
             PackageXML = os.path.join(os.path.dirname(__file__), "package.xml")
@@ -686,7 +688,9 @@ class ModernMenu(RibbonBar):
 
         # Create the ribbon
         self.CreateMenus()  # Create the menus
+        self._fmfBuildingMenu = True
         self.createModernMenu()  # Create the ribbon
+        self._fmfBuildingMenu = False
         
         # Set the custom stylesheet
         self.StyleSheet = Path(Parameters.STYLESHEET).read_text()
@@ -1109,7 +1113,7 @@ class ModernMenu(RibbonBar):
         self.FoldRibbon()
         
         # Activate some WB's first to ensure proper loading of the panels
-        for Wb in self.WBtoLoadFirst:
+        for Wb in ([] if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES") else self.WBtoLoadFirst):
             try:
                 Gui.activateWorkbench(Wb)
                 self.isWbLoaded[Wb] = True
@@ -1184,6 +1188,17 @@ class ModernMenu(RibbonBar):
         width = mw.width()
         return max(threshold for threshold in thresholds if width >= threshold)
 
+    def _fmfReplacePanel(self, category, panel, replacement):
+        """Replace one panel without leaving stale aliases in the category."""
+        category.replaceWidget(panel, replacement)
+        for key, candidate in list(category._panels.items()):
+            if candidate is panel:
+                category._panels.pop(key, None)
+        category._panels[replacement.objectName()] = replacement
+        panel.close()
+        panel.deleteLater()
+        return replacement
+
     def _rebuildResponsivePanels(self):
         """Rebuild only width-aware panels after the window crosses a size tier."""
         self._responsiveRebuildPending = False
@@ -1212,10 +1227,8 @@ class ModernMenu(RibbonBar):
             )
             if replacement is None:
                 continue
-            category.replacePanel(panel, replacement)
-            category._panels[replacement.title()] = replacement
+            self._fmfReplacePanel(category, panel, replacement)
             self.setPanelProperties(replacement)
-            panel.close()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -2770,10 +2783,8 @@ class ModernMenu(RibbonBar):
                 enableSeparator=False,
                 ActivateButtons=True,
             )
-            self.currentCategory().replacePanel(panel, replacement)
+            self._fmfReplacePanel(self.currentCategory(), panel, replacement)
             self.setPanelProperties(replacement)
-            self.currentCategory()._panels[replacement.objectName()] = replacement
-            panel.close()
             App.Console.PrintMessage(
                 "FMF reset the {} panel.\n".format(replacement.title())
             )
@@ -3620,6 +3631,8 @@ class ModernMenu(RibbonBar):
         """
         Import selected workbench toolbars to ModernMenu section.
         """                
+        if getattr(self, "_fmfBuildingMenu", False):
+            return
         if len(mw.findChildren(QDockWidget, "Ribbon")) > 0:
             if Parameters.AUTOHIDE_RIBBON is False:
                 self.UnfoldRibbon()
@@ -3636,18 +3649,21 @@ class ModernMenu(RibbonBar):
                 Gui.activateWorkbench(self.wbNameMapping[tabName])
 
             if tabActivated is True:
-                # Do not remove this explicit synchronization as a performance
-                # shortcut. FreeCAD can emit its Sketcher-exit workbench signal
-                # before Ribbon has finished selecting the matching category.
                 self.onWbActivated()
                 self.ApplicationMenus()
 
-        # These calls intentionally repeat work also performed by onWbActivated.
-        # They finish the tab-driven transition after FreeCAD's signal handlers.
+        # Do not remove this second synchronization pass as a performance
+        # shortcut. FreeCAD can emit its Sketcher-exit workbench signal before
+        # Ribbon has finished selecting the matching destination category.
+        self.onWbActivated()
+        self.ApplicationMenus()
+
+        # hide normal toolbars
         self.hideClassicToolbars()
 
         if self.CustomizeEnabled:
             self.on_Customize_Clicked()
+            # Activate all commands
             self.activateButtons()
 
         # Emit a signal when switching to a new tab. Used to update the "addcommands" panel
@@ -3741,7 +3757,7 @@ class ModernMenu(RibbonBar):
         
         # hide normal toolbars
         self.hideClassicToolbars()
-        
+
         if self.CustomizeEnabled:
             self.on_Customize_Clicked()
             # If not activated, activate all buttons    
@@ -5258,6 +5274,8 @@ class ModernMenu(RibbonBar):
         return ButtonList
 
     def CreateButtonFromCommand(self, CommandName: str, ActivateWorkBench = True, Dict=ribbonStructure):
+        if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES"):
+            ActivateWorkBench = False
         if CommandName.endswith("_ddb") is False:
             try:            
                 # Activate the workbench, the command belongs to. Otherwise, the command wont be created later
@@ -5869,6 +5887,9 @@ class ModernMenu(RibbonBar):
                     ActivateButtons = False,
                     ActivateWorkbench = True,
                     ):
+
+        if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES"):
+            ActivateWorkbench = False
 
         if UpdateDict is True:
             Standard_Functions_Ribbon.add_keys_nested_dict(Dict, ["workbenches", workbenchName, "toolbars"], 1, True)
@@ -7336,7 +7357,7 @@ class ModernMenu(RibbonBar):
                 # Check if the workbench is loaded. If not, actions will be an empty list
                 # Find the command its workbench and activate it
                 QuickAction = Gui.Command.get(commandName).getAction()
-                if len(QuickAction) == 0:
+                if len(QuickAction) == 0 and not os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES"):
                     for CommandItem in self.List_Commands:
                         if CommandItem[0] == commandName and CommandItem[3] not in self.isWbLoaded:
                             Gui.activateWorkbench(CommandItem[3])
@@ -7806,38 +7827,12 @@ class EventInspector(QObject):
             except Exception:
                 return False
         
-        if event.type() == QEvent.Type.WindowActivate or event.type() == QEvent.Type.WindowDeactivate:
-            mw = Gui.getMainWindow()
-            DockWidget_Ribbon: QDockWidget = mw.findChild(QDockWidget, "Ribbon")
-            if DockWidget_Ribbon is not None:
-                RibbonBar: ModernMenu = mw.findChild(ModernMenu, "Ribbon")
-                if DockWidget_Ribbon.isFloating() is False:
-                    try:
-                        DockWidget_Ribbon.setTitleBarWidget(QWidget())
-                    except Exception:
-                        pass       
         if event.type() == QEvent.Type.Close:
             OverlayParam_Top = App.ParamGet("User parameter:BaseApp/MainWindow/DockWindows/OverlayTop")
             String = OverlayParam_Top.GetString("Widgets")
             Parameters_Ribbon.Settings.SetStringSetting("StoredOverlayState", String)
             App.saveParameter()                           
             
-        if event.type() == QEvent.Type.ApplicationActivated:
-            mw = Gui.getMainWindow()
-            mw.setWindowState(Qt.WindowState.WindowMaximized)
-            Style = mw.style()
-            RibbonBar: ModernMenu = mw.findChild(ModernMenu, "Ribbon")
-            RestoreButton: QToolButton = RibbonBar.rightToolBar().findChildren(
-                QToolButton, "RestoreButton"
-            )[0]
-            try:
-                RestoreButton.setIcon(
-                    Style.standardIcon(QStyle.StandardPixmap.SP_TitleBarNormalButton)
-                )
-            except Exception:
-                pass
-                                            
-            return QObject.eventFilter(self, obj, event)
         # This is a workaround for windows
         # If the window state changes and the titlebar is hidden, catch the event
         if (event.type() == QEvent.Type.WindowStateChange or event.type() == QEvent.Type.DragMove) and Parameters.HIDE_TITLEBAR_FC is True:            

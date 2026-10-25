@@ -14,6 +14,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from fmf_common import RUNTIME_MODULES  # noqa: E402
+from tools.check_ribbon_transition_contract import (  # noqa: E402
+    validate as validate_ribbon_transition,
+)
 
 PACKAGE_NAME = "FMF"
 PACKAGE_METADATA_FILES = (
@@ -41,6 +44,9 @@ def package_version() -> str:
 
 
 def package_sources() -> list[Path]:
+    # A dev install builds this archive. Refuse to package the known Sketcher-exit
+    # corruption even when the caller skipped the test suite.
+    validate_ribbon_transition()
     paths = [ROOT / relative for relative in PACKAGE_FILES]
     for relative in PACKAGE_DIRECTORIES:
         directory = ROOT / relative

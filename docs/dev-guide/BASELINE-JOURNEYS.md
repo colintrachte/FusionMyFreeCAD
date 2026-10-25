@@ -31,8 +31,11 @@ Set `FREECAD_USER_HOME`, `FREECAD_USER_DATA`, and `FREECAD_USER_TEMP` to an isol
 also pass isolated `--user-cfg` and `--system-cfg` paths. Add this repository with `-M` only when
 the test intentionally loads FMF. For native-FreeCAD control measurements, pass
 `--disable-addon FMF`. On the checked source build, prepend the Pixi environment,
-`Library/bin`, and `Scripts` to `PATH` and set `QT_PLUGIN_PATH` to
-`Library/lib/qt6/plugins` before launching.
+`Library/mingw-w64/bin`, `Library/usr/bin`, `Library/bin`, `Scripts`, and `bin` to `PATH`.
+Set `QT_PLUGIN_PATH` to `Library/lib/qt6/plugins` and `QML2_IMPORT_PATH` to
+`Library/lib/qt6/qml` before launching. Missing those paths can produce the misleading startup
+error that no Qt platform plugin could be initialized; that is a source-build launcher failure,
+not FMF behavior.
 
 The checked-in live evidence was captured from source build `26.3.0devR47870` at revision
 `a61ee58c265ca735e1ddbd2df0a9ca78574b5284`. The isolated native-action probe toggled
@@ -46,10 +49,36 @@ machine-readable result is `tests/fixtures/freecad-coincident-command.json`. A h
 the rendered FMF button remains required because a hidden startup script cannot establish whether
 the visible ribbon button is wired to the same native command after the UI settles.
 
-Fresh-profile FMF startup also exposed a benchmark risk: FreeCAD Ribbon's first-run command-cache
-generation stalled while switching to `CAMWorkbench` in a hidden run. Do not count that launch as
-a successful startup measurement. Repeat it visibly or pre-seed the cache before recording startup
-timings, and retain the log as diagnostic evidence rather than silently timing out.
+### Host-isolation regression probe
+
+Run `tools/probe_host_isolation.py` from a fresh isolated profile in which FMF is installed but
+disabled, then enable FMF through the probe. Set `FMF_HOST_ISOLATION_OUTPUT` under `ai_poop/`.
+The JSON verdict fails if startup reaches the network, activates a workbench other than the
+intentional native-to-FMF replacement, or installs the task-accept filter on `QApplication`.
+
+Also inspect the FreeCAD log for `Cannot find icon`, `cache generation failed`, `Traceback`, and Qt
+platform-plugin errors. A passing host-isolation JSON verdict does not conceal those independent
+startup failures. On the source-build baseline, first-run Ribbon cache generation completes without
+activating CAM or any other discovery workbench.
+
+### Focus-performance regression probe
+
+Run `tools/probe_focus_performance.py` inside the same isolated source-build environment after any
+change to Ribbon event handling, SearchBar installation, or workbench lifecycle. Set
+`FMF_FOCUS_PROBE_OUTPUT` to a path under `ai_poop/`; the script shows the real Qt main window,
+starts FMF if necessary, writes JSON, and requests application shutdown.
+
+The probe fails its JSON verdict unless all structural and timing gates hold:
+
+- exactly one retained SearchBar event filter after startup;
+- ten repeated SearchBar installations add zero filters;
+- twenty simulated focus cycles replace zero title-bar widgets; and
+- application-activation and focus-pair p95 handler time remain below 2 ms.
+
+The source-build `FreeCADCmd` GUI harness can return a Windows access-violation code during Qt
+teardown even after writing a passing result. Treat the JSON verdict as handler evidence and the
+process exit as a separate harness defect; visible normal-GUI focus switching remains the final
+interaction check.
 
 ## Manual sign-off record
 

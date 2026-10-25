@@ -194,7 +194,11 @@ def test_bundled_ribbon_workbench_activation_preserves_transition_synchronizatio
 
     user_change = methods["onUserChangedWorkbench"]
     assert "Gui.activateWorkbench(self.wbNameMapping[tabName])" in user_change
-    assert "self.onWbActivated()\n                self.ApplicationMenus()" in user_change
+    assert user_change.count("self.onWbActivated()") == 2
+    assert user_change.count("self.ApplicationMenus()") == 2
+    second_sync = user_change.rindex("self.onWbActivated()")
+    assert second_sync < user_change.index("self.hideClassicToolbars()")
+    assert second_sync < user_change.index("self.on_Customize_Clicked()")
     assert "self.hideClassicToolbars()" in user_change
     assert "self.on_Customize_Clicked()" in user_change
     assert "if tooltipStyle not in styleSheet:" in methods["onWbActivated"]
@@ -503,6 +507,37 @@ def test_ribbon_startup_cache_check_shows_no_modal_dialog():
     )
 
 
+def test_bundled_startup_does_not_check_vendor_updates_over_the_network():
+    source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
+    assert "LatestVersion = None" in source
+    assert "LatestVersion = StandardFunctions.ReturnXML_Value_Git(" not in source
+
+
+def test_fmf_cache_discovery_does_not_activate_workbenches():
+    ribbon = (BUNDLED / "FreeCAD-Ribbon" / "CacheFunctions.py").read_text("utf-8")
+    search = (BUNDLED / "SearchBar" / "RefreshTools.py").read_text("utf-8")
+    binding = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
+
+    isolated_branch = ribbon.index('if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES")')
+    active_lookup = ribbon.index("activeWorkbench = Gui.activeWorkbench().name()", isolated_branch)
+    assert isolated_branch < ribbon.index("            return", isolated_branch) < active_lookup
+    assert "wbToolbars = returnWorkBenchToolbars(WorkBench[0])" in ribbon
+    assert "ToolbarItems: dict = List_Workbenches[i][3]" in ribbon
+    assert "using commands already registered by FreeCAD" in search
+    assert '[] if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES")' in binding
+    assert binding.count('and not os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES")') >= 3
+    assert "ActivateWorkBench = False" in binding
+    assert "ActivateWorkbench = False" in binding
+    assert 'getattr(self, "_fmfBuildingMenu", False)' in binding
+    assert "\n        Gui.activateWorkbench(WorkBenchName)\n" not in ribbon
+
+
+def test_ribbon_cache_corrects_freecad_development_placeholder_icon():
+    source = (BUNDLED / "FreeCAD-Ribbon" / "Standard_Functions_Ribbon.py").read_text("utf-8")
+    assert 'if CommandName == "Part_PickCurveNet":' in source
+    assert 'CommandInfo["pixmap"] = "Part_Spline_Parametric.svg"' in source
+
+
 def test_ribbon_dialogs_keep_a_close_button():
     source = (BUNDLED / "FreeCAD-Ribbon" / "CacheFunctions.py").read_text("utf-8")
     assert "WindowCloseButtonHint, True" in source
@@ -538,6 +573,55 @@ def test_ribbon_surfaces_overflow_commands_at_declared_width_tiers():
     assert 'Dict.get("authoritativeWorkbenches", [])' in source
 
 
+def test_responsive_panel_rebuild_does_not_accumulate_stale_panel_aliases():
+    source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
+    tree = ast.parse(source)
+    methods = {
+        node.name: ast.get_source_segment(source, node)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef)
+        and node.name in {"_fmfReplacePanel", "_rebuildResponsivePanels", "_resetOnePanel"}
+    }
+
+    replacement = methods["_fmfReplacePanel"]
+    assert "if candidate is panel:" in replacement
+    assert "category._panels.pop(key, None)" in replacement
+    assert "category._panels[replacement.objectName()] = replacement" in replacement
+    assert "panel.deleteLater()" in replacement
+    assert (
+        "self._fmfReplacePanel(category, panel, replacement)" in methods["_rebuildResponsivePanels"]
+    )
+    assert (
+        "self._fmfReplacePanel(self.currentCategory(), panel, replacement)"
+        in methods["_resetOnePanel"]
+    )
+    assert "category._panels[replacement.title()]" not in source
+
+
+def test_ribbon_transition_contract_rejects_the_known_regressions():
+    from tools.check_ribbon_transition_contract import validate
+
+    source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
+    validate(source)
+
+    missing_second_pass = source.replace(
+        "        self.onWbActivated()\n        self.ApplicationMenus()\n\n"
+        "        # hide normal toolbars\n",
+        "        # hide normal toolbars\n",
+        1,
+    )
+    with pytest.raises(RuntimeError, match="both onWbActivated"):
+        validate(missing_second_pass)
+
+    stale_alias = source.replace(
+        "category._panels[replacement.objectName()] = replacement",
+        "category._panels[replacement.title()] = replacement",
+        1,
+    )
+    with pytest.raises(RuntimeError, match="stale aliases"):
+        validate(stale_alias)
+
+
 def test_ribbon_buttons_use_direct_drag_with_the_platform_threshold():
     widgets = (BUNDLED / "FreeCAD-Ribbon" / "CustomWidgets.py").read_text("utf-8")
     binding = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
@@ -566,6 +650,54 @@ def test_searchbar_startup_is_non_interactive():
     ]
     assert dialog_calls == [], "the SearchBar changelog dialog must stay suppressed"
     assert 'SetBoolSetting("ShowChangeDialog", False)' in source
+
+
+def test_searchbar_event_filters_are_idempotent_and_uninstallable():
+    source = (BUNDLED / "SearchBar" / "InitGui.py").read_text("utf-8")
+    assert "installEventFilter(EventInspector_SB(mw))" not in source
+    assert source.count("_event_filter = EventInspector_SB(mw)") == 1
+    assert "target.installEventFilter(_event_filter)" in source
+    assert "target not in _event_filter_targets" in source
+    assert "def uninstall():" in source
+    assert "target.removeEventFilter(_event_filter)" in source
+
+
+def test_ribbon_focus_events_do_not_mutate_window_or_dock_structure():
+    source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
+    tree = ast.parse(source)
+    event_inspector = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "EventInspector"
+    )
+    method = next(
+        node
+        for node in event_inspector.body
+        if isinstance(node, ast.FunctionDef) and node.name == "eventFilter"
+    )
+    method_source = ast.get_source_segment(source, method)
+    assert "QEvent.Type.ApplicationActivated" not in method_source
+    assert "QEvent.Type.WindowActivate" not in method_source
+    assert "QEvent.Type.WindowDeactivate" not in method_source
+
+
+def test_checked_source_build_focus_baseline_meets_regression_gates():
+    fixture = json.loads(
+        (ROOT / "tests" / "fixtures" / "freecad-focus-performance.json").read_text("utf-8")
+    )
+    after = fixture["after"]
+
+    assert after["searchBarFilters"] == 1
+    assert after["filtersAddedByTenInstalls"] == 0
+    assert after["titleBarReplacements"] == 0
+    assert after["applicationActivatedP95Ms"] < 2.0
+    assert after["focusPairP95Ms"] < 2.0
+
+    probe = (ROOT / "tools" / "probe_focus_performance.py").read_text("utf-8")
+    assert "P95_LIMIT_MS = 2.0" in probe
+    assert '"singleSearchBarFilter"' in probe
+    assert '"idempotentSearchBarInstall"' in probe
+    assert '"stableRibbonTitleBar"' in probe
 
 
 def test_bundled_addons_declare_no_third_party_python_dependencies():

@@ -88,11 +88,6 @@ StringList_Toolbars = []
 List_WorkBenchToolBarItems = []
 List_Commands = []
 
-# Automated consumers can restrict first-run cache initialization to the
-# workbenches they actually own.  The variable is deliberately opt-in so a
-# standalone Ribbon installation keeps its existing all-workbench behavior.
-CACHE_WORKBENCHES_ENV = "FREECAD_RIBBON_CACHE_WORKBENCHES"
-
 # Create lists for the several list in the json file.
 List_IgnoredToolbars = []
 List_IconOnly_Toolbars = []
@@ -208,7 +203,7 @@ def CreateCache(RestartFreeCAD=False):
             and WorkBench[0] is not None
         ):
             # Gui.activateWorkbench(WorkBench[0])
-            wbToolbars = Gui.getWorkbench(WorkBench[0]).listToolbars()
+            wbToolbars = returnWorkBenchToolbars(WorkBench[0])
             # Go through the toolbars
             for Toolbar in wbToolbars:
                 ToolBarTtranslated = StandardFunctions.TranslationsMapping(
@@ -237,10 +232,10 @@ def CreateCache(RestartFreeCAD=False):
     CommandNames = []
     for i in range(len(List_Workbenches)):
         # Gui.activateWorkbench(List_Workbenches[i][0])
-        WorkBench = Gui.getWorkbench(List_Workbenches[i][0])
         WorkBenchName = List_Workbenches[i][0]
-        # Get the toolbar items
-        ToolbarItems: dict = WorkBench.getToolbarItems()
+        # Reuse the toolbar items captured above. Asking Python-defined
+        # workbenches again can require FreeCAD's private __Workbench__.
+        ToolbarItems: dict = List_Workbenches[i][3]
         # Update the toolbar items with corrections
         ToolbarItems: dict = StandardFunctions.CorrectGetToolbarItems(ToolbarItems)
 
@@ -730,8 +725,10 @@ def returnWorkBenchToolbars(WorkBenchName):
             if ToolbarItem[2] == WorkBenchName:
                 wbToolbars.append(ToolbarItem[0])
     except Exception:
-        Gui.activateWorkbench(WorkBenchName)
-        wbToolbars: list = Gui.getWorkbench(WorkBenchName).listToolbars()
+        try:
+            wbToolbars = list(Gui.getWorkbench(WorkBenchName).listToolbars())
+        except Exception:
+            wbToolbars = []
     return wbToolbars
 
 def returnToolbarCommands(WorkBenchName):
@@ -740,9 +737,10 @@ def returnToolbarCommands(WorkBenchName):
             if item[0] == WorkBenchName:
                 return item[3]
     except Exception:
-        Gui.activateWorkbench(WorkBenchName)
-        Toolbars = Gui.getWorkbench(WorkBenchName).getToolbarItems()
-        return Toolbars
+        try:
+            return Gui.getWorkbench(WorkBenchName).getToolbarItems()
+        except Exception:
+            return {}
 
 def returnDropDownCommands(commandName):
     Commands = []
@@ -768,17 +766,19 @@ def returnDropDownCommands(commandName):
 
 def loadAllWorkbenches(AutoHide=True, HideOnly=False, FinishMessage="", progressBar: QProgressBar = None, maximum = 0):        
     if HideOnly is False:
-        activeWorkbench = Gui.activeWorkbench().name()
         progressBar.show()
         lst = Gui.listWorkbenches()
-        requested = {
-            name.strip()
-            for name in os.environ.get(CACHE_WORKBENCHES_ENV, "").split(",")
-            if name.strip()
-        }
-        if requested:
-            requested.add(activeWorkbench)
-            lst = {name: value for name, value in lst.items() if name in requested}
+        if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES"):
+            # FMF supplies curated manifests. Cache generation may inspect what
+            # FreeCAD has already registered, but it must not activate workbenches
+            # as a discovery mechanism: activation initializes unrelated host and
+            # third-party code and emits user-visible transition signals.
+            progressBar.setMaximum(maximum)
+            progressBar.setValue(maximum)
+            if FinishMessage != "":
+                print(FinishMessage)
+            return
+        activeWorkbench = Gui.activeWorkbench().name()
         progressBar.setMaximum(len(lst) - 1 + maximum)
         for i, wb in enumerate(lst):
             try:

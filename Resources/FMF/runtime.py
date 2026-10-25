@@ -75,6 +75,7 @@ _displaced_shortcuts = []
 _pending_shortcut_conflicts = []
 _last_workbench = ""
 _task_accept_filter = None
+_task_accept_targets = []
 _deferred_tokens = {}
 _action_inventory_cache = {}
 _usage_action_connections = 0
@@ -442,6 +443,12 @@ class _TaskAcceptFilter(QtCore.QObject):
     """Give FreeCAD task dialogs Fusion-style Enter-to-OK behaviour."""
 
     def eventFilter(self, watched, event):
+        child_added = _qt_enum(QtCore.QEvent, "Type", "ChildAdded")
+        if event.type() == child_added:
+            child = event.child() if hasattr(event, "child") else None
+            if child is not None:
+                _install_task_accept_target(child)
+            return False
         key_press = _qt_enum(QtCore.QEvent, "Type", "KeyPress")
         enter_keys = {
             _qt_enum(QtCore.Qt, "Key", "Key_Return"),
@@ -470,14 +477,41 @@ class _TaskAcceptFilter(QtCore.QObject):
         return True
 
 
+def _install_task_accept_target(target):
+    """Watch one task-surface subtree without touching QApplication."""
+    if target is None or target in _task_accept_targets:
+        return
+    if not hasattr(target, "installEventFilter"):
+        return
+    target.installEventFilter(_task_accept_filter)
+    _task_accept_targets.append(target)
+    widget_type = getattr(QtWidgets, "QWidget", None)
+    if widget_type is not None and hasattr(target, "findChildren"):
+        for child in target.findChildren(widget_type):
+            _install_task_accept_target(child)
+
+
 def install_task_accept_filter():
     global _task_accept_filter
-    application = QtWidgets.QApplication.instance()
-    if application is None:
+    main_window = Gui.getMainWindow()
+    if main_window is None:
         return False
     if _task_accept_filter is None:
-        _task_accept_filter = _TaskAcceptFilter(application)
-        application.installEventFilter(_task_accept_filter)
+        _task_accept_filter = _TaskAcceptFilter(main_window)
+
+    widget_type = getattr(QtWidgets, "QWidget", None)
+    if widget_type is None:
+        return False
+    task_surfaces = [
+        widget
+        for widget in main_window.findChildren(widget_type)
+        if getattr(widget, "objectName", lambda: "")() in {"Tasks", "TaskView"}
+        or getattr(widget, "windowTitle", lambda: "")().replace("&", "").strip().lower() == "tasks"
+    ]
+    for surface in task_surfaces:
+        _install_task_accept_target(surface)
+    # A task surface is created lazily. Startup is complete even when none is
+    # present; edit-mode observers call this again after FreeCAD creates one.
     return True
 
 
@@ -1263,12 +1297,13 @@ def uninstall():
         except Exception as error:
             _record_teardown_problem("workbench activation signal", error)
         main_window._fmf_my_freecad_connected = False
-    application = QtWidgets.QApplication.instance()
-    if application is not None and _task_accept_filter is not None:
-        try:
-            application.removeEventFilter(_task_accept_filter)
-        except Exception as error:
-            _record_teardown_problem("task accept event filter", error)
+    if _task_accept_filter is not None:
+        for target in tuple(_task_accept_targets):
+            try:
+                target.removeEventFilter(_task_accept_filter)
+            except (AttributeError, RuntimeError) as error:
+                _record_teardown_problem("task accept event filter", error)
+        _task_accept_targets.clear()
         _task_accept_filter = None
     _record_lifecycle_event("uninstall", "uninstalled", services=runtime_service_state(main_window))
 

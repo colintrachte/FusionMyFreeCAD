@@ -797,6 +797,9 @@ def CommandInfoCorrections(CommandName):
                 CommandInfo["whatsThis"] = "PartDesign_CompSketches"
                 CommandInfo["statusTip"] = "Create or edit a sketch"
 
+            if CommandName == "Part_PickCurveNet":
+                CommandInfo["pixmap"] = "Part_Spline_Parametric.svg"
+
             # Sketcher
             if CommandName == "Sketcher_Grid":
                 CommandInfo["pixmap"] = "Sketcher_GridToggle_Deactivated.svg"

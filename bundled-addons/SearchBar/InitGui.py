@@ -6,9 +6,9 @@ from PySide.QtCore import Qt, Signal, QEvent, QObject
 import os
 import Parameters_SearchBar
 
-# FMF ships its own release information.  Suppress SearchBar's
+# FusionMyFreeCAD ships its own release information.  Suppress SearchBar's
 # always-on-top startup changelog at the source so add-on load order cannot
-# re-enable it before FMF preferences are applied.
+# re-enable it before FusionMyFreeCAD preferences are applied.
 Parameters_SearchBar.Settings.SetStringSetting("DoNotShowAgain", "1.8")
 Parameters_SearchBar.Settings.SetBoolSetting("ShowChangeDialog", False)
 Parameters_SearchBar.DO_NOT_SHOW_AGAIN = "1.8"
@@ -17,6 +17,9 @@ Parameters_SearchBar.DO_NOT_SHOW_AGAIN = "1.8"
 wax = None
 sea = None
 tbr = None
+_event_filter = None
+_event_filter_targets = []
+_workbench_signal_connected = False
 
 ChangeDialogLoaded = False
 
@@ -41,7 +44,7 @@ class SearchBar(Gui.Workbench):
         return "Gui::PythonWorkbench"
 
     def addToolSearchBox():
-        global wax, sea, tbr, ChangeDialogLoaded
+        global wax, sea, tbr, ChangeDialogLoaded, _event_filter
         mw: QMainWindow = Gui.getMainWindow()
         cp = mw.centralWidget()
         vp: QWidget = cp.viewport()
@@ -60,11 +63,12 @@ class SearchBar(Gui.Workbench):
                 # Activate the searchBar at the pointer module
                 MouseBar.SearchBar_Pointer()
                 
-                mw.installEventFilter(EventInspector_SB(mw))
-                mw.centralWidget().installEventFilter(EventInspector_SB(mw))
-                vp.installEventFilter(EventInspector_SB(mw))
-                for child in vp.children():
-                    child.installEventFilter(EventInspector_SB(mw))
+                if _event_filter is None:
+                    _event_filter = EventInspector_SB(mw)
+                for target in (mw, mw.centralWidget(), vp, *vp.children()):
+                    if target not in _event_filter_targets:
+                        target.installEventFilter(_event_filter)
+                        _event_filter_targets.append(target)
             
             # if the toolbars are enabled in preferences, load them
             if Parameters_SearchBar.Settings.GetBoolSetting("EnableToolbars", True) is True:          
@@ -80,7 +84,36 @@ class SearchBar(Gui.Workbench):
                 tbr.show()
             return   
 
-SearchBar.addToolSearchBox()
-Gui.getMainWindow().workbenchActivated.connect(SearchBar.addToolSearchBox)
+def install():
+    """Install one shared event filter and one workbench callback."""
+    global _workbench_signal_connected
+    SearchBar.addToolSearchBox()
+    if not _workbench_signal_connected:
+        Gui.getMainWindow().workbenchActivated.connect(SearchBar.addToolSearchBox)
+        _workbench_signal_connected = True
+
+
+def uninstall():
+    """Release SearchBar's long-lived callbacks and event filters."""
+    global _event_filter, _workbench_signal_connected
+    main_window = Gui.getMainWindow()
+    if _workbench_signal_connected:
+        try:
+            main_window.workbenchActivated.disconnect(SearchBar.addToolSearchBox)
+        except Exception:
+            pass
+        _workbench_signal_connected = False
+    if _event_filter is not None:
+        for target in tuple(_event_filter_targets):
+            try:
+                target.removeEventFilter(_event_filter)
+            except RuntimeError:
+                pass
+        _event_filter_targets.clear()
+        _event_filter.deleteLater()
+        _event_filter = None
+
+
+install()
 
 

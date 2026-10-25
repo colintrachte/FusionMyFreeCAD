@@ -1030,6 +1030,25 @@ def test_ribbon_cache_is_scoped_to_fmf_workbenches(env, bootstrap, monkeypatch):
     )
 
 
+def test_fmf_commands_reference_real_icon_names(env, bootstrap):
+    assert bootstrap.DisableCommand().GetResources()["Pixmap"] == "applications-accessories"
+    assert bootstrap.ReviewShortcutsCommand().GetResources()["Pixmap"] == "applications-accessories"
+
+
+def test_searchbar_service_lifecycle_calls_loaded_vendor_module(env, bootstrap, monkeypatch):
+    calls = []
+    module = types.SimpleNamespace(
+        install=lambda: calls.append("install"),
+        uninstall=lambda: calls.append("uninstall"),
+    )
+    monkeypatch.setitem(sys.modules, "_fmf_vendor_SearchBar", module)
+
+    bootstrap._set_searchbar_service(True)
+    bootstrap._set_searchbar_service(False)
+
+    assert calls == ["install", "uninstall"]
+
+
 def test_startup_failures_are_cleared_on_a_clean_launch(env, bootstrap, monkeypatch):
     bootstrap.record_startup_failure("installation", RuntimeError("old news"))
     assert bootstrap.startup_failures()

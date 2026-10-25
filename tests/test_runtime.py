@@ -397,10 +397,34 @@ def test_enter_does_nothing_without_an_active_task(env, runtime):
 
 
 def test_task_accept_filter_is_installed_once(env, runtime):
+    task_surface = env.qtwidgets.QWidget()
+    task_surface.setObjectName("Tasks")
+    env.main_window.widgets = [task_surface]
+
     assert runtime.install_task_accept_filter() is True
     assert runtime.install_task_accept_filter() is True
     application = env.qtwidgets.QApplication.instance()
-    assert application.filters == [runtime._task_accept_filter]
+    assert application.filters == []
+    assert task_surface._installed_filters == [runtime._task_accept_filter]
+    assert runtime._task_accept_targets == [task_surface]
+
+
+def test_task_accept_filter_stays_off_the_application_without_task_surface(env, runtime):
+    assert runtime.install_task_accept_filter() is True
+    assert env.qtwidgets.QApplication.instance().filters == []
+    assert runtime._task_accept_targets == []
+
+
+def test_task_accept_filter_is_removed_from_task_surface(env, runtime):
+    task_surface = env.qtwidgets.QWidget()
+    task_surface.setObjectName("Tasks")
+    env.main_window.widgets = [task_surface]
+    runtime.install_task_accept_filter()
+
+    runtime.uninstall()
+
+    assert task_surface._installed_filters == []
+    assert runtime._task_accept_targets == []
 
 
 def test_runtime_problems_reach_verify(env, bootstrap, runtime):

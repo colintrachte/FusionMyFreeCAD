@@ -27,6 +27,10 @@ def loadAllWorkbenches():
 
     activeWorkbench = Gui.activeWorkbench().name()
 
+    if os.environ.get("FREECAD_RIBBON_CACHE_WORKBENCHES"):
+        print("SearchBox: using commands already registered by FreeCAD; workbenches were not activated for discovery.")
+        return
+
     # # Define a QProgressBar as a counter dialog
     # progressBar = QProgressBar(minimum=0, value=0)
     # progressBar.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint)

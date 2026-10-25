@@ -902,6 +902,16 @@ class FakeQtWidget(FakeQtObject):
     def installEventFilter(self, flt):
         self._installed_filters.append(flt)
 
+    def removeEventFilter(self, flt):
+        if flt in self._installed_filters:
+            self._installed_filters.remove(flt)
+
+    def findChildren(self, kind):
+        return [child for child in getattr(self, "children", []) if isinstance(child, kind)]
+
+    def windowTitle(self):
+        return getattr(self, "_window_title", "")
+
     def eventFilter(self, watched, event):
         return False
 

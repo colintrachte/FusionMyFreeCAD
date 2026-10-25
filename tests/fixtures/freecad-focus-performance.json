@@ -1,0 +1,22 @@
+{
+  "freecadVersion": "26.3.0devR47870",
+  "freecadRevision": "a61ee58c265ca735e1ddbd2df0a9ca78574b5284",
+  "profile": "fresh isolated FMF profile",
+  "before": {
+    "searchBarFilters": 94,
+    "filtersAddedByTenInstalls": 40,
+    "applicationActivatedMedianMs": 1.412,
+    "focusPairMedianMs": 17.1863,
+    "focusPairP95Ms": 20.1557,
+    "titleBarReplacements": 39
+  },
+  "after": {
+    "searchBarFilters": 1,
+    "filtersAddedByTenInstalls": 0,
+    "applicationActivatedMedianMs": 0.0035,
+    "applicationActivatedP95Ms": 0.0135,
+    "focusPairMedianMs": 0.0095,
+    "focusPairP95Ms": 0.0389,
+    "titleBarReplacements": 0
+  }
+}
