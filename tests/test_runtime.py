@@ -258,7 +258,7 @@ def test_usage_tracking_connects_once_per_action(env, runtime):
     assert len(actions["PartDesign_Revolution"].triggered.handlers) == 1
 
 
-def test_deferred_reconciliation_reuses_action_inventory_until_generation_changes(env, runtime):
+def test_deferred_reconciliation_reuses_action_inventory_across_command_changes(env, runtime):
     env.main_window.actions = [FakeAction("PartDesign_Pad", "")]
     real_find = env.main_window.findChildren
     scans = {"count": 0}
@@ -276,7 +276,11 @@ def test_deferred_reconciliation_reuses_action_inventory_until_generation_change
 
     env.registered_commands.append("Late_Command")
     runtime.reconcile_actions()
-    assert scans["count"] == 2
+    assert scans["count"] == 1
+
+    for _iteration in range(50):
+        runtime.reconcile_actions()
+    assert scans["count"] == 1
 
 
 def test_deleted_cached_action_forces_one_inventory_refresh(env, runtime):
@@ -618,6 +622,14 @@ def test_unchanged_refresh_skips_ribbon_json_parsing(env, bootstrap, runtime, mo
     assert loads["count"] == 0
 
 
+def test_responsive_compound_panel_is_not_reported_as_broken(env, bootstrap, runtime):
+    """A compact dropdown can intentionally replace every adaptive slot."""
+    bootstrap.prepare()
+
+    runtime.refresh_adaptive_panel("FMFSketchWorkbench")
+    assert not any("candidates for 0 slots" in problem for problem in runtime._problems)
+
+
 def test_sketcher_slot_swap_keeps_non_candidates_in_place(env, bootstrap, runtime):
     bootstrap.prepare()
     path = Path(bootstrap.RIBBON_PATH)
@@ -887,7 +899,6 @@ def test_disabled_runtime_ignores_late_workbench_and_usage_callbacks(
 def test_runtime_uninstall_disconnects_live_services(env, runtime):
     runtime.install()
     FakeTimer.pump()
-    assert env.main_window._fmf_my_freecad_connected is True
     assert runtime._task_accept_filter is not None
     installed = runtime.runtime_service_state()
     assert installed["ribbonActionBindings"] == 0
@@ -896,8 +907,11 @@ def test_runtime_uninstall_disconnects_live_services(env, runtime):
 
     runtime.uninstall()
 
-    assert env.main_window._fmf_my_freecad_connected is False
-    assert env.main_window.workbenchActivated.handlers == []
+    import fmf_transitions
+
+    assert "runtime" not in fmf_transitions.snapshot()["phases"]
+    assert "action-registry" in fmf_transitions.snapshot()["phases"]
+    assert len(env.main_window.workbenchActivated.handlers) == 1
     assert runtime._task_accept_filter is None
     removed = runtime.runtime_service_state()
     assert removed["workbenchSignalConnected"] is False
@@ -905,18 +919,20 @@ def test_runtime_uninstall_disconnects_live_services(env, runtime):
     assert removed["pendingDeferredTasks"] == []
 
 
-def test_runtime_uninstall_reports_a_signal_cleanup_failure(env, runtime, monkeypatch):
+def test_runtime_uninstall_reports_a_transition_cleanup_failure(env, runtime, monkeypatch):
     runtime.install()
     FakeTimer.pump()
 
-    def fail_disconnect(_handler):
-        raise RuntimeError("simulated disconnect failure")
+    import fmf_transitions
 
-    monkeypatch.setattr(env.main_window.workbenchActivated, "disconnect", fail_disconnect)
+    def fail_unregister(_name, _callback):
+        raise RuntimeError("simulated transition cleanup failure")
+
+    monkeypatch.setattr(fmf_transitions, "unregister_phase", fail_unregister)
     runtime.uninstall()
 
-    assert any("workbench activation signal" in problem for problem in runtime._problems)
-    assert any("simulated disconnect failure" in line for line in env.console.warnings)
+    assert any("workbench transition phase" in problem for problem in runtime._problems)
+    assert any("simulated transition cleanup failure" in line for line in env.console.warnings)
 
 
 def test_every_action_is_asked_for_its_shortcut_once(env, runtime):

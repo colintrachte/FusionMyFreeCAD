@@ -171,7 +171,9 @@ try:
 
     if Parameters.HIDE_TITLEBAR_FC is False:
         mw.setWindowFlags(Qt.WindowType.WindowFullscreenButtonHint)
-        mw.workbenchActivated.connect(FCBinding.run)
+        import fmf_transitions
+
+        fmf_transitions.register_phase("ribbon-initialize", FCBinding.run, order=10)
         mw.showMaximized()
 
     # Hide the Titlebar of FreeCAD
@@ -182,7 +184,9 @@ try:
         mw.setWindowFlag(Qt.WindowType.WindowMinMaxButtonsHint, False)
         mw.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
         # Connect the ribbon when the workbench is activated
-        mw.workbenchActivated.connect(FCBinding.run)
+        import fmf_transitions
+
+        fmf_transitions.register_phase("ribbon-initialize", FCBinding.run, order=10)
         # Normally after setting the window frameless you show the window with mw.show()
         # This is now done in FCBinding with an eventfilter class
         print(translate("FreeCAD Ribbon", "Ribbon UI: FreeCAD loaded without titlebar"))

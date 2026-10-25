@@ -1,6 +1,6 @@
 # Research brief and ADR: Bound FMF's impact on FreeCAD performance
 
-**Status:** Proposed; architectural review complete, implementation not started  
+**Status:** Slices 1–2 implemented with automated verification; live Slice 2 transition gate pending
 **Date:** 2026-10-24  
 **Question:** How should FMF interact with upstream FreeCAD so that FMF cannot silently become the
 cause of startup, focus, workbench-switch, idle, or modeling slowdowns?  
@@ -234,7 +234,7 @@ FMF-attributable time.
 The repository's planning rule requires explicit approval before these multi-file changes begin.
 Approval of this document should authorize **Slice 1 only**; later slices remain separately gated.
 
-### Slice 1 — eliminate unbounded work (highest return, lowest ambiguity)
+### Slice 1 — eliminate unbounded work (implemented)
 
 1. Patch the vendored Ribbon adapter and sync script to disable its startup update check under FMF.
 2. Add structural tests forbidding `urlopen`, `requests`, or equivalent network entry points from
@@ -248,7 +248,7 @@ Approval of this document should authorize **Slice 1 only**; later slices remain
 zero application-wide FMF event filters, full existing pytest/package/privacy checks, and a source-
 build smoke run through startup, the four FMF workbenches, Sketch edit enter/exit, and shutdown.
 
-### Slice 2 — consolidate workbench transitions
+### Slice 2 — consolidate workbench transitions (implemented; live gate pending)
 
 1. Introduce one transition coordinator with a monotonic generation and one restartable single-shot.
 2. Adapt runtime, Ribbon, and SearchBar to register bounded phase callbacks instead of independently
@@ -338,6 +338,10 @@ budgets pass on the reference source build.
   show them unavailable. Hidden workbench activation is rejected.
 - Exact numeric budgets need calibration on three clean A/B runs. The structural gates—no network,
   no discovery activation, no global event filter, stable lifecycle counts—are immediately enforceable.
+- On 2026-10-25 the new matched transition probe initialized the checked source build and FMF under
+  `FreeCADCmd`, but the GUI harness exited before producing its result file. This is not a passing
+  transition measurement. Run the same probe in a normal visible source-build GUI before closing
+  the Slice 2 gate; keep the deterministic coordinator tests as structural evidence only.
 
 ## Recommendation
 

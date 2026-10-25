@@ -80,6 +80,20 @@ teardown even after writing a passing result. Treat the JSON verdict as handler 
 process exit as a separate harness defect; visible normal-GUI focus switching remains the final
 interaction check.
 
+### Workbench-transition performance probe
+
+Run `tools/probe_transition_performance.py` in a fresh isolated source-build profile with this
+repository passed through `-M`. Set `FMF_TRANSITION_PROBE_OUTPUT` under `ai_poop/`. The probe first
+measures 52 switches among the four stock workbenches, starts FMF, then measures the corresponding
+52 FMF workbench switches. It records every requested and active workbench, Ribbon visibility,
+coordinator phases and counters, median/p95/maximum time, and the matched p95 increment.
+
+The verdict requires every transition to complete without an exception, the one coordinator to own
+the Ribbon/runtime/SearchBar phases, the one-time Ribbon initializer to detach, the Ribbon to remain
+present and visible, and FMF's p95 increment to remain at or below 100 ms. Inspect the saved samples
+when the aggregate gate fails; a single first-load outlier must not be misreported as warm-switch
+performance.
+
 ## Manual sign-off record
 
 The remaining evidence must be gathered in a visible FreeCAD session. Record `PASS` or `FAIL` and a

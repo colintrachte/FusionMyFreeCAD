@@ -37,6 +37,7 @@ RUNTIME_MODULES: tuple[str, ...] = (
     "fmf_parameters_dock.py",
     "fmf_repair_tools.py",
     "fmf_sketch_tools.py",
+    "fmf_transitions.py",
     "fmf_viewport.py",
     "fmf_workbenches.py",
 )

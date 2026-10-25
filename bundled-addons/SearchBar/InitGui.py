@@ -85,21 +85,26 @@ class SearchBar(Gui.Workbench):
             return   
 
 def install():
-    """Install one shared event filter and one workbench callback."""
+    """Install one shared event filter and one coordinated transition phase."""
     global _workbench_signal_connected
     SearchBar.addToolSearchBox()
     if not _workbench_signal_connected:
-        Gui.getMainWindow().workbenchActivated.connect(SearchBar.addToolSearchBox)
+        import fmf_transitions
+
+        fmf_transitions.register_phase(
+            "searchbar", lambda _name: SearchBar.addToolSearchBox(), order=40
+        )
         _workbench_signal_connected = True
 
 
 def uninstall():
     """Release SearchBar's long-lived callbacks and event filters."""
     global _event_filter, _workbench_signal_connected
-    main_window = Gui.getMainWindow()
     if _workbench_signal_connected:
         try:
-            main_window.workbenchActivated.disconnect(SearchBar.addToolSearchBox)
+            import fmf_transitions
+
+            fmf_transitions.unregister_phase("searchbar")
         except Exception:
             pass
         _workbench_signal_connected = False

@@ -64,6 +64,7 @@ def test_required_files_are_present():
         ROOT / "fmf_catalog.py",
         ROOT / "fmf_workbenches.py",
         ROOT / "fmf_sketch_tools.py",
+        ROOT / "fmf_transitions.py",
         ROOT / "LICENSE",
         ROOT / "THIRD_PARTY_NOTICES.md",
         RESOURCES / "RibbonStructure.json",
@@ -193,18 +194,46 @@ def test_bundled_ribbon_workbench_activation_preserves_transition_synchronizatio
     }
 
     user_change = methods["onUserChangedWorkbench"]
-    assert "Gui.activateWorkbench(self.wbNameMapping[tabName])" in user_change
-    assert user_change.count("self.onWbActivated()") == 2
-    assert user_change.count("self.ApplicationMenus()") == 2
-    second_sync = user_change.rindex("self.onWbActivated()")
-    assert second_sync < user_change.index("self.hideClassicToolbars()")
-    assert second_sync < user_change.index("self.on_Customize_Clicked()")
+    assert user_change.count("Gui.activateWorkbench(") == 1
+    assert "self._fmfProgrammaticTabChange" in user_change
+    assert "self.onWbActivated(" not in user_change
+    assert "self.ApplicationMenus(" not in user_change
+    assert "self.buildPanels(" not in user_change
     assert "self.hideClassicToolbars()" in user_change
-    assert "self.on_Customize_Clicked()" in user_change
     assert "if tooltipStyle not in styleSheet:" in methods["onWbActivated"]
     assert "self._applicationMenu = ApplictionMenu" in methods["ApplicationMenus"]
     assert "self._applicationMenuSignature" in methods["ApplicationMenus"]
     assert methods["ApplicationMenus"].count("self.addFileMenu()") == 1
+
+
+def test_fmf_owns_one_coordinated_workbench_activation_connection():
+    coordinator = (ROOT / "fmf_transitions.py").read_text(encoding="utf-8")
+    runtime = (RESOURCES / "runtime.py").read_text(encoding="utf-8")
+    searchbar = (BUNDLED / "SearchBar" / "InitGui.py").read_text(encoding="utf-8")
+    ribbon_init = (BUNDLED / "FreeCAD-Ribbon" / "InitGui.py").read_text(encoding="utf-8")
+    ribbon = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text(encoding="utf-8")
+
+    assert coordinator.count("workbenchActivated.connect(") == 1
+    assert "workbenchActivated.connect(" not in runtime
+    assert "workbenchActivated.connect(" not in searchbar
+    assert "workbenchActivated.connect(" not in ribbon_init
+    assert "workbenchActivated.connect(" not in ribbon
+    assert 'register_phase("runtime"' in runtime
+    assert '"searchbar", lambda _name' in searchbar
+    assert 'register_phase("ribbon-initialize"' in ribbon_init
+    assert '"ribbon", self._fmfTransitionCallback' in ribbon
+
+
+def test_runtime_uses_the_canonical_action_registry_without_warm_global_scans():
+    runtime = (RESOURCES / "runtime.py").read_text(encoding="utf-8")
+    actions = (ROOT / "fmf_actions.py").read_text(encoding="utf-8")
+    bootstrap = (ROOT / "fmf_bootstrap.py").read_text(encoding="utf-8")
+
+    assert "Gui.listCommands()" not in runtime
+    assert "findChildren(_qaction_type())" not in runtime
+    assert "bootstrap.native_action_registry()" in runtime
+    assert "CanonicalActionRegistry" in actions
+    assert "CanonicalActionRegistry(Gui, QAction)" in bootstrap
 
 
 def test_bundled_ribbon_customization_rejects_a_missing_replacement_panel():
@@ -538,6 +567,16 @@ def test_ribbon_cache_corrects_freecad_development_placeholder_icon():
     assert 'CommandInfo["pixmap"] = "Part_Spline_Parametric.svg"' in source
 
 
+def test_ribbon_prefers_native_command_icons_before_pixmap_fallbacks():
+    source = (BUNDLED / "FreeCAD-Ribbon" / "Standard_Functions_Ribbon.py").read_text("utf-8")
+    function = source[
+        source.index("def returnQiCons_Commands") : source.index("def CorrectGetToolbarItems")
+    ]
+    assert function.index("Gui.Command.get(CommandName)") < function.index("Gui.getIcon(pixmap)")
+    sync = (ROOT / "tools" / "sync_bundled_addons.py").read_text("utf-8")
+    assert "STANDARD_FUNCTIONS_NATIVE_ICON_PATCH" in sync
+
+
 def test_ribbon_dialogs_keep_a_close_button():
     source = (BUNDLED / "FreeCAD-Ribbon" / "CacheFunctions.py").read_text("utf-8")
     assert "WindowCloseButtonHint, True" in source
@@ -565,7 +604,7 @@ def test_empty_custom_dropdown_does_not_take_down_the_ribbon():
 def test_ribbon_surfaces_overflow_commands_at_declared_width_tiers():
     source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
     assert "def _responsiveWidthTier" in source
-    assert "def _rebuildResponsivePanels" in source
+    assert "def _rebuildResponsivePanels" not in source
     assert "def resizeEvent" in source
     assert 'responsiveCommands = panelDefinition.get("responsive", {})' in source
     assert "mw.width() >= int(minimumResponsiveWidth)" in source
@@ -573,14 +612,14 @@ def test_ribbon_surfaces_overflow_commands_at_declared_width_tiers():
     assert 'Dict.get("authoritativeWorkbenches", [])' in source
 
 
-def test_responsive_panel_rebuild_does_not_accumulate_stale_panel_aliases():
+def test_runtime_resize_does_not_replace_ribbon_panels():
     source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
     tree = ast.parse(source)
     methods = {
         node.name: ast.get_source_segment(source, node)
         for node in ast.walk(tree)
         if isinstance(node, ast.FunctionDef)
-        and node.name in {"_fmfReplacePanel", "_rebuildResponsivePanels", "_resetOnePanel"}
+        and node.name in {"_fmfReplacePanel", "resizeEvent", "_resetOnePanel"}
     }
 
     replacement = methods["_fmfReplacePanel"]
@@ -588,9 +627,7 @@ def test_responsive_panel_rebuild_does_not_accumulate_stale_panel_aliases():
     assert "category._panels.pop(key, None)" in replacement
     assert "category._panels[replacement.objectName()] = replacement" in replacement
     assert "panel.deleteLater()" in replacement
-    assert (
-        "self._fmfReplacePanel(category, panel, replacement)" in methods["_rebuildResponsivePanels"]
-    )
+    assert "QTimer.singleShot" not in methods["resizeEvent"]
     assert (
         "self._fmfReplacePanel(self.currentCategory(), panel, replacement)"
         in methods["_resetOnePanel"]
@@ -602,24 +639,25 @@ def test_ribbon_transition_contract_rejects_the_known_regressions():
     from tools.check_ribbon_transition_contract import validate
 
     source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text("utf-8")
-    validate(source)
+    bootstrap_source = (ROOT / "fmf_bootstrap.py").read_text("utf-8")
+    validate(source, bootstrap_source)
 
-    missing_second_pass = source.replace(
-        "        self.onWbActivated()\n        self.ApplicationMenus()\n\n"
-        "        # hide normal toolbars\n",
-        "        # hide normal toolbars\n",
+    reentrant_tab = source.replace(
+        "        self.hideClassicToolbars()\n        self.TabChanged.emit()",
+        "        self.onWbActivated()\n        self.hideClassicToolbars()\n"
+        "        self.TabChanged.emit()",
         1,
     )
-    with pytest.raises(RuntimeError, match="both onWbActivated"):
-        validate(missing_second_pass)
+    with pytest.raises(RuntimeError, match="transition rebuild work"):
+        validate(reentrant_tab, bootstrap_source)
 
-    stale_alias = source.replace(
-        "category._panels[replacement.objectName()] = replacement",
-        "category._panels[replacement.title()] = replacement",
+    observer_activation = bootstrap_source.replace(
+        '        show_ribbon_context("FMFSketchWorkbench")',
+        '        Gui.activateWorkbench("FMFSketchWorkbench")',
         1,
     )
-    with pytest.raises(RuntimeError, match="stale aliases"):
-        validate(stale_alias)
+    with pytest.raises(RuntimeError, match="must not activate workbenches"):
+        validate(source, observer_activation)
 
 
 def test_ribbon_buttons_use_direct_drag_with_the_platform_threshold():

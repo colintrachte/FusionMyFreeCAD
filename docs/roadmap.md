@@ -60,6 +60,22 @@ visibility transition is reversible and never removes the stock implementations.
   **Read:** `<fmf-study>/ANALYTICAL_FOUNDATIONS_AND_BENCHMARKS.md` · `<fmf-study>/upstream_repos/NeoRibbon/freecad/NeoRibbon/bootstrap.py`
   **Blocked by:** A real FreeCAD 1.1 GUI runtime for the disposable-profile smoke check
 
+- [ ] **Score 5 🥇 · Class 2 — Isolate FMF work from FreeCAD hot paths**
+
+  **ID:** task_a1070000000000000000000000000007
+  **Status:** In verification — unbounded startup work and independent transition listeners are removed; the real-FreeCAD 50-transition timing/state gate remains
+  **Outcome:** Make FMF overhead attributable by prohibiting startup network and discovery activation, scoping event filters, and routing each host workbench change through one generation-based coordinator.
+  **Work mode:** Forge + Steward
+  **Execution size:** Large
+  **Uncertainty:** Medium
+  **Protected behavior:** The Ribbon Sketch/Design second synchronization pass, explicit user workbench changes, search, adaptive panels, shortcuts, and live enable/disable remain intact.
+  **Acceptance:** Normal startup performs no network or discovery-driven activation; one FMF-owned host signal connection orders Ribbon, runtime, and SearchBar phases; stale generations do no work; phase failure does not block later phases; fifty transitions preserve correct panels with no rising callback count.
+  **Evidence:** Host-isolation, focus, transition ordering/coalescing, teardown, extracted-archive startup, and full automated regression tests pass; phase timing and lifecycle counters are exposed for the live probe.
+  **Implement:** `fmf_transitions.py` · `Resources/FMF/runtime.py` · `bundled-addons/FreeCAD-Ribbon/FCBinding.py` · `bundled-addons/SearchBar/InitGui.py`
+  **Context:** `research/freecad-integration-performance-plan-2026-10-24.md` · `tools/probe_host_isolation.py` · `tools/probe_focus_performance.py` · `tests/test_transitions.py`
+  **Next:** Replace warm-path global action scans with the canonical action registry, after the live transition gate passes.
+  **Blocked by:** A real FreeCAD GUI run of the documented 50-transition smoke/latency probe
+
 ---
 
 ## Next — Product safeguards and release evidence
@@ -176,7 +192,7 @@ visibility transition is reversible and never removes the stock implementations.
 - [ ] **Score 4 🥇 · Class 2 — Consolidate personalization and scope runtime observers**
 
   **ID:** task_b2070000000000000000000000000007
-  **Status:** In verification — service-state diagnostics, teardown evidence, leak checks, and the static benchmark are complete; live startup/switch timing remains
+  **Status:** In verification — service-state diagnostics, teardown evidence, leak checks, static benchmark, and coordinated workbench transitions are complete; live startup/switch timing remains
   **Outcome:** Give stable-ID personalization one owner and activate expensive scans, filters, observers, and adaptive rewrites only in their owning FMF contexts.
   **Work mode:** Forge + Steward
   **Execution size:** Large
@@ -271,7 +287,7 @@ visibility transition is reversible and never removes the stock implementations.
 - [ ] **Score 5 🥇 · Class 2 — Run cross-platform beta and restoration qualification**
 
   **ID:** task_c3050000000000000000000000000005
-  **Status:** Blocked — migration incomplete
+  **Status:** Defined — owned-workbench migration is owner-accepted; performance isolation gates and cross-platform participant coverage remain
   **Outcome:** Qualify owned workbenches with real users and FreeCAD installations before retiring the legacy path.
   **Work mode:** Steward
   **Execution size:** Large

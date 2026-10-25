@@ -1,6 +1,10 @@
 """Native QAction adapter contracts."""
 
-from fmf_actions import NativeActionAdapter, RibbonActionBindingRegistry
+from fmf_actions import (
+    CanonicalActionRegistry,
+    NativeActionAdapter,
+    RibbonActionBindingRegistry,
+)
 
 
 class Signal:
@@ -27,6 +31,7 @@ class Action:
         self.trigger_count = 0
         self.changed = Signal()
         self.toggled = Signal()
+        self.triggered = Signal()
         self.destroyed = Signal()
 
     def objectName(self):
@@ -100,6 +105,66 @@ class GuiWithCommands(Gui):
         self.Command = CommandApi(commands)
 
 
+def test_registry_direct_lookup_avoids_global_scan():
+    action = Action("PartDesign_Pad")
+    gui = GuiWithCommands([Action("Unrelated")], {action.name: Command([action])})
+    registry = CanonicalActionRegistry(gui, Action)
+
+    assert registry.resolve(action.name) is action
+    assert registry.resolve(action.name) is action
+    assert registry.snapshot() == {
+        "cachedActions": 1,
+        "triggerConnections": 0,
+        "directLookups": 1,
+        "inventoryScans": 0,
+        "generation": 0,
+        "missingActions": 0,
+    }
+
+
+def test_registry_scans_once_for_non_command_actions():
+    unnamed = Action("")
+    gui = Gui([unnamed])
+    registry = CanonicalActionRegistry(gui, Action)
+
+    assert registry.inventory() == (unnamed,)
+    assert registry.inventory() == (unnamed,)
+    assert registry.snapshot()["inventoryScans"] == 1
+
+
+def test_registry_retries_a_missing_command_only_after_generation_change():
+    action = Action("Late_Command")
+    gui = GuiWithCommands([], {})
+    registry = CanonicalActionRegistry(gui, Action)
+
+    assert registry.resolve(action.name) is None
+    assert registry.resolve(action.name) is None
+    assert registry.snapshot()["directLookups"] == 1
+
+    gui.Command.commands[action.name] = Command([action])
+    assert registry.resolve(action.name) is None
+    registry.advance_generation("FMFPartWorkbench")
+    assert registry.resolve(action.name) is action
+    assert registry.snapshot()["directLookups"] == 2
+
+
+def test_registry_owns_trigger_connection_and_explicit_cleanup():
+    action = Action("PartDesign_Pad")
+    registry = CanonicalActionRegistry(Gui([action]), Action)
+    calls = []
+
+    assert registry.connect_triggered(action.name, "runtime", calls.append) is True
+    assert registry.connect_triggered(action.name, "runtime", calls.append) is False
+    action.triggered.emit(True)
+    assert calls == [True]
+
+    registry.dispose()
+    state = registry.snapshot()
+    assert state["cachedActions"] == 0
+    assert state["triggerConnections"] == 0
+    assert action.triggered.callbacks == []
+
+
 def test_resolve_invoke_and_missing_action():
     action = Action("Sketcher_ToggleConstruction")
     adapter = NativeActionAdapter(Gui([action]), Action)
@@ -141,14 +206,13 @@ def test_subscription_publishes_native_state_and_disposes():
     assert states[-1]["checked"] is True
 
 
-def test_destroyed_action_disconnects_the_subscription():
+def test_subscription_does_not_run_python_during_action_destruction():
     action = Action("Toggle", checkable=True)
     adapter = NativeActionAdapter(Gui([action]), Action)
     subscription = adapter.subscribe("Toggle", lambda _state: None)
 
-    action.destroyed.emit(action)
-
-    assert subscription.connections == []
+    assert action.destroyed.callbacks == []
+    subscription.dispose()
     assert action.changed.callbacks == []
     assert action.toggled.callbacks == []
     assert action.destroyed.callbacks == []
@@ -181,7 +245,9 @@ def test_rebinding_a_widget_does_not_duplicate_callbacks():
     assert registry.count() == 1
     assert len(action.changed.callbacks) == 1
     assert len(action.toggled.callbacks) == 1
-    assert len(action.destroyed.callbacks) == 1
+    # Native QAction destruction must not call back into Python. Qt removes
+    # sender-owned connections; ribbon rebuild teardown owns our subscription.
+    assert action.destroyed.callbacks == []
 
 
 def test_destroyed_widget_and_registry_teardown_dispose_subscriptions():
@@ -201,15 +267,3 @@ def test_destroyed_widget_and_registry_teardown_dispose_subscriptions():
     assert registry.count() == 0
     assert second.changed.callbacks == []
     assert second_button.destroyed.callbacks == []
-
-
-def test_destroyed_action_removes_its_registry_entry():
-    action = Action("Toggle", checkable=True)
-    registry = RibbonActionBindingRegistry(NativeActionAdapter(Gui([action]), Action))
-    button = Button()
-    registry.bind("Toggle", button)
-
-    action.destroyed.emit(action)
-
-    assert registry.count() == 0
-    assert button.destroyed.callbacks == []

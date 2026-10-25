@@ -456,6 +456,8 @@ FCBINDING_WORKBENCH_FAMILY_PATCH = (
         "        # or unrelated workbench must never blank the entire Ribbon.\n"
         "        self._setFmfChromeVisible(True)\n"
         '        if len(mw.findChildren(QDockWidget, "Ribbon")) > 0:\n',
+        1,
+        "        self._setFmfChromeVisible(True)\n",
     ),
     (
         "                    replacedPanel = self.currentCategory().replacePanel(objPanel, newPanel)\n",
@@ -496,6 +498,8 @@ FCBINDING_UI_LATENCY_PATCH = (
         "        self.ApplicationMenus()\n"
         "\n"
         "        # hide normal toolbars\n",
+        1,
+        "        Activate a workbench only for a genuine user-selected Ribbon tab.\n",
     ),
     (
         "        styleSheet = self.tabBar().styleSheet()\n"
@@ -587,6 +591,8 @@ FCBINDING_HOST_ISOLATION_PATCH = (
     (
         "            if self.wbNameMapping[tabName] is not None:                \n",
         "            if self.wbNameMapping[tabName] is not None:\n",
+        1,
+        "        Activate a workbench only for a genuine user-selected Ribbon tab.\n",
     ),
     (
         "        self.hideClassicToolbars()\n        \n        if self.CustomizeEnabled:\n",
@@ -620,6 +626,8 @@ FCBINDING_HOST_ISOLATION_PATCH = (
         '        """                \n'
         '        if getattr(self, "_fmfBuildingMenu", False):\n'
         "            return\n",
+        1,
+        "        Activate a workbench only for a genuine user-selected Ribbon tab.\n",
     ),
     (
         "            LatestVersion = StandardFunctions.ReturnXML_Value_Git(\n"
@@ -785,20 +793,25 @@ SEARCHBAR_EVENT_FILTER_PATCH = (
         "SearchBar.addToolSearchBox()\n"
         "Gui.getMainWindow().workbenchActivated.connect(SearchBar.addToolSearchBox)\n",
         "def install():\n"
-        '    """Install one shared event filter and one workbench callback."""\n'
+        '    """Install one shared event filter and one coordinated transition phase."""\n'
         "    global _workbench_signal_connected\n"
         "    SearchBar.addToolSearchBox()\n"
         "    if not _workbench_signal_connected:\n"
-        "        Gui.getMainWindow().workbenchActivated.connect(SearchBar.addToolSearchBox)\n"
+        "        import fmf_transitions\n"
+        "\n"
+        "        fmf_transitions.register_phase(\n"
+        '            "searchbar", lambda _name: SearchBar.addToolSearchBox(), order=40\n'
+        "        )\n"
         "        _workbench_signal_connected = True\n"
         "\n\n"
         "def uninstall():\n"
         '    """Release SearchBar\'s long-lived callbacks and event filters."""\n'
         "    global _event_filter, _workbench_signal_connected\n"
-        "    main_window = Gui.getMainWindow()\n"
         "    if _workbench_signal_connected:\n"
         "        try:\n"
-        "            main_window.workbenchActivated.disconnect(SearchBar.addToolSearchBox)\n"
+        "            import fmf_transitions\n"
+        "\n"
+        '            fmf_transitions.unregister_phase("searchbar")\n'
         "        except Exception:\n"
         "            pass\n"
         "        _workbench_signal_connected = False\n"
@@ -813,6 +826,228 @@ SEARCHBAR_EVENT_FILTER_PATCH = (
         "        _event_filter = None\n"
         "\n\n"
         "install()\n",
+    ),
+)
+
+
+RIBBON_INIT_TRANSITION_PATCH = (
+    (
+        "        mw.workbenchActivated.connect(FCBinding.run)\n",
+        "        import fmf_transitions\n"
+        "\n"
+        '        fmf_transitions.register_phase("ribbon-initialize", FCBinding.run, order=10)\n',
+        2,
+    ),
+)
+
+
+FCBINDING_TRANSITION_PATCH = (
+    (
+        "    def connectSignals(self):\n"
+        "        self.tabBar().currentChanged.connect(self.onUserChangedWorkbench)\n"
+        "        mw.workbenchActivated.connect(self.onWbActivated)\n"
+        "        return\n",
+        "    def connectSignals(self):\n"
+        "        self.tabBar().currentChanged.connect(self.onUserChangedWorkbench)\n"
+        "        import fmf_transitions\n"
+        "\n"
+        "        self._fmfTransitionCallback = self.onWbActivated\n"
+        "        fmf_transitions.register_phase(\n"
+        '            "ribbon", self._fmfTransitionCallback, order=20\n'
+        "        )\n"
+        "        return\n",
+    ),
+    (
+        "    def disconnectSignals(self):\n"
+        "        self.tabBar().currentChanged.disconnect(self.onUserChangedWorkbench)\n"
+        "        mw.workbenchActivated.disconnect(self.onWbActivated)\n"
+        "        return\n",
+        "    def disconnectSignals(self):\n"
+        "        self.tabBar().currentChanged.disconnect(self.onUserChangedWorkbench)\n"
+        "        import fmf_transitions\n"
+        "\n"
+        "        fmf_transitions.unregister_phase(\n"
+        '            "ribbon", getattr(self, "_fmfTransitionCallback", None)\n'
+        "        )\n"
+        "        return\n",
+    ),
+    (
+        "            # Disable connection after activation\n"
+        "            mw.workbenchActivated.disconnect(run)\n",
+        "            # The one-time initializer is owned by FMF's transition coordinator.\n"
+        "            import fmf_transitions\n"
+        "\n"
+        '            fmf_transitions.unregister_phase("ribbon-initialize")\n',
+    ),
+)
+
+
+# Workbench signals describe host state; they must never trigger another host
+# transition or rebuild live panel widgets. The Ribbon changes presentation only.
+FCBINDING_PASSIVE_TRANSITION_PATCH = (
+    (
+        "            ribbonDock.setEnabled(True)\n"
+        "            ribbonDock.setVisible(True)\n"
+        "            ribbonDock.show()\n"
+        "\n"
+        "            return\n",
+        "            ribbonDock.setEnabled(True)\n"
+        "            ribbonDock.setVisible(True)\n"
+        "            ribbonDock.show()\n"
+        "            # Menu-construction tab signals are suppressed. Build the settled\n"
+        "            # startup category once, after the Ribbon is fully attached.\n"
+        "            ribbon.onWbActivated(name)\n"
+        "\n"
+        "            return\n",
+    ),
+    (
+        '        super().__init__(title="")\n'
+        '        self.setObjectName("Ribbon")\n',
+        '        super().__init__(title="")\n'
+        '        self.setObjectName("Ribbon")\n'
+        "        self._fmfProgrammaticTabChange = False\n"
+        "        self._fmfBuiltWorkbenches = set()\n",
+    ),
+    (
+        "    def onUserChangedWorkbench(self, tabActivated=True):\n"
+        '        """\n'
+        "        Import selected workbench toolbars to ModernMenu section.\n"
+        '        """                \n'
+        '        if getattr(self, "_fmfBuildingMenu", False):\n'
+        "            return\n"
+        '        if len(mw.findChildren(QDockWidget, "Ribbon")) > 0:\n'
+        "            if Parameters.AUTOHIDE_RIBBON is False:\n"
+        "                self.UnfoldRibbon()\n"
+        "            # else:\n"
+        "            #     self.FoldRibbon(True)\n"
+        "\n"
+        "        index = self.tabBar().currentIndex()\n"
+        "        tabName = self.tabBar().tabText(index)\n"
+        "\n"
+        '        if tabName is not None and tabName != "" and tabName != "test":\n'
+        "            # activate selected workbench\n"
+        '            tabName = tabName.replace("&", "")\n'
+        "            if self.wbNameMapping[tabName] is not None:\n"
+        "                Gui.activateWorkbench(self.wbNameMapping[tabName])\n"
+        "\n"
+        "            if tabActivated is True:\n"
+        "                self.onWbActivated()\n"
+        "                self.ApplicationMenus()\n"
+        "\n"
+        "        # Do not remove this second synchronization pass as a performance\n"
+        "        # shortcut. FreeCAD can emit its Sketcher-exit workbench signal before\n"
+        "        # Ribbon has finished selecting the matching destination category.\n"
+        "        self.onWbActivated()\n"
+        "        self.ApplicationMenus()\n"
+        "\n"
+        "        # hide normal toolbars\n"
+        "        self.hideClassicToolbars()\n"
+        "\n"
+        "        if self.CustomizeEnabled:\n"
+        "            self.on_Customize_Clicked()\n"
+        "            # Activate all commands\n"
+        "            self.activateButtons()\n"
+        "\n"
+        '        # Emit a signal when switching to a new tab. Used to update the "addcommands" panel\n'
+        "        self.TabChanged.emit()\n"
+        "        return\n",
+        "    def onUserChangedWorkbench(self, tabActivated=True):\n"
+        '        """\n'
+        "        Activate a workbench only for a genuine user-selected Ribbon tab.\n"
+        '        """                \n'
+        '        if getattr(self, "_fmfBuildingMenu", False) or self._fmfProgrammaticTabChange:\n'
+        "            return\n"
+        "        workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())\n"
+        "        if workbenchName and workbenchName != Gui.activeWorkbench().name():\n"
+        "            Gui.activateWorkbench(workbenchName)\n"
+        "        self.hideClassicToolbars()\n"
+        "        self.TabChanged.emit()\n",
+    ),
+    (
+        "    def onWbActivated(self):        \n"
+        "        # The Ribbon is the application chrome for every workbench. FMF only\n"
+        "        # owns the layouts of its four namespaced workbenches; selecting a stock\n"
+        "        # or unrelated workbench must never blank the entire Ribbon.\n"
+        "        self._setFmfChromeVisible(True)\n",
+        "    def selectFmfWorkbenchContext(self, workbenchName, buildIfNeeded=True):\n"
+        '        """Show one existing category without emitting a workbench request."""\n'
+        "        index = next(\n"
+        "            (\n"
+        "                candidate\n"
+        "                for candidate in range(self.tabBar().count())\n"
+        "                if self.tabBar().tabData(candidate) == workbenchName\n"
+        "            ),\n"
+        "            -1,\n"
+        "        )\n"
+        "        if index < 0:\n"
+        "            return False\n"
+        "        self._fmfProgrammaticTabChange = True\n"
+        "        try:\n"
+        "            self.tabBar().setCurrentIndex(index)\n"
+        "        finally:\n"
+        "            self._fmfProgrammaticTabChange = False\n"
+        "        if buildIfNeeded and workbenchName not in self._fmfBuiltWorkbenches:\n"
+        "            if self.CustomizeEnabled is False:\n"
+        "                self.buildPanels()\n"
+        "            else:\n"
+        "                self.buildPanels(Dict=self.workBenchDict, UpdateDict=False)\n"
+        "            self._fmfBuiltWorkbenches.add(workbenchName)\n"
+        "        return True\n"
+        "\n"
+        "    def onWbActivated(self, workbenchName=None):\n"
+        "        # The Ribbon is the application chrome for every workbench. FMF only\n"
+        "        # owns the layouts of its four namespaced workbenches; selecting a stock\n"
+        "        # or unrelated workbench must never blank the entire Ribbon.\n"
+        "        self._setFmfChromeVisible(True)\n"
+        "        workbenchName = workbenchName or Gui.activeWorkbench().name()\n"
+        "        self.selectFmfWorkbenchContext(workbenchName)\n",
+    ),
+    (
+        "        # ensure that workbench is already loaded\n"
+        "        workbench = Gui.activeWorkbench()\n"
+        '        if not hasattr(workbench, "__Workbench__"):\n'
+        "            # XXX for debugging purposes\n"
+        "            if Parameters.DEBUG_MODE is True:\n"
+        '                StandardFunctions.Print(f"wb {workbench.MenuText} not loaded", "Log")\n'
+        "\n"
+        "            # wait for 0.1s hoping that after that time the workbench is loaded\n"
+        "            timer.timeout.connect(self.onWbActivated)\n"
+        "            timer.setSingleShot(True)\n"
+        "            timer.start(1000)\n"
+        "            return\n"
+        "\n"
+        "        # hide normal toolbars\n"
+        "        self.hideClassicToolbars()\n"
+        "\n"
+        "        # switch tab if necessary\n"
+        "        self.updateCurrentTab()\n"
+        "\n"
+        "        # create panels. Do this after updateCurrentTab.\n"
+        "        # Otherwise, the sketcher workbench won;t be loaded properly the first time\n"
+        "        if self.CustomizeEnabled is False: \n"
+        "            self.buildPanels()\n"
+        "        if self.CustomizeEnabled:\n"
+        "            self.buildPanels(Dict=self.workBenchDict, UpdateDict=False)\n"
+        "        \n"
+        "        # hide normal toolbars\n"
+        "        self.hideClassicToolbars()\n"
+        "\n"
+        "        if self.CustomizeEnabled:\n"
+        "            self.on_Customize_Clicked()\n"
+        "            # If not activated, activate all buttons    \n"
+        "            self.activateButtons() \n"
+        "\n"
+        "        # if self.DesignMenuLoaded is True:\n"
+        "        #     # Disable the quick toolbar, righttoolbar and application menu\n"
+        "        #     self.rightToolBar().setDisabled(True)\n"
+        "        #     self.quickAccessToolBar().setDisabled(True)\n"
+        "        #     self.applicationOptionButton().setDisabled(True)\n"
+        "        #     Gui.updateGui()\n"
+        "        \n"
+        "        return\n",
+        "        # hide normal toolbars\n"
+        "        self.hideClassicToolbars()\n"
+        "        self.ApplicationMenus()\n",
     ),
 )
 
@@ -1357,6 +1592,44 @@ STANDARD_FUNCTIONS_ICON_PATCH = (
 )
 
 
+# Native commands already expose their authoritative QAction icon. Resolve it
+# before treating a command ID as a pixmap name; otherwise Gui.getIcon logs a
+# false missing-icon warning for valid commands such as Std_ViewFitAll.
+STANDARD_FUNCTIONS_NATIVE_ICON_PATCH = (
+    (
+        '    icon = QIcon()\n    \n    if pixmap != "":\n',
+        "    icon = QIcon()\n"
+        "\n"
+        "    # Prefer the command's live QAction. Command IDs are often used as\n"
+        "    # fallback pixmap names, but asking Gui.getIcon for those IDs first emits\n"
+        "    # a misleading warning even when the command already owns a valid icon.\n"
+        "    try:\n"
+        "        Command = Gui.Command.get(CommandName)\n"
+        "        action = Command.getAction()[0]\n"
+        "        icon = action.icon()\n"
+        "        if icon is not None and icon.isNull() is False:\n"
+        "            return icon\n"
+        "    except Exception:\n"
+        "        pass\n"
+        "\n"
+        '    if pixmap != "":\n',
+    ),
+    (
+        "    if icon is None or (icon is not None and icon.isNull()):\n"
+        "        try:\n"
+        "            Command = Gui.Command.get(CommandName)\n"
+        "            action = Command.getAction()[0]\n"
+        "            icon = action.icon()\n"
+        "            if icon is not None and icon.isNull() is False:\n"
+        "                return icon\n"
+        "        except Exception:\n"
+        "            pass\n"
+        "        \n",
+        "",
+    ),
+)
+
+
 # Upstream seeds a missing large-icon size from the small-icon setting, which
 # makes every large ribbon button come back the size of a small one.
 PARAMETERS_ICON_SIZE_PATCH = (
@@ -1656,46 +1929,11 @@ FCBINDING_INTEGRATION_PATCH = (
         "        panel.deleteLater()\n"
         "        return replacement\n"
         "\n"
-        "    def _rebuildResponsivePanels(self):\n"
-        '        """Rebuild only width-aware panels after the window crosses a size tier."""\n'
-        "        self._responsiveRebuildPending = False\n"
-        "        if self.CustomizeEnabled:\n"
-        "            return\n"
-        "        workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())\n"
-        "        category = self.currentCategory()\n"
-        "        if workbenchName is None or category is None:\n"
-        "            return\n"
-        "        Dict = self.workBenchDict\n"
-        '        if workbenchName not in Dict.get("workbenches", {}):\n'
-        "            Dict = self.ribbonStructure\n"
-        '        definitions = Dict.get("workbenches", {}).get(workbenchName, {}).get("toolbars", {})\n'
-        "        for panel in list(category.panels().values()):\n"
-        '            if not definitions.get(panel.objectName(), {}).get("responsive"):\n'
-        "                continue\n"
-        "            replacement = self.CreatePanel(\n"
-        "                workbenchName,\n"
-        "                panel.objectName(),\n"
-        "                addPanel=False,\n"
-        "                Dict=Dict,\n"
-        "                ignoreColumnLimit=False,\n"
-        "                showEnableControl=False,\n"
-        "                enableSeparator=False,\n"
-        "                ActivateButtons=True,\n"
-        "            )\n"
-        "            if replacement is None:\n"
-        "                continue\n"
-        "            self._fmfReplacePanel(category, panel, replacement)\n"
-        "            self.setPanelProperties(replacement)\n"
-        "\n"
         "    def resizeEvent(self, event):\n"
         "        super().resizeEvent(event)\n"
-        "        tier = self._responsiveWidthTier()\n"
-        '        previousTier = getattr(self, "_responsiveWidthTierValue", tier)\n'
-        "        self._responsiveWidthTierValue = tier\n"
-        '        if tier == previousTier or getattr(self, "_responsiveRebuildPending", False):\n'
-        "            return\n"
-        "        self._responsiveRebuildPending = True\n"
-        "        QTimer.singleShot(75, self._rebuildResponsivePanels)\n"
+        "        # Runtime panel replacement is intentionally disabled. Replacing widgets\n"
+        "        # while FreeCAD is changing workbenches can mix two categories, and the\n"
+        "        # initial width tier already places narrower commands in overflow menus.\n"
         "\n"
         "    def eventFilter(self, obj, event):\n"
         "        # Disable the standard hover behavior\n"
@@ -2167,7 +2405,8 @@ LOCAL_PATCHES = (
     ),
     (
         ("FreeCAD-Ribbon", "FCBinding.py"),
-        FCBINDING_INTEGRATION_PATCH
+        FCBINDING_TRANSITION_PATCH
+        + FCBINDING_INTEGRATION_PATCH
         + FCBINDING_DIVIDER_PATCH
         + FCBINDING_OVERFLOW_PATCH
         + FCBINDING_ACTIVATE_PATCH
@@ -2176,7 +2415,12 @@ LOCAL_PATCHES = (
         + FCBINDING_UI_LATENCY_PATCH
         + FCBINDING_FOCUS_PATCH
         + FCBINDING_HOST_ISOLATION_PATCH
-        + FCBINDING_ACTION_BINDING_PATCH,
+        + FCBINDING_ACTION_BINDING_PATCH
+        + FCBINDING_PASSIVE_TRANSITION_PATCH,
+    ),
+    (
+        ("FreeCAD-Ribbon", "InitGui.py"),
+        RIBBON_INIT_TRANSITION_PATCH,
     ),
     (
         ("FreeCAD-Ribbon", "CustomWidgets.py"),
@@ -2188,7 +2432,9 @@ LOCAL_PATCHES = (
     ),
     (
         ("FreeCAD-Ribbon", "Standard_Functions_Ribbon.py"),
-        STANDARD_FUNCTIONS_COLOUR_PATCH + STANDARD_FUNCTIONS_ICON_PATCH,
+        STANDARD_FUNCTIONS_COLOUR_PATCH
+        + STANDARD_FUNCTIONS_ICON_PATCH
+        + STANDARD_FUNCTIONS_NATIVE_ICON_PATCH,
     ),
     (
         ("FreeCAD-Ribbon", "Parameters_Ribbon.py"),

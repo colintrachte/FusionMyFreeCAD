@@ -914,7 +914,19 @@ def returnQiCons_Commands(CommandName, pixmap=""):
         pass
 
     icon = QIcon()
-    
+
+    # Prefer the command's live QAction. Command IDs are often used as
+    # fallback pixmap names, but asking Gui.getIcon for those IDs first emits
+    # a misleading warning even when the command already owns a valid icon.
+    try:
+        Command = Gui.Command.get(CommandName)
+        action = Command.getAction()[0]
+        icon = action.icon()
+        if icon is not None and icon.isNull() is False:
+            return icon
+    except Exception:
+        pass
+
     if pixmap != "":
         if icon is None or (icon is not None and icon.isNull()):
             try:
@@ -934,16 +946,6 @@ def returnQiCons_Commands(CommandName, pixmap=""):
     #     except Exception:
     #         pass
 
-    if icon is None or (icon is not None and icon.isNull()):
-        try:
-            Command = Gui.Command.get(CommandName)
-            action = Command.getAction()[0]
-            icon = action.icon()
-            if icon is not None and icon.isNull() is False:
-                return icon
-        except Exception:
-            pass
-        
     if icon is None or (icon is not None and icon.isNull()):
         try:
             Menus = mw.findChildren(QToolButton)

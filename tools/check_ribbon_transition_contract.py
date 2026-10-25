@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FCBINDING = ROOT / "bundled-addons" / "FreeCAD-Ribbon" / "FCBinding.py"
+BOOTSTRAP = ROOT / "fmf_bootstrap.py"
 
 
 def _method_source(source: str, name: str) -> str:
@@ -24,27 +25,72 @@ def _method_source(source: str, name: str) -> str:
     return ast.get_source_segment(source, method) or ""
 
 
-def validate(source: str | None = None) -> None:
-    """Validate the synchronization and panel-identity invariants."""
+def validate(source: str | None = None, bootstrap_source: str | None = None) -> None:
+    """Validate passive transition and stable panel-identity invariants."""
     source = FCBINDING.read_text(encoding="utf-8") if source is None else source
+    bootstrap_source = (
+        BOOTSTRAP.read_text(encoding="utf-8") if bootstrap_source is None else bootstrap_source
+    )
     transition = _method_source(source, "onUserChangedWorkbench")
-    if transition.count("self.onWbActivated()") != 2:
+    forbidden_transition_work = (
+        "self.onWbActivated(",
+        "self.ApplicationMenus(",
+        "self.buildPanels(",
+        "self.on_Customize_Clicked(",
+    )
+    present = [fragment for fragment in forbidden_transition_work if fragment in transition]
+    if present:
         raise RuntimeError(
-            "Ribbon transition contract: onUserChangedWorkbench() must retain both "
-            "onWbActivated() synchronization passes"
+            "Ribbon transition contract: a user tab handler performs transition rebuild work; "
+            f"found {present}"
         )
-    if transition.count("self.ApplicationMenus()") != 2:
+    if transition.count("Gui.activateWorkbench(") != 1:
         raise RuntimeError(
-            "Ribbon transition contract: onUserChangedWorkbench() must retain both "
-            "ApplicationMenus() synchronization passes"
+            "Ribbon transition contract: only a user tab choice may request one workbench change"
         )
-    second_sync = transition.rindex("self.onWbActivated()")
-    for required_after in ("self.hideClassicToolbars()", "self.on_Customize_Clicked()"):
-        if required_after not in transition or second_sync > transition.index(required_after):
+    if "self._fmfProgrammaticTabChange" not in transition:
+        raise RuntimeError("Ribbon transition contract: programmatic tab changes are not guarded")
+
+    selector = _method_source(source, "selectFmfWorkbenchContext")
+    for fragment in (
+        "self._fmfProgrammaticTabChange = True",
+        "finally:",
+        "self._fmfProgrammaticTabChange = False",
+        "workbenchName not in self._fmfBuiltWorkbenches",
+    ):
+        if fragment not in selector:
             raise RuntimeError(
-                "Ribbon transition contract: the second synchronization pass must run "
-                f"before {required_after}"
+                "Ribbon transition contract: passive context selection is incomplete; "
+                f"missing {fragment}"
             )
+
+    activation = _method_source(source, "onWbActivated")
+    for fragment in ("Gui.activateWorkbench(", "self.buildPanels("):
+        if fragment in activation:
+            raise RuntimeError(
+                "Ribbon transition contract: host activation callback performs forbidden work; "
+                f"found {fragment}"
+            )
+    if "self.selectFmfWorkbenchContext(workbenchName)" not in activation:
+        raise RuntimeError("Ribbon transition contract: host activation is not presentation-only")
+
+    resize = _method_source(source, "resizeEvent")
+    if "_rebuildResponsivePanels" in source or "QTimer.singleShot" in resize:
+        raise RuntimeError("Ribbon transition contract: resize may replace live panel widgets")
+
+    bootstrap_tree = ast.parse(bootstrap_source)
+    observer = next(
+        node
+        for node in bootstrap_tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "_SketchEditWorkbenchObserver"
+    )
+    observer_source = ast.get_source_segment(bootstrap_source, observer) or ""
+    if "Gui.activateWorkbench(" in observer_source:
+        raise RuntimeError(
+            "Ribbon transition contract: sketch edit observers must not activate workbenches"
+        )
+    if "show_ribbon_context(" not in observer_source:
+        raise RuntimeError("Ribbon transition contract: sketch edit presentation is not passive")
 
     replacement = _method_source(source, "_fmfReplacePanel")
     required_replacement_fragments = (
@@ -63,12 +109,7 @@ def validate(source: str | None = None) -> None:
             f"missing {missing}"
         )
 
-    responsive = _method_source(source, "_rebuildResponsivePanels")
     reset = _method_source(source, "_resetOnePanel")
-    if "self._fmfReplacePanel(category, panel, replacement)" not in responsive:
-        raise RuntimeError(
-            "Ribbon transition contract: responsive rebuild bypasses safe panel replacement"
-        )
     if "self._fmfReplacePanel(self.currentCategory(), panel, replacement)" not in reset:
         raise RuntimeError(
             "Ribbon transition contract: panel reset bypasses safe panel replacement"

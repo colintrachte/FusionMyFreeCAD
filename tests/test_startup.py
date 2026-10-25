@@ -179,11 +179,15 @@ def test_live_reenable_reinstalls_runtime_and_feature_observers(
 
     _message, problems = bootstrap.disable()
     assert problems == []
-    assert env.main_window._fmf_my_freecad_connected is False
+    import fmf_transitions
+
+    assert "runtime" not in fmf_transitions.snapshot()["phases"]
+    assert "action-registry" not in fmf_transitions.snapshot()["phases"]
     assert bootstrap._feature_commands_registered is False
 
     bootstrap.enable()
-    assert env.main_window._fmf_my_freecad_connected is True
+    assert "runtime" in fmf_transitions.snapshot()["phases"]
+    assert "action-registry" in fmf_transitions.snapshot()["phases"]
     assert bootstrap._feature_commands_registered is True
     assert len(env.selection_observers) == 2
 
@@ -726,7 +730,9 @@ def test_startup_diagnostics_flush_events_as_one_batch(env, bootstrap, monkeypat
     assert [event["operation"] for event in events] == ["session", "installation"]
 
 
-def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher(env, bootstrap):
+def test_create_sketch_keeps_host_workbench_and_presents_sketch_context(
+    env, bootstrap, monkeypatch
+):
     class View:
         def __init__(self):
             self.calls = []
@@ -740,6 +746,8 @@ def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher
     view = View()
     env.gui.ActiveDocument = types.SimpleNamespace(ActiveView=view)
     bootstrap.register_commands()
+    contexts = []
+    monkeypatch.setattr(bootstrap, "show_ribbon_context", contexts.append)
 
     env.commands["FMF_CreateSketch"].Activated()
     FakeTimer.pump()
@@ -755,11 +763,10 @@ def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher
     observer = env.document_observers[0]
     sketch = FakeObject("Sketcher::SketchObject", "Sketch")
     observer.slotInEdit(types.SimpleNamespace(Object=sketch))
-    # The switch is deferred out of the slotInEdit callback so it cannot re-enter
-    # a half-built edit state; it lands on the next event-loop turn.
     assert env.active_workbench == "PartDesignWorkbench"
     FakeTimer.pump()
-    assert env.active_workbench == "SketcherWorkbench"
+    assert env.active_workbench == "PartDesignWorkbench"
+    assert contexts == ["FMFSketchWorkbench"]
     # New empty sketch is centered on sketch plane origin at 100mm initial range
     assert view.calls == [
         "axonometric",
@@ -768,46 +775,53 @@ def test_create_sketch_keeps_plane_selection_in_part_design_then_enters_sketcher
     ]
 
 
-def test_owned_sketch_edit_always_returns_to_fmf_design(env, bootstrap):
+def test_owned_sketch_edit_changes_only_ribbon_context(env, bootstrap, monkeypatch):
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
     env.active_workbench = "FMFPartWorkbench"
     bootstrap.register_commands()
+    contexts = []
+    monkeypatch.setattr(bootstrap, "show_ribbon_context", contexts.append)
     observer = env.document_observers[0]
     sketch = FakeSketch()
     view_provider = types.SimpleNamespace(Object=sketch)
 
     observer.slotInEdit(view_provider)
     FakeTimer.pump()
-    assert env.active_workbench == "FMFSketchWorkbench"
+    assert env.active_workbench == "FMFPartWorkbench"
+    assert contexts == ["FMFSketchWorkbench"]
 
     observer.slotResetEdit(view_provider)
     FakeTimer.pump()
-    assert env.active_workbench == "FMFDesignWorkbench"
+    assert env.active_workbench == "FMFPartWorkbench"
+    assert contexts[-1] == "FMFPartWorkbench"
 
 
-def test_sketch_exit_waits_for_freecads_queued_workbench_transition(env, bootstrap):
+def test_sketch_exit_never_competes_with_freecads_workbench_transition(
+    env, bootstrap, monkeypatch
+):
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
     env.active_workbench = "FMFSketchWorkbench"
     bootstrap.register_commands()
+    contexts = []
+    monkeypatch.setattr(bootstrap, "show_ribbon_context", contexts.append)
     observer = env.document_observers[0]
     view_provider = types.SimpleNamespace(Object=FakeSketch())
 
     observer.slotResetEdit(view_provider)
 
-    # FMF must not rebuild Ribbon on the same queued turn in which FreeCAD is
-    # still completing its native Sketcher-exit transition.
     FakeTimer.pump(rounds=1)
     assert env.active_workbench == "FMFSketchWorkbench"
-
-    env.gui.activateWorkbench("PartDesignWorkbench")
-    FakeTimer.pump(rounds=1)
-    assert env.active_workbench == "FMFDesignWorkbench"
+    assert contexts == ["FMFDesignWorkbench"]
 
 
-def test_stale_sketch_exit_does_not_interrupt_a_new_sketch_edit(env, bootstrap):
+def test_stale_sketch_exit_does_not_replace_a_new_sketch_context(
+    env, bootstrap, monkeypatch
+):
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
     env.active_workbench = "FMFSketchWorkbench"
     bootstrap.register_commands()
+    contexts = []
+    monkeypatch.setattr(bootstrap, "show_ribbon_context", contexts.append)
     observer = env.document_observers[0]
     view_provider = types.SimpleNamespace(Object=FakeSketch())
 
@@ -817,6 +831,31 @@ def test_stale_sketch_exit_does_not_interrupt_a_new_sketch_edit(env, bootstrap):
     FakeTimer.pump()
 
     assert env.active_workbench == "FMFSketchWorkbench"
+    assert contexts[-1] == "FMFSketchWorkbench"
+
+
+def test_repeated_existing_sketch_edits_never_activate_a_workbench(
+    env, bootstrap, monkeypatch
+):
+    env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
+    env.active_workbench = "FMFDesignWorkbench"
+    bootstrap.register_commands()
+    observer = env.document_observers[0]
+    view_provider = types.SimpleNamespace(Object=FakeSketch())
+    contexts = []
+    monkeypatch.setattr(bootstrap, "show_ribbon_context", contexts.append)
+    initial_workbench_events = [event for event in env.gui_events if event[0] == "workbench"]
+
+    for _cycle in range(25):
+        observer.slotInEdit(view_provider)
+        FakeTimer.pump()
+        observer.slotResetEdit(view_provider)
+        FakeTimer.pump()
+
+    assert env.active_workbench == "FMFDesignWorkbench"
+    assert contexts == ["FMFSketchWorkbench", "FMFDesignWorkbench"] * 25
+    final_workbench_events = [event for event in env.gui_events if event[0] == "workbench"]
+    assert final_workbench_events == initial_workbench_events
 
 
 def test_untouched_document_created_for_sketch_is_discarded_when_another_opens(env, bootstrap):
@@ -901,7 +940,7 @@ def test_create_sketch_with_preselection_skips_origin_plane_framing(env, bootstr
     assert view.calls == []
 
 
-def test_existing_sketch_with_geometry_preserves_camera_framing(env, bootstrap):
+def test_existing_sketch_with_geometry_preserves_camera_framing(env, bootstrap, monkeypatch):
     class View:
         def __init__(self):
             self.calls = []
@@ -915,6 +954,7 @@ def test_existing_sketch_with_geometry_preserves_camera_framing(env, bootstrap):
     view = View()
     env.gui.ActiveDocument = types.SimpleNamespace(ActiveView=view)
     bootstrap.register_commands()
+    monkeypatch.setattr(bootstrap, "show_ribbon_context", lambda _name: True)
 
     observer = env.document_observers[0]
     env.load_sketch_tools()  # ensure sketch tools are available
@@ -924,7 +964,7 @@ def test_existing_sketch_with_geometry_preserves_camera_framing(env, bootstrap):
     observer.slotInEdit(types.SimpleNamespace(Object=sketch_obj))
     FakeTimer.pump()
 
-    assert env.active_workbench == "SketcherWorkbench"
+    assert env.active_workbench == "PartDesignWorkbench"
     # Geometry exists, so camera zoom/framing is not overridden
     assert view.calls == []
 

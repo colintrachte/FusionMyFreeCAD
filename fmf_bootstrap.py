@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from fmf_actions import NativeActionAdapter, RibbonActionBindingRegistry
+from fmf_actions import CanonicalActionRegistry, NativeActionAdapter, RibbonActionBindingRegistry
 
 ADDON_ROOT = os.path.dirname(os.path.abspath(__file__))
 RESOURCE_ROOT = os.path.join(ADDON_ROOT, "Resources", "FMF")
@@ -92,10 +92,26 @@ PACKAGE_VERSION = _read_package_version()
 
 
 _ribbon_action_bindings = None
+_native_action_registry = None
 _native_toolbar_visibility = None
 _addon_directory_watcher = None
 _addon_recovery_started = False
 _quit_hooked = False
+
+
+def native_action_registry():
+    """Return the one native-action registry shared by every FMF service."""
+    global _native_action_registry
+    if _native_action_registry is None:
+        from PySide.QtGui import QAction
+
+        _native_action_registry = CanonicalActionRegistry(Gui, QAction)
+        import fmf_transitions
+
+        fmf_transitions.register_phase(
+            "action-registry", _native_action_registry.advance_generation, order=15
+        )
+    return _native_action_registry
 
 
 def _action_bindings():
@@ -104,7 +120,7 @@ def _action_bindings():
     if _ribbon_action_bindings is None:
         from PySide.QtGui import QAction
 
-        adapter = NativeActionAdapter(Gui, QAction)
+        adapter = NativeActionAdapter(Gui, QAction, native_action_registry())
         _ribbon_action_bindings = RibbonActionBindingRegistry(adapter)
     return _ribbon_action_bindings
 
@@ -122,6 +138,22 @@ def dispose_ribbon_action_bindings():
     if _ribbon_action_bindings is not None:
         _ribbon_action_bindings.dispose()
         _ribbon_action_bindings = None
+
+
+def dispose_native_action_registry():
+    """Detach registry-owned usage callbacks and discard cached Qt wrappers."""
+    global _native_action_registry
+    if _native_action_registry is not None:
+        try:
+            import fmf_transitions
+
+            fmf_transitions.unregister_phase(
+                "action-registry", _native_action_registry.advance_generation
+            )
+        except (ImportError, AttributeError):
+            pass
+        _native_action_registry.dispose()
+        _native_action_registry = None
 
 
 def ribbon_action_binding_count():
@@ -167,6 +199,7 @@ def _on_about_to_quit():
     """Prevent Qt from persisting FMF's intentionally hidden native toolbars."""
     restore_native_toolbar_visibility()
     dispose_ribbon_action_bindings()
+    dispose_native_action_registry()
     _set_searchbar_service(False)
     uninstall_activation_monitor()
 
@@ -1324,6 +1357,20 @@ def active_workbench_name():
         return ""
 
 
+def show_ribbon_context(workbench_name):
+    """Select an FMF Ribbon context without changing FreeCAD's workbench."""
+    try:
+        from PySide import QtWidgets
+
+        main_window = Gui.getMainWindow()
+        ribbon_dock = main_window.findChild(QtWidgets.QDockWidget, "Ribbon")
+        ribbon = ribbon_dock.widget() if ribbon_dock is not None else None
+        select_context = getattr(ribbon, "selectFmfWorkbenchContext", None)
+        return bool(select_context and select_context(workbench_name))
+    except (AttributeError, RuntimeError, TypeError):
+        return False
+
+
 def fmf_workbench_for(native_workbench):
     """Return the matching FMF identity when the owned interface is active."""
     if is_enabled() and owned_workbenches_enabled():
@@ -1465,6 +1512,7 @@ def disable():
             runtime.uninstall()
         except Exception as error:
             problems.append("Runtime teardown: {}".format(error))
+    dispose_native_action_registry()
     unregister_feature_observers()
     try:
         import fmf_viewport
@@ -1795,10 +1843,11 @@ def _frame_origin_planes():
 
 
 class _SketchEditWorkbenchObserver:
-    """Use Sketcher as a temporary editing context, then return to Design."""
+    """Present Sketch tools without taking ownership of FreeCAD's workbench state."""
 
     def __init__(self):
         self._transition_serial = 0
+        self._return_context = "FMFDesignWorkbench"
 
     def slotInEdit(self, view_provider):
         def install_task_filter():
@@ -1817,11 +1866,16 @@ class _SketchEditWorkbenchObserver:
         if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
             return
         self._transition_serial += 1
-        # Switch after setEdit returns, not from inside this callback. Activating
-        # a workbench rebuilds the ribbon and polls every command's IsActive();
-        # doing that while FreeCAD is still mid-setEdit re-enters a half-built
-        # edit state. Deferring to the event loop keeps the switch out of that
-        # window. _frame_origin_planes uses the same pattern.
+        active = active_workbench_name()
+        allowed_returns = {
+            "FMFDesignWorkbench",
+            "FMFPartWorkbench",
+            "FMFSurfaceWorkbench",
+        }
+        self._return_context = active if active in allowed_returns else "FMFDesignWorkbench"
+        # FreeCAD owns edit-mode workbench state. FMF changes only the visible
+        # Ribbon category after setEdit returns, avoiding a re-entrant host
+        # workbench activation while the edit transaction is still opening.
         try:
             from PySide import QtCore
 
@@ -1830,7 +1884,7 @@ class _SketchEditWorkbenchObserver:
             self._on_sketch_in_edit(obj)
 
     def _on_sketch_in_edit(self, sketch_obj):
-        Gui.activateWorkbench(fmf_workbench_for("SketcherWorkbench"))
+        show_ribbon_context("FMFSketchWorkbench")
         # If this is a newly created sketch (no geometry yet), ensure its view
         # is cleanly centered on the sketch plane origin with ~100x100mm range,
         # preventing off-center pan and extreme zoom.
@@ -1860,29 +1914,17 @@ class _SketchEditWorkbenchObserver:
             return
         self._transition_serial += 1
         transition_serial = self._transition_serial
-        return_workbench = fmf_workbench_for("PartDesignWorkbench")
-        if return_workbench and return_workbench != active_workbench_name():
-            try:
-                from PySide import QtCore
+        return_context = self._return_context
+        try:
+            from PySide import QtCore
 
-                # FreeCAD queues its own post-Sketcher workbench update while
-                # slotResetEdit is running.  Activating Design on that same
-                # event-loop turn makes Ribbon process both transitions at
-                # once, which can leave Sketch and Design panels in one tab.
-                # Wait one additional turn so FreeCAD's transition finishes,
-                # then ignore this callback if another edit transition began.
-                def after_freecad_transition():
-                    def activate_design():
-                        if transition_serial != self._transition_serial:
-                            return
-                        if return_workbench != active_workbench_name():
-                            Gui.activateWorkbench(return_workbench)
+            def show_return_context():
+                if transition_serial == self._transition_serial:
+                    show_ribbon_context(return_context)
 
-                    QtCore.QTimer.singleShot(0, activate_design)
-
-                QtCore.QTimer.singleShot(0, after_freecad_transition)
-            except ImportError:
-                Gui.activateWorkbench(return_workbench)
+            QtCore.QTimer.singleShot(0, show_return_context)
+        except ImportError:
+            show_ribbon_context(return_context)
         try:
             import fmf_sketch_tools
 

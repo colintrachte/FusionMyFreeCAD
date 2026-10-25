@@ -26,15 +26,20 @@
 - **Local Dev Deploy:** `powershell -ExecutionPolicy Bypass -File .\tools\install-dev.ps1`
 
 ## Ribbon Workbench-Transition Guardrail
-- In `FreeCAD-Ribbon/FCBinding.py`, the repeated `onWbActivated()`, `ApplicationMenus()`,
-  `hideClassicToolbars()`, and customization synchronization inside
-  `onUserChangedWorkbench()` are intentional. Do not remove or skip them as a performance
-  optimization. FreeCAD may emit its Sketcher-exit workbench signal before Ribbon finishes
-  selecting the destination category; suppressing the second synchronization pass can merge
-  Sketch and Design panels into one corrupted ribbon tab.
-- Performance work may cache idempotent data used by those calls, but must preserve the full
-  transition sequence and the regression contract in `tests/test_package.py`.
-- Responsive and reset-driven panel replacement must remove every dictionary entry that still
+- FreeCAD exclusively owns sketch edit-mode workbench transitions. Document observers may select
+  an existing FMF Ribbon context, but must never call `Gui.activateWorkbench()` directly or through
+  a deferred timer. Only an explicit user click on a Ribbon workbench tab may request a workbench.
+- Workbench-activation callbacks are presentation-only. They may select an existing category,
+  update cached menus, and hide native toolbars, but must not rebuild panels, replace widgets,
+  enter customization, or reactivate a workbench.
+- Programmatic category selection must keep `onUserChangedWorkbench()` from running while still
+  allowing the Ribbon stack to display the selected category. Preserve the scoped
+  `_fmfProgrammaticTabChange` guard.
+- Runtime resize handling must not replace panels. Width-responsive commands use the width tier
+  captured when a category is first built and remain available through overflow menus.
+- Run `tools/check_ribbon_transition_contract.py` after any work on sketch observers, Ribbon tabs,
+  panel construction, responsive layout, or workbench lifecycle code.
+- Manual reset-driven panel replacement must remove every dictionary entry that still
   points to the old panel, then register the replacement by `objectName()`. Do not combine
   `replacePanel()` with a second `_panels[...]` assignment: FMF panel display titles and object
   names differ, so that pattern accumulates stale aliases and eventually renders duplicate panels.

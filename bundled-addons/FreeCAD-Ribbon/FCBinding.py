@@ -361,6 +361,8 @@ class ModernMenu(RibbonBar):
         """
         super().__init__(title="")
         self.setObjectName("Ribbon")
+        self._fmfProgrammaticTabChange = False
+        self._fmfBuiltWorkbenches = set()
 
         # Enable dragdrop
         self.setAcceptDrops(True)
@@ -1199,46 +1201,11 @@ class ModernMenu(RibbonBar):
         panel.deleteLater()
         return replacement
 
-    def _rebuildResponsivePanels(self):
-        """Rebuild only width-aware panels after the window crosses a size tier."""
-        self._responsiveRebuildPending = False
-        if self.CustomizeEnabled:
-            return
-        workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())
-        category = self.currentCategory()
-        if workbenchName is None or category is None:
-            return
-        Dict = self.workBenchDict
-        if workbenchName not in Dict.get("workbenches", {}):
-            Dict = self.ribbonStructure
-        definitions = Dict.get("workbenches", {}).get(workbenchName, {}).get("toolbars", {})
-        for panel in list(category.panels().values()):
-            if not definitions.get(panel.objectName(), {}).get("responsive"):
-                continue
-            replacement = self.CreatePanel(
-                workbenchName,
-                panel.objectName(),
-                addPanel=False,
-                Dict=Dict,
-                ignoreColumnLimit=False,
-                showEnableControl=False,
-                enableSeparator=False,
-                ActivateButtons=True,
-            )
-            if replacement is None:
-                continue
-            self._fmfReplacePanel(category, panel, replacement)
-            self.setPanelProperties(replacement)
-
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        tier = self._responsiveWidthTier()
-        previousTier = getattr(self, "_responsiveWidthTierValue", tier)
-        self._responsiveWidthTierValue = tier
-        if tier == previousTier or getattr(self, "_responsiveRebuildPending", False):
-            return
-        self._responsiveRebuildPending = True
-        QTimer.singleShot(75, self._rebuildResponsivePanels)
+        # Runtime panel replacement is intentionally disabled. Replacing widgets
+        # while FreeCAD is changing workbenches can mix two categories, and the
+        # initial width tier already places narrower commands in overflow menus.
 
     def eventFilter(self, obj, event):
         # Disable the standard hover behavior
@@ -3584,12 +3551,21 @@ class ModernMenu(RibbonBar):
     # region - Standard ribbon functions
     def connectSignals(self):
         self.tabBar().currentChanged.connect(self.onUserChangedWorkbench)
-        mw.workbenchActivated.connect(self.onWbActivated)
+        import fmf_transitions
+
+        self._fmfTransitionCallback = self.onWbActivated
+        fmf_transitions.register_phase(
+            "ribbon", self._fmfTransitionCallback, order=20
+        )
         return
 
     def disconnectSignals(self):
         self.tabBar().currentChanged.disconnect(self.onUserChangedWorkbench)
-        mw.workbenchActivated.disconnect(self.onWbActivated)
+        import fmf_transitions
+
+        fmf_transitions.unregister_phase(
+            "ribbon", getattr(self, "_fmfTransitionCallback", None)
+        )
         return
 
     def _fmfAuthoritativeWorkbenchActive(self):
@@ -3629,52 +3605,48 @@ class ModernMenu(RibbonBar):
 
     def onUserChangedWorkbench(self, tabActivated=True):
         """
-        Import selected workbench toolbars to ModernMenu section.
+        Activate a workbench only for a genuine user-selected Ribbon tab.
         """                
-        if getattr(self, "_fmfBuildingMenu", False):
+        if getattr(self, "_fmfBuildingMenu", False) or self._fmfProgrammaticTabChange:
             return
-        if len(mw.findChildren(QDockWidget, "Ribbon")) > 0:
-            if Parameters.AUTOHIDE_RIBBON is False:
-                self.UnfoldRibbon()
-            # else:
-            #     self.FoldRibbon(True)
-
-        index = self.tabBar().currentIndex()
-        tabName = self.tabBar().tabText(index)
-
-        if tabName is not None and tabName != "" and tabName != "test":
-            # activate selected workbench
-            tabName = tabName.replace("&", "")
-            if self.wbNameMapping[tabName] is not None:
-                Gui.activateWorkbench(self.wbNameMapping[tabName])
-
-            if tabActivated is True:
-                self.onWbActivated()
-                self.ApplicationMenus()
-
-        # Do not remove this second synchronization pass as a performance
-        # shortcut. FreeCAD can emit its Sketcher-exit workbench signal before
-        # Ribbon has finished selecting the matching destination category.
-        self.onWbActivated()
-        self.ApplicationMenus()
-
-        # hide normal toolbars
+        workbenchName = self.tabBar().tabData(self.tabBar().currentIndex())
+        if workbenchName and workbenchName != Gui.activeWorkbench().name():
+            Gui.activateWorkbench(workbenchName)
         self.hideClassicToolbars()
-
-        if self.CustomizeEnabled:
-            self.on_Customize_Clicked()
-            # Activate all commands
-            self.activateButtons()
-
-        # Emit a signal when switching to a new tab. Used to update the "addcommands" panel
         self.TabChanged.emit()
-        return
 
-    def onWbActivated(self):        
+    def selectFmfWorkbenchContext(self, workbenchName, buildIfNeeded=True):
+        """Show one existing category without emitting a workbench request."""
+        index = next(
+            (
+                candidate
+                for candidate in range(self.tabBar().count())
+                if self.tabBar().tabData(candidate) == workbenchName
+            ),
+            -1,
+        )
+        if index < 0:
+            return False
+        self._fmfProgrammaticTabChange = True
+        try:
+            self.tabBar().setCurrentIndex(index)
+        finally:
+            self._fmfProgrammaticTabChange = False
+        if buildIfNeeded and workbenchName not in self._fmfBuiltWorkbenches:
+            if self.CustomizeEnabled is False:
+                self.buildPanels()
+            else:
+                self.buildPanels(Dict=self.workBenchDict, UpdateDict=False)
+            self._fmfBuiltWorkbenches.add(workbenchName)
+        return True
+
+    def onWbActivated(self, workbenchName=None):
         # The Ribbon is the application chrome for every workbench. FMF only
         # owns the layouts of its four namespaced workbenches; selecting a stock
         # or unrelated workbench must never blank the entire Ribbon.
         self._setFmfChromeVisible(True)
+        workbenchName = workbenchName or Gui.activeWorkbench().name()
+        self.selectFmfWorkbenchContext(workbenchName)
         if len(mw.findChildren(QDockWidget, "Ribbon")) > 0:
             if Parameters.AUTOHIDE_RIBBON is False:
                 self.UnfoldRibbon()
@@ -3729,48 +3701,9 @@ class ModernMenu(RibbonBar):
         if tooltipStyle not in styleSheet:
             self.tabBar().setStyleSheet(styleSheet + tooltipStyle)
 
-        # ensure that workbench is already loaded
-        workbench = Gui.activeWorkbench()
-        if not hasattr(workbench, "__Workbench__"):
-            # XXX for debugging purposes
-            if Parameters.DEBUG_MODE is True:
-                StandardFunctions.Print(f"wb {workbench.MenuText} not loaded", "Log")
-
-            # wait for 0.1s hoping that after that time the workbench is loaded
-            timer.timeout.connect(self.onWbActivated)
-            timer.setSingleShot(True)
-            timer.start(1000)
-            return
-
         # hide normal toolbars
         self.hideClassicToolbars()
-
-        # switch tab if necessary
-        self.updateCurrentTab()
-
-        # create panels. Do this after updateCurrentTab.
-        # Otherwise, the sketcher workbench won;t be loaded properly the first time
-        if self.CustomizeEnabled is False: 
-            self.buildPanels()
-        if self.CustomizeEnabled:
-            self.buildPanels(Dict=self.workBenchDict, UpdateDict=False)
-        
-        # hide normal toolbars
-        self.hideClassicToolbars()
-
-        if self.CustomizeEnabled:
-            self.on_Customize_Clicked()
-            # If not activated, activate all buttons    
-            self.activateButtons() 
-
-        # if self.DesignMenuLoaded is True:
-        #     # Disable the quick toolbar, righttoolbar and application menu
-        #     self.rightToolBar().setDisabled(True)
-        #     self.quickAccessToolBar().setDisabled(True)
-        #     self.applicationOptionButton().setDisabled(True)
-        #     Gui.updateGui()
-        
-        return
+        self.ApplicationMenus()
 
     def onTabBarClicked(self):
         self.UnfoldRibbon()
@@ -7904,8 +7837,10 @@ class run:
         disable = 0
         if name != "NoneWorkbench":
             mw: QMainWindow = Gui.getMainWindow()
-            # Disable connection after activation
-            mw.workbenchActivated.disconnect(run)
+            # The one-time initializer is owned by FMF's transition coordinator.
+            import fmf_transitions
+
+            fmf_transitions.unregister_phase("ribbon-initialize")
             if disable:
                 return
 
@@ -7939,5 +7874,8 @@ class run:
             ribbonDock.setEnabled(True)
             ribbonDock.setVisible(True)
             ribbonDock.show()
+            # Menu-construction tab signals are suppressed. Build the settled
+            # startup category once, after the Ribbon is fully attached.
+            ribbon.onWbActivated(name)
 
             return

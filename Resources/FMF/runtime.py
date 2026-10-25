@@ -77,7 +77,6 @@ _last_workbench = ""
 _task_accept_filter = None
 _task_accept_targets = []
 _deferred_tokens = {}
-_action_inventory_cache = {}
 _usage_action_connections = 0
 _adaptive_refresh_fingerprints = {}
 
@@ -88,20 +87,6 @@ def _record_problem(text):
     if text not in _problems:
         _problems.append(text)
     schedule_status_write()
-
-
-def _qaction_type():
-    return getattr(QtGui, "QAction", None) or QtWidgets.QAction
-
-
-def _action_inventory(main_window, force=False):
-    """Return a cached QAction population for the active command generation."""
-    command_generation = tuple(sorted(Gui.listCommands()))
-    key = (id(main_window), _last_workbench, command_generation)
-    if force or key not in _action_inventory_cache:
-        _action_inventory_cache.clear()
-        _action_inventory_cache[key] = tuple(main_window.findChildren(_qaction_type()))
-    return _action_inventory_cache[key]
 
 
 def _application_shortcut_context():
@@ -831,6 +816,10 @@ def _rewrite_slots(ribbon, workbench, panel_name, group, promoted):
     reordered = promoted + [
         command for command in current_order if command in candidate_set and command not in promoted
     ]
+    if not candidate_positions:
+        # Responsive projections may replace an entire slot group with a
+        # compound/dropdown command. The group is simply inapplicable there.
+        return False
     if len(reordered) != len(candidate_positions):
         # Silently truncating here would drop a promoted command from the
         # panel; report the mismatch and leave this panel untouched instead.
@@ -968,13 +957,14 @@ def reconcile_actions(main_window=None):
     # meant thirteen sweeps of a tree with thousands of actions in it, twice
     # per sketch -- entering an edit activates Sketcher and leaving activates
     # PartDesign again -- and all of it on the thread that draws the window.
-    actions = _action_inventory(main_window, force=explicit_window)
+    registry = bootstrap.native_action_registry()
+    actions = registry.inventory(force=explicit_window)
     try:
         by_name = _action_map(actions)
     except RuntimeError:
         # Ribbon rebuilds can delete QAction wrappers without changing FreeCAD's
         # command registry. Refresh only when a cached wrapper proves stale.
-        actions = _action_inventory(main_window, force=True)
+        actions = registry.inventory(force=True)
         by_name = _action_map(actions)
     adaptive_commands = {
         command
@@ -983,12 +973,12 @@ def reconcile_actions(main_window=None):
         for command in config.get("commands", {})
     }
     for command in adaptive_commands:
-        action = by_name.get(command)
-        if action is None or action.property("fmfUsageConnected"):
-            continue
-        action.setProperty("fmfUsageConnected", True)
-        action.triggered.connect(lambda checked=False, name=command: record_usage(name))
-        _usage_action_connections += 1
+        connected = registry.connect_triggered(
+            command,
+            "runtime",
+            lambda checked=False, name=command: record_usage(name),
+        )
+        _usage_action_connections += int(connected)
 
     if not PREFERENCES.GetBool("SetShortcuts", True):
         restore_shortcuts(main_window)
@@ -1061,9 +1051,7 @@ def _apply_shortcut_plan(plan, by_name=None):
     """Apply one accepted plan and persist its exact pre-change bindings."""
     global _displaced_shortcuts, _pending_shortcut_conflicts
     if by_name is None:
-        main_window = Gui.getMainWindow()
-        actions = main_window.findChildren(_qaction_type()) if main_window is not None else []
-        by_name = _action_map(actions)
+        by_name = _action_map(bootstrap.native_action_registry().inventory())
     encoded_prior = PREFERENCES.GetString("ShortcutPriorState", "")
     try:
         saved_prior = json.loads(encoded_prior) if encoded_prior else {}
@@ -1108,8 +1096,7 @@ def restore_shortcuts(main_window=None):
     except (TypeError, ValueError):
         _record_problem("shortcut restore state is invalid")
         return False
-    main_window = main_window if main_window is not None else Gui.getMainWindow()
-    actions = main_window.findChildren(_qaction_type()) if main_window is not None else []
+    actions = bootstrap.native_action_registry().inventory(force=True)
     by_name = _action_map(actions)
     shortcut_group = App.ParamGet("User parameter:BaseApp/Preferences/Shortcut")
     for command, shortcut in prior.items():
@@ -1130,7 +1117,7 @@ def restore_shortcuts(main_window=None):
 def review_shortcuts(confirm=None, main_window=None):
     """Preview conflicts and apply only after an explicit confirmation."""
     main_window = main_window if main_window is not None else Gui.getMainWindow()
-    actions = main_window.findChildren(_qaction_type()) if main_window is not None else []
+    actions = bootstrap.native_action_registry().inventory(force=True)
     plan = _shortcut_plan(actions)
     lines = [
         "{}: {} → {}".format(item.sequence, item.owner_name, item.target_id)
@@ -1167,8 +1154,8 @@ def write_runtime_status(active_workbench=None):
     active_workbench = _last_workbench if active_workbench is None else active_workbench
     try:
         manifest = load_manifest()
-        available = set(Gui.listCommands())
         expected = manifest.get("primaryCommands", [])
+        available = bootstrap.native_action_registry().available(expected)
         status = {
             "status": "loaded",
             "checkedAt": datetime.now().astimezone().isoformat(),
@@ -1208,16 +1195,16 @@ def runtime_service_state(main_window=None, deep=False):
     """Return observable ownership state for every long-lived runtime service."""
     main_window = main_window if main_window is not None else Gui.getMainWindow()
     usage_connections = _usage_action_connections
-    if deep and main_window is not None:
-        actions = main_window.findChildren(_qaction_type())
-        usage_connections = sum(1 for action in actions if action.property("fmfUsageConnected"))
+    action_registry = bootstrap.native_action_registry().snapshot()
+    if deep:
+        usage_connections = action_registry["triggerConnections"]
     return {
-        "workbenchSignalConnected": bool(
-            main_window is not None and getattr(main_window, "_fmf_my_freecad_connected", False)
-        ),
+        "workbenchSignalConnected": "runtime" in _transition_snapshot()["phases"],
+        "transitionCoordinator": _transition_snapshot(),
         "taskAcceptFilterInstalled": _task_accept_filter is not None,
         "usageActionConnections": usage_connections,
         "ribbonActionBindings": bootstrap.ribbon_action_binding_count(),
+        "actionRegistry": action_registry,
         "pendingDeferredTasks": sorted(_deferred_tokens),
         "problemCount": len(_problems),
         "displacedShortcutCount": len(_displaced_shortcuts),
@@ -1265,13 +1252,22 @@ def after_workbench_activation(name):
     schedule_status_write()
 
 
+def _transition_snapshot():
+    try:
+        import fmf_transitions
+
+        return fmf_transitions.snapshot()
+    except (ImportError, AttributeError):
+        return {"connected": False, "phases": []}
+
+
 def install():
     """Wire the runtime into the running FreeCAD session."""
     _run("preferences", apply_preferences)
     main_window = Gui.getMainWindow()
-    if main_window is not None and not getattr(main_window, "_fmf_my_freecad_connected", False):
-        main_window._fmf_my_freecad_connected = True
-        main_window.workbenchActivated.connect(after_workbench_activation)
+    import fmf_transitions
+
+    fmf_transitions.register_phase("runtime", after_workbench_activation, order=30)
     _defer("starter design", ensure_starter_design)
     _defer("model tree", ensure_model_tree)
     _defer("navigation cube", ensure_navigation_cube)
@@ -1289,14 +1285,14 @@ def uninstall():
     """Disconnect live services so disabling FMF takes effect before restart."""
     global _task_accept_filter
     _deferred_tokens.clear()
-    _action_inventory_cache.clear()
+    bootstrap.native_action_registry().disconnect_owner("runtime")
     main_window = Gui.getMainWindow()
-    if main_window is not None and getattr(main_window, "_fmf_my_freecad_connected", False):
-        try:
-            main_window.workbenchActivated.disconnect(after_workbench_activation)
-        except Exception as error:
-            _record_teardown_problem("workbench activation signal", error)
-        main_window._fmf_my_freecad_connected = False
+    try:
+        import fmf_transitions
+
+        fmf_transitions.unregister_phase("runtime", after_workbench_activation)
+    except Exception as error:
+        _record_teardown_problem("workbench transition phase", error)
     if _task_accept_filter is not None:
         for target in tuple(_task_accept_targets):
             try:

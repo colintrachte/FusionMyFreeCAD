@@ -27,37 +27,161 @@ class ActionSubscription:
         self.connections.clear()
 
 
-class NativeActionAdapter:
-    """Resolve command actions and mirror their native state without caching QActions."""
+class CanonicalActionRegistry:
+    """Resolve native command actions once and own scan/subscription lifetimes."""
 
     def __init__(self, gui: Any, action_type: type[Any]):
         self._gui = gui
         self._action_type = action_type
+        self._actions: dict[str, Any] = {}
+        self._inventory: tuple[Any, ...] | None = None
+        self._trigger_connections: dict[tuple[str, str], tuple[Any, Any, Callable[..., None]]] = {}
+        self._generation = 0
+        self._missing_at_generation: dict[str, int] = {}
+        self._direct_lookups = 0
+        self._inventory_scans = 0
 
-    def resolve(self, command_id: str) -> Any | None:
+    def resolve(self, command_id: str, *, allow_scan: bool = False) -> Any | None:
+        cached = self._actions.get(command_id)
+        if cached is not None and self._is_live(cached):
+            return cached
+        self._actions.pop(command_id, None)
+        if self._missing_at_generation.get(command_id) == self._generation:
+            return None
+
+        self._direct_lookups += 1
+        action = self._resolve_direct(command_id)
+        if action is not None:
+            return self._remember(command_id, action)
+        if allow_scan:
+            for candidate in self.inventory():
+                try:
+                    if candidate.objectName() == command_id:
+                        return self._remember(command_id, candidate)
+                except RuntimeError:
+                    continue
+        self._missing_at_generation[command_id] = self._generation
+        return None
+
+    def inventory(self, *, force: bool = False) -> tuple[Any, ...]:
+        """Return the diagnostic/shortcut inventory, scanning only when explicitly needed."""
+        if force or self._inventory is None:
+            if force:
+                self._missing_at_generation.clear()
+            main_window = self._gui.getMainWindow()
+            self._inventory = (
+                tuple(main_window.findChildren(self._action_type))
+                if main_window is not None
+                else ()
+            )
+            self._inventory_scans += 1
+            for action in self._inventory:
+                try:
+                    command_id = action.objectName()
+                except RuntimeError:
+                    continue
+                if command_id:
+                    self._remember(command_id, action)
+        return self._inventory
+
+    def connect_triggered(self, command_id: str, owner: str, callback: Callable[..., None]) -> bool:
+        """Connect one owner once, using the canonical action for the command."""
+        key = (owner, command_id)
+        if key in self._trigger_connections:
+            return False
+        action = self.resolve(command_id, allow_scan=True)
+        signal = getattr(action, "triggered", None) if action is not None else None
+        if signal is None or not hasattr(signal, "connect"):
+            return False
+        signal.connect(callback)
+        self._trigger_connections[key] = (action, signal, callback)
+        return True
+
+    def disconnect_owner(self, owner: str) -> None:
+        for key, (_action, signal, callback) in tuple(self._trigger_connections.items()):
+            if key[0] != owner:
+                continue
+            try:
+                signal.disconnect(callback)
+            except (RuntimeError, TypeError, ValueError):
+                pass
+            del self._trigger_connections[key]
+
+    def available(self, command_ids) -> set[str]:
+        return {command_id for command_id in command_ids if self.resolve(command_id) is not None}
+
+    def invalidate_inventory(self) -> None:
+        """Drop only the optional global scan; direct command entries remain authoritative."""
+        self._inventory = None
+
+    def advance_generation(self, _workbench_name="") -> None:
+        """Permit unresolved direct commands to be retried after a host lifecycle change."""
+        self._generation += 1
+        self._missing_at_generation.clear()
+
+    def dispose(self) -> None:
+        for owner in {key[0] for key in self._trigger_connections}:
+            self.disconnect_owner(owner)
+        self._actions.clear()
+        self._missing_at_generation.clear()
+        self._inventory = None
+
+    def snapshot(self) -> dict[str, int]:
+        return {
+            "cachedActions": len(self._actions),
+            "triggerConnections": len(self._trigger_connections),
+            "directLookups": self._direct_lookups,
+            "inventoryScans": self._inventory_scans,
+            "generation": self._generation,
+            "missingActions": len(self._missing_at_generation),
+        }
+
+    def _resolve_direct(self, command_id: str) -> Any | None:
         command_api = getattr(self._gui, "Command", None)
         get_command = getattr(command_api, "get", None)
-        if get_command is not None:
-            try:
-                command = get_command(command_id)
-                actions = command.getAction() if command is not None else ()
-                if isinstance(actions, self._action_type):
-                    return actions
-                for action in actions or ():
-                    if isinstance(action, self._action_type):
-                        return action
-            except (AttributeError, RuntimeError, TypeError):
-                pass
-        main_window = self._gui.getMainWindow()
-        if main_window is None:
+        if get_command is None:
             return None
-        for action in main_window.findChildren(self._action_type):
-            try:
-                if action.objectName() == command_id:
-                    return action
-            except RuntimeError:
-                continue
-        return None
+        try:
+            command = get_command(command_id)
+            actions = command.getAction() if command is not None else ()
+            if isinstance(actions, self._action_type):
+                return actions
+            return next(
+                (action for action in actions or () if isinstance(action, self._action_type)), None
+            )
+        except (AttributeError, RuntimeError, TypeError):
+            return None
+
+    def _remember(self, command_id: str, action: Any) -> Any:
+        previous = self._actions.get(command_id)
+        if previous is action:
+            return action
+        self._actions[command_id] = action
+        self._missing_at_generation.pop(command_id, None)
+        return action
+
+    @staticmethod
+    def _is_live(action: Any) -> bool:
+        try:
+            action.objectName()
+            return True
+        except RuntimeError:
+            return False
+
+
+class NativeActionAdapter:
+    """Resolve command actions and mirror their native state without caching QActions."""
+
+    def __init__(
+        self,
+        gui: Any,
+        action_type: type[Any],
+        registry: CanonicalActionRegistry | None = None,
+    ):
+        self._registry = registry or CanonicalActionRegistry(gui, action_type)
+
+    def resolve(self, command_id: str) -> Any | None:
+        return self._registry.resolve(command_id, allow_scan=True)
 
     def invoke(self, command_id: str) -> bool:
         action = self.resolve(command_id)
@@ -84,7 +208,6 @@ class NativeActionAdapter:
         self,
         command_id: str,
         callback: Callable[[dict[str, bool]], None],
-        on_destroyed: Callable[[], None] | None = None,
     ):
         action = self.resolve(command_id)
         if action is None:
@@ -101,16 +224,6 @@ class NativeActionAdapter:
             if signal is not None and hasattr(signal, "connect"):
                 signal.connect(publish)
                 subscription.connections.append((signal, publish))
-        destroyed = getattr(action, "destroyed", None)
-        if destroyed is not None and hasattr(destroyed, "connect"):
-
-            def action_destroyed(*_arguments):
-                subscription.dispose()
-                if on_destroyed is not None:
-                    on_destroyed()
-
-            destroyed.connect(action_destroyed)
-            subscription.connections.append((destroyed, action_destroyed))
         publish()
         return subscription
 
@@ -163,10 +276,7 @@ class RibbonActionBindingRegistry:
             except RuntimeError:
                 self._dispose_key(id(button))
 
-        def remove_action() -> None:
-            self._dispose_key(key)
-
-        subscription = self._adapter.subscribe(command_id, apply_state, remove_action)
+        subscription = self._adapter.subscribe(command_id, apply_state)
         if subscription is None:
             return False
 
