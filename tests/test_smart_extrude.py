@@ -391,3 +391,196 @@ def test_enhance_active_extrude_signed_drag():
 
     # Second enhance call returns False (already hooked)
     assert fmf_extrude.enhance_active_extrude(info) is False
+
+
+def test_smart_extrude_hud_signed_distance_and_operation_controls(env):
+    """Cursor HUD synchronizes signed distances (+/-), operations, and Enter/Esc keys."""
+
+    class MockSpin:
+        def __init__(self, val=10.0):
+            self._val = val
+
+        def value(self):
+            return self._val
+
+        def setValue(self, val):
+            self._val = float(val)
+
+    class MockCheck:
+        def __init__(self, checked=False):
+            self._checked = checked
+
+        def isChecked(self):
+            return self._checked
+
+        def setChecked(self, val):
+            self._checked = bool(val)
+
+    sb = MockSpin(15.0)
+    cb = MockCheck(False)
+    hud = fmf_extrude.show_extrude_hud({"spinbox": sb, "checkbox_reversed": cb})
+    assert hud is not None
+    assert fmf_extrude.get_active_extrude_hud() is hud
+    assert hud.is_visible() is True
+    assert hud.distance() == 15.0
+    assert hud.operation() == "auto"
+
+    # Typing a negative distance in the HUD sets Reversed=True and Length=abs(val)
+    hud.set_distance(-22.5)
+    assert cb.isChecked() is True
+    assert sb.value() == 22.5
+    assert hud.distance() == -22.5
+
+    # Typing a positive distance sets Reversed=False
+    hud.set_distance(30.0)
+    assert cb.isChecked() is False
+    assert sb.value() == 30.0
+    assert hud.distance() == 30.0
+
+    # Operation selector supports Auto / Join / Cut / New Body
+    for op in ("join", "cut", "new_body", "auto"):
+        hud.set_operation(op)
+        assert hud.operation() == op
+
+    with pytest.raises(ValueError):
+        hud.set_operation("invalid_op")
+
+    # Enter accepts and closes the HUD; Esc cancels and closes the HUD
+    accepted_calls = []
+    rejected_calls = []
+    env.gui.Control = types.SimpleNamespace(
+        accept=lambda: accepted_calls.append(True),
+        reject=lambda: rejected_calls.append(True),
+    )
+    assert hud.handle_key("Enter") is True
+    assert len(accepted_calls) == 1
+    assert fmf_extrude.get_active_extrude_hud() is None
+
+    hud2 = fmf_extrude.show_extrude_hud({"spinbox": sb, "checkbox_reversed": cb})
+    assert hud2 is not None
+    assert hud2.handle_key("Escape") is True
+    assert len(rejected_calls) == 1
+    assert fmf_extrude.get_active_extrude_hud() is None
+
+
+def test_open_wire_diagnostic_and_one_click_undoable_close(extrude_env, monkeypatch):
+    """diagnose_open_wires and close_open_wire_gaps repair small gaps."""
+    import fmf_sketch_tools
+
+    sketch = extrude_env.sketch
+    doc = extrude_env.doc
+
+    def make_edge(p1, p2):
+        return types.SimpleNamespace(
+            StartPoint=types.SimpleNamespace(x=p1[0], y=p1[1]),
+            EndPoint=types.SimpleNamespace(x=p2[0], y=p2[1]),
+            Construction=False,
+        )
+
+    # Create a 10x10 rectangle with a 0.08 mm gap at the last corner (0.0, 0.08) -> (0.0, 0.0)
+    sketch.Geometry = [
+        make_edge((0.0, 0.0), (10.0, 0.0)),
+        make_edge((10.0, 0.0), (10.0, 10.0)),
+        make_edge((10.0, 10.0), (0.0, 10.0)),
+        make_edge((0.0, 10.0), (0.0, 0.08)),
+    ]
+    sketch.Constraints = []
+    added_lines = []
+
+    def fake_add_line(sk, p1, p2, construction=False):
+        edge = make_edge(p1, p2)
+        sk.Geometry.append(edge)
+        added_lines.append((p1, p2))
+        return len(sk.Geometry) - 1
+
+    monkeypatch.setattr(fmf_sketch_tools, "_add_line", fake_add_line)
+
+    diag = fmf_sketch_tools.diagnose_open_wires(sketch, tolerance=0.5)
+    assert diag["is_closed"] is False
+    assert diag["open_endpoint_count"] == 2
+    assert len(diag["closable_gaps"]) == 1
+    assert abs(diag["closable_gaps"][0]["distance"] - 0.08) < 1e-4
+
+    # Close the gap in a single transaction
+    res = fmf_sketch_tools.close_open_wire_gaps(sketch, tolerance=0.5)
+    assert res["status"] == "closed"
+    assert res["closed_count"] == 1
+    assert len(added_lines) == 1
+
+    # Verify the sketch is now closed
+    diag_after = fmf_sketch_tools.diagnose_open_wires(sketch, tolerance=0.5)
+    assert diag_after["is_closed"] is True
+    assert diag_after["open_endpoint_count"] == 0
+
+    # Verify smart_extrude refuses a large unclosable gap (> 0.5 mm) with an actionable diagnostic
+    sketch_large_gap = doc.addObject("Sketcher::SketchObject", "SketchLargeGap")
+    sketch_large_gap.Geometry = [
+        make_edge((0.0, 0.0), (10.0, 0.0)),
+        make_edge((10.0, 0.0), (10.0, 10.0)),
+        make_edge((10.0, 10.0), (0.0, 5.0)),
+    ]
+    sketch_large_gap.Constraints = []
+    sketch_large_gap.Shape = types.SimpleNamespace(Faces=[], Wires=[])
+    sketch_large_gap.InternalShape = None
+
+    ext_res = fmf_extrude.smart_extrude(
+        operation="join",
+        length=10.0,
+        profile=(sketch_large_gap, []),
+        document=doc,
+    )
+    assert ext_res["status"] == "open-wire"
+    assert "Wire is not closed" in ext_res["diagnosis"]["summary"]
+
+
+def test_partdesign_feature_edit_and_transition_keep_fmf_workbench(
+    env, bootstrap, monkeypatch
+):
+    """Native PartDesign/Sketcher activations map to FMF workbenches."""
+    import sys
+
+    import fmf_transitions
+    import fmf_workbenches
+
+    env.param("User parameter:BaseApp/Preferences/Mod/FMF").SetBool(
+        "UseOwnedWorkbenches", True
+    )
+    assert (
+        fmf_transitions._normalize_workbench_name("PartDesignWorkbench")
+        == "FMFDesignWorkbench"
+    )
+    assert (
+        fmf_transitions._normalize_workbench_name("SketcherWorkbench")
+        == "FMFSketchWorkbench"
+    )
+    assert (
+        fmf_transitions._normalize_workbench_name("PartWorkbench") == "FMFPartWorkbench"
+    )
+    assert (
+        fmf_transitions._normalize_workbench_name("SurfaceWorkbench")
+        == "FMFSurfaceWorkbench"
+    )
+
+    monkeypatch.setitem(sys.modules, "PartDesign", types.ModuleType("PartDesign"))
+    monkeypatch.setitem(
+        sys.modules, "PartDesignGui", types.ModuleType("PartDesignGui")
+    )
+    gear_mod = types.ModuleType("PartDesign.InvoluteGearFeature")
+    gear_mod.CommandInvoluteGear = lambda: object()
+    sprocket_mod = types.ModuleType("PartDesign.SprocketFeature")
+    sprocket_mod.CommandSprocket = lambda: object()
+    monkeypatch.setitem(sys.modules, "PartDesign.InvoluteGearFeature", gear_mod)
+    monkeypatch.setitem(sys.modules, "PartDesign.SprocketFeature", sprocket_mod)
+
+    wb = fmf_workbenches.FMFDesignWorkbench()
+    wb.Initialize()
+    assert "PartDesign_InvoluteGear" in env.commands
+    assert "PartDesign_Sprocket" in env.commands
+
+    bootstrap.set_owned_workbench_visibility(True)
+    ordered = env.param(
+        "User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon"
+    ).GetString("TabOrder", "")
+    assert ordered.startswith(
+        "FMFDesignWorkbench,FMFPartWorkbench,FMFSketchWorkbench,FMFSurfaceWorkbench"
+    )

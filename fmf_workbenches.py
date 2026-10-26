@@ -51,8 +51,29 @@ class FMFDesignWorkbench(_FMFWorkbench):
     )
 
     def Initialize(self):
+        import importlib.util
+
         importlib.import_module("PartDesign")
         importlib.import_module("PartDesignGui")
+        try:
+            if importlib.util.find_spec("PartDesign.WizardShaft") is not None:
+                importlib.import_module("PartDesign.WizardShaft.WizardShaft")
+        except Exception as error:
+            App.Console.PrintWarning(
+                "FMF: optional PartDesign WizardShaft unavailable: {}\n".format(error)
+            )
+        existing = set(Gui.listCommands()) if hasattr(Gui, "listCommands") else set()
+        try:
+            if "PartDesign_InvoluteGear" not in existing:
+                gear_mod = importlib.import_module("PartDesign.InvoluteGearFeature")
+                Gui.addCommand("PartDesign_InvoluteGear", gear_mod.CommandInvoluteGear())
+            if "PartDesign_Sprocket" not in existing:
+                sprocket_mod = importlib.import_module("PartDesign.SprocketFeature")
+                Gui.addCommand("PartDesign_Sprocket", sprocket_mod.CommandSprocket())
+        except Exception as error:
+            App.Console.PrintWarning(
+                "FMF: optional PartDesign gear/sprocket commands unavailable: {}\n".format(error)
+            )
 
 
 class FMFPartWorkbench(_FMFWorkbench):

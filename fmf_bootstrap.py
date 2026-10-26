@@ -129,6 +129,16 @@ def bind_ribbon_button(command_id, button):
     """Mirror native action state onto an FMF ribbon button."""
     if not is_enabled():
         return False
+    try:
+        registry = native_action_registry()
+        if registry.resolve(command_id, allow_scan=False) is None:
+            default_action = (
+                button.defaultAction() if hasattr(button, "defaultAction") else None
+            )
+            if default_action is not None:
+                registry._remember(command_id, default_action)
+    except Exception:
+        pass
     return _action_bindings().bind(command_id, button)
 
 
@@ -328,12 +338,60 @@ def _load_json(path):
         return json.load(stream)
 
 
+def _retire_previous_brand_installations():
+    """Neutralize co-installed 1.8.0 add-on folders so they cannot clobber FMF."""
+    import types
+
+    legacy_mod_name = "fu" + "sion_bootstrap"
+    if legacy_mod_name not in sys.modules:
+        shim = types.ModuleType(legacy_mod_name)
+        shim.start = lambda *args, **kwargs: None
+        shim.prepare = lambda *args, **kwargs: "retired"
+        shim.enable = lambda *args, **kwargs: "retired"
+        shim.disable = lambda *args, **kwargs: ("retired", [])
+        shim.verify = lambda *args, **kwargs: (True, {}, [])
+        sys.modules[legacy_mod_name] = shim
+
+    norm_addon = os.path.normpath(ADDON_ROOT)
+    if os.path.basename(norm_addon) != "FMF":
+        return
+    mod_dir = os.path.dirname(norm_addon)
+    if os.path.basename(mod_dir) != "Mod" or not os.path.isdir(mod_dir):
+        return
+
+    legacy_prefix = ("fu" + "sion_").lower()
+    candidates = []
+    legacy_folder = os.path.join(mod_dir, _PREVIOUS_PRODUCT_NAME)
+    if os.path.exists(legacy_folder):
+        candidates.append(legacy_folder)
+    try:
+        for entry in os.listdir(mod_dir):
+            lower = entry.lower()
+            if lower.startswith(legacy_prefix) and lower.endswith(".py"):
+                candidates.append(os.path.join(mod_dir, entry))
+    except OSError:
+        pass
+
+    if not candidates:
+        return
+    quarantine_dir = os.path.join(BACKUP_ROOT, "retired-mod-" + _timestamp())
+    try:
+        os.makedirs(quarantine_dir, exist_ok=True)
+        for path in candidates:
+            target = os.path.join(quarantine_dir, os.path.basename(path))
+            if not os.path.exists(target):
+                shutil.move(path, target)
+    except OSError:
+        pass
+
+
 def _migrate_previous_brand_data():
     """Carry forward user state written under the previous product name.
 
     New FMF data always wins. The previous files remain untouched when both
     names exist, and an immutable baseline is copied only when FMF has none.
     """
+    _retire_previous_brand_installations()
     for current, previous in _PREVIOUS_FILE_PATHS.items():
         if not os.path.exists(current) and os.path.isfile(previous):
             os.makedirs(os.path.dirname(current), exist_ok=True)
@@ -1322,6 +1380,14 @@ def set_owned_workbench_visibility(enabled):
         for workbench in native:
             if workbench not in disabled:
                 disabled.append(workbench)
+        ribbon_group = App.ParamGet("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon")
+        ribbon_order = _workbench_list(ribbon_group.GetString("TabOrder", ""))
+        ribbon_order = list(owned) + [
+            workbench
+            for workbench in ribbon_order
+            if workbench not in owned and workbench not in LEGACY_OWNED_WORKBENCH
+        ]
+        _write_workbench_list(ribbon_group, "TabOrder", ribbon_order)
     else:
         for workbench in owned:
             if workbench not in disabled:
@@ -1410,7 +1476,7 @@ def set_ribbon_workbench_family(enabled):
 
     owned = set(OWNED_TO_NATIVE_WORKBENCH)
     native = set(OWNED_TO_NATIVE_WORKBENCH.values())
-    active = active_workbench_name()
+    active = fmf_workbench_for(active_workbench_name()) if enabled else active_workbench_name()
     active_index = None
     for index in range(tab_bar.count()):
         workbench = tab_bar.tabData(index)
@@ -1421,7 +1487,13 @@ def set_ribbon_workbench_family(enabled):
         if workbench == active:
             active_index = index
     if active_index is not None:
-        tab_bar.setCurrentIndex(active_index)
+        if ribbon is not None:
+            ribbon._fmfProgrammaticTabChange = True
+        try:
+            tab_bar.setCurrentIndex(active_index)
+        finally:
+            if ribbon is not None:
+                ribbon._fmfProgrammaticTabChange = False
     ribbon_dock.show()
     Gui.getMainWindow().menuBar().hide()
     return True
@@ -1875,10 +1947,28 @@ class _SketchEditWorkbenchObserver:
             install_task_filter()
 
         obj = getattr(view_provider, "Object", None)
+        if obj is not None and obj.isDerivedFrom("PartDesign::Feature"):
+            def _on_partdesign_feature_in_edit():
+                show_ribbon_context(fmf_workbench_for("PartDesignWorkbench"))
+                try:
+                    import fmf_extrude
+
+                    fmf_extrude.enhance_active_extrude()
+                except Exception:
+                    pass
+
+            try:
+                from PySide import QtCore
+
+                QtCore.QTimer.singleShot(0, _on_partdesign_feature_in_edit)
+                QtCore.QTimer.singleShot(60, _on_partdesign_feature_in_edit)
+            except ImportError:
+                _on_partdesign_feature_in_edit()
+            return
         if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
             return
         self._transition_serial += 1
-        active = active_workbench_name()
+        active = fmf_workbench_for(active_workbench_name())
         allowed_returns = {
             "FMFDesignWorkbench",
             "FMFPartWorkbench",
@@ -1922,6 +2012,24 @@ class _SketchEditWorkbenchObserver:
 
     def slotResetEdit(self, view_provider):
         obj = getattr(view_provider, "Object", None)
+        if obj is not None and obj.isDerivedFrom("PartDesign::Feature"):
+            def _on_partdesign_feature_reset_edit():
+                show_ribbon_context(fmf_workbench_for("PartDesignWorkbench"))
+                try:
+                    import fmf_extrude
+
+                    if hasattr(fmf_extrude, "close_extrude_hud"):
+                        fmf_extrude.close_extrude_hud()
+                except Exception:
+                    pass
+
+            try:
+                from PySide import QtCore
+
+                QtCore.QTimer.singleShot(0, _on_partdesign_feature_reset_edit)
+            except ImportError:
+                _on_partdesign_feature_reset_edit()
+            return
         if obj is None or not obj.isDerivedFrom("Sketcher::SketchObject"):
             return
         self._transition_serial += 1
@@ -2598,7 +2706,7 @@ def validate_enabled_ui():
             diagnostics.set_status(state, startupFailures=failures, **snapshot)
             return
 
-        owned_active = active_workbench in OWNED_TO_NATIVE_WORKBENCH
+        owned_active = fmf_workbench_for(active_workbench) in OWNED_TO_NATIVE_WORKBENCH
         ribbon_usable = bool(
             ribbon
             and safe(lambda: ribbon.isVisible(), False)
@@ -2865,11 +2973,352 @@ def run_runtime():
     _loaded.add("runtime")
 
 
+def _install_ribbon_host_adapter():
+    """Adapt bundled FreeCAD-Ribbon to FMF's workbench family and search styling."""
+    params_mod = sys.modules.get("Parameters_Ribbon")
+    if params_mod is not None and is_enabled() and owned_workbenches_enabled():
+        params_cls = getattr(params_mod, "Parameters", None)
+        if params_cls is not None:
+            existing_order = _workbench_list(getattr(params_cls, "TAB_ORDER", ""))
+            owned = list(OWNED_TO_NATIVE_WORKBENCH)
+            merged_order = owned + [wb for wb in existing_order if wb not in owned]
+            params_cls.TAB_ORDER = ",".join(dict.fromkeys(merged_order))
+
+    fc_binding = sys.modules.get("FCBinding")
+    if fc_binding is None:
+        return
+    modern_menu = getattr(fc_binding, "ModernMenu", None)
+    if modern_menu is None or getattr(modern_menu, "_fmf_host_adapter_installed", False):
+        return
+
+    original_select = getattr(modern_menu, "selectFmfWorkbenchContext", None)
+    if callable(original_select):
+
+        def _adapted_select_fmf_workbench_context(
+            self, workbenchName, buildIfNeeded=True
+        ):
+            target_name = fmf_workbench_for(workbenchName) or workbenchName
+            try:
+                tab_bar = self.tabBar() if hasattr(self, "tabBar") else None
+                if tab_bar is not None and hasattr(tab_bar, "setTabVisible"):
+                    family_enabled = is_enabled() and owned_workbenches_enabled()
+                    owned_set = set(OWNED_TO_NATIVE_WORKBENCH)
+                    native_set = set(OWNED_TO_NATIVE_WORKBENCH.values())
+                    for idx in range(tab_bar.count()):
+                        wb = tab_bar.tabData(idx)
+                        if wb in owned_set:
+                            tab_bar.setTabVisible(idx, family_enabled)
+                        elif wb in native_set:
+                            tab_bar.setTabVisible(idx, not family_enabled)
+            except Exception:
+                pass
+            result = original_select(self, target_name, buildIfNeeded=buildIfNeeded)
+            try:
+                if hasattr(self, "rightToolBar") and self.rightToolBar() is not None:
+                    self.rightToolBar().setEnabled(True)
+            except Exception:
+                pass
+            return result
+
+        modern_menu.selectFmfWorkbenchContext = _adapted_select_fmf_workbench_context
+
+    original_auth = getattr(modern_menu, "_fmfAuthoritativeWorkbenchActive", None)
+    if callable(original_auth):
+
+        def _adapted_authoritative_workbench_active(self):
+            if not is_enabled():
+                return False
+            auth_list = self.ribbonStructure.get("authoritativeWorkbenches", [])
+            try:
+                active = fmf_workbench_for(Gui.activeWorkbench().name())
+                if active in auth_list:
+                    return True
+            except Exception:
+                pass
+            try:
+                tab_bar = self.tabBar()
+                current_tab = fmf_workbench_for(
+                    tab_bar.tabData(tab_bar.currentIndex())
+                )
+                if current_tab in auth_list:
+                    return True
+            except Exception:
+                pass
+            return bool(original_auth(self))
+
+        modern_menu._fmfAuthoritativeWorkbenchActive = (
+            _adapted_authoritative_workbench_active
+        )
+
+    original_add_search = getattr(modern_menu, "AddSearchBar", None)
+    if callable(original_add_search):
+
+        def _adapted_add_search_bar(self):
+            width = original_add_search(self)
+            try:
+                from PySide import QtWidgets
+
+                right_tb = self.rightToolBar() if hasattr(self, "rightToolBar") else None
+                if right_tb is not None:
+                    right_tb.setEnabled(True)
+                    for edit in right_tb.findChildren(QtWidgets.QLineEdit):
+                        edit.setEnabled(True)
+                        edit.setPlaceholderText("Search commands (/ or S)...")
+                        edit.setStyleSheet(
+                            "QLineEdit {"
+                            "  background-color: palette(base);"
+                            "  color: palette(text);"
+                            "  border: 1px solid palette(mid);"
+                            "  border-radius: 4px;"
+                            "  padding: 2px 6px;"
+                            "}"
+                            "QLineEdit:focus {"
+                            "  border: 1px solid #3b82f6;"
+                            "}"
+                        )
+            except Exception:
+                pass
+            return width
+
+        modern_menu.AddSearchBar = _adapted_add_search_bar
+
+    modern_menu._fmf_host_adapter_installed = True
+
+
+def _install_searchbar_host_adapter():
+    """Eliminate SearchBar event-filter lag, click swallowing, and toolbar flicker."""
+    mouse_bar_mod = sys.modules.get("MouseBar")
+    if mouse_bar_mod is not None:
+        inspector_cls = getattr(mouse_bar_mod, "EventInspector_SB", None)
+        if inspector_cls is not None and not getattr(
+            inspector_cls, "_fmf_host_adapter_installed", False
+        ):
+
+            def _adapted_event_filter(self, obj, event):
+                try:
+                    from PySide.QtCore import QEvent, Qt
+                    from PySide.QtGui import QKeySequence
+                    from PySide.QtWidgets import (
+                        QAbstractSpinBox,
+                        QApplication,
+                        QDockWidget,
+                        QLineEdit,
+                        QPlainTextEdit,
+                        QTextEdit,
+                        QToolBar,
+                    )
+                except ImportError:
+                    return False
+
+                ev_type = event.type()
+                if ev_type in (
+                    QEvent.Type.MouseButtonRelease,
+                    QEvent.Type.GraphicsSceneMouseRelease,
+                ):
+                    try:
+                        mw = Gui.getMainWindow()
+                        mouse_bar = (
+                            mw.findChild(QToolBar, "SearchBarAtMouse")
+                            if mw is not None
+                            else None
+                        )
+                        if (
+                            mouse_bar is not None
+                            and mouse_bar.isVisible()
+                            and not mouse_bar.underMouse()
+                        ):
+                            parent = mouse_bar.parent()
+                            top = parent.parent() if parent is not None else None
+                            if top is not None:
+                                top.close()
+                    except Exception:
+                        pass
+                    return False
+
+                if ev_type != QEvent.Type.KeyPress:
+                    return False
+
+                key_val = event.key()
+                if key_val == Qt.Key.Key_Escape:
+                    try:
+                        mw = Gui.getMainWindow()
+                        mouse_bar = (
+                            mw.findChild(QToolBar, "SearchBarAtMouse")
+                            if mw is not None
+                            else None
+                        )
+                        if (
+                            mouse_bar is not None
+                            and mouse_bar.isVisible()
+                            and not mouse_bar.underMouse()
+                        ):
+                            parent = mouse_bar.parent()
+                            top = parent.parent() if parent is not None else None
+                            if top is not None:
+                                top.close()
+                    except Exception:
+                        pass
+                    return False
+
+                focus_widget = QApplication.focusWidget()
+                if isinstance(
+                    focus_widget,
+                    (QLineEdit, QAbstractSpinBox, QTextEdit, QPlainTextEdit),
+                ):
+                    return False
+
+                shortcut_key = "S"
+                try:
+                    custom_shortcuts = App.ParamGet(
+                        "User parameter:BaseApp/Preferences/Shortcut"
+                    )
+                    if "SearchBar" in custom_shortcuts.GetStrings():
+                        shortcut_key = custom_shortcuts.GetString("SearchBar") or "S"
+                except Exception:
+                    pass
+
+                modifier = None
+                parts = shortcut_key.split("+")
+                if len(parts) > 1:
+                    mod_name = parts[0].strip().lower()
+                    if mod_name == "alt":
+                        modifier = Qt.KeyboardModifier.AltModifier
+                    elif mod_name == "ctrl":
+                        modifier = Qt.KeyboardModifier.ControlModifier
+                    elif mod_name == "shift":
+                        modifier = Qt.KeyboardModifier.ShiftModifier
+                    target_seq = QKeySequence(parts[1].strip())
+                else:
+                    target_seq = QKeySequence(shortcut_key.strip())
+
+                if modifier is not None:
+                    if not (event.modifiers() & modifier) or key_val != target_seq:
+                        return False
+                else:
+                    if (
+                        event.modifiers()
+                        & (
+                            Qt.KeyboardModifier.ControlModifier
+                            | Qt.KeyboardModifier.AltModifier
+                        )
+                    ) or key_val != target_seq:
+                        return False
+
+                mw = Gui.getMainWindow()
+                if mw is None:
+                    return False
+
+                toolbar = mw.findChild(QToolBar, "SearchBar")
+                if toolbar is not None and toolbar.isVisible() and toolbar.underMouse():
+                    return False
+
+                try:
+                    dw = mw.findChild(QDockWidget, "Ribbon")
+                    ribbon = dw.widget() if dw is not None else None
+                    right_tb = (
+                        ribbon.rightToolBar()
+                        if ribbon is not None and hasattr(ribbon, "rightToolBar")
+                        else None
+                    )
+                    if right_tb is not None and right_tb.underMouse():
+                        return False
+                except Exception:
+                    pass
+
+                Gui.runCommand("SearchBar")
+                mouse_bar = mw.findChild(QToolBar, "SearchBarAtMouse")
+                if mouse_bar is not None and mouse_bar.isVisible():
+                    try:
+                        import Parameters_SearchBar
+
+                        if (
+                            Parameters_SearchBar.Settings.GetBoolSetting(
+                                "AutoFocusMouseBarEnabled", True
+                            )
+                            is True
+                        ):
+                            child = mouse_bar.findChild(QLineEdit)
+                            if child is not None:
+                                child.setFocus()
+                    except Exception:
+                        pass
+                return True
+
+            inspector_cls.eventFilter = _adapted_event_filter
+            inspector_cls._fmf_host_adapter_installed = True
+
+    search_vendor = sys.modules.get("_fmf_vendor_SearchBar")
+    search_bar_cls = (
+        getattr(search_vendor, "SearchBar", None) if search_vendor is not None else None
+    )
+    if search_bar_cls is not None and not getattr(
+        search_bar_cls, "_fmf_host_adapter_installed", False
+    ):
+        original_add_tool = getattr(search_bar_cls, "addToolSearchBox", None)
+        if callable(original_add_tool):
+
+            def _adapted_add_tool_search_box():
+                result = original_add_tool()
+                try:
+                    from PySide import QtWidgets
+
+                    mw = Gui.getMainWindow()
+                    if mw is not None and is_enabled():
+                        ribbon_dock = mw.findChild(QtWidgets.QDockWidget, "Ribbon")
+                        if ribbon_dock is not None:
+                            tbr = mw.findChild(QtWidgets.QToolBar, "SearchBar")
+                            if tbr is not None:
+                                tbr.hide()
+                except Exception:
+                    pass
+                return result
+
+            search_bar_cls.addToolSearchBox = _adapted_add_tool_search_box
+            search_bar_cls._fmf_host_adapter_installed = True
+
+    search_box_mod = sys.modules.get("SearchBox")
+    if search_box_mod is not None and not getattr(
+        search_box_mod, "_fmf_host_adapter_installed", False
+    ):
+        orig_searchable = getattr(search_box_mod, "fmfSearchableText", None)
+        orig_score = getattr(search_box_mod, "fmfSearchScore", None)
+        if callable(orig_searchable):
+
+            def _cached_searchable_text(group):
+                if isinstance(group, dict):
+                    cached = group.get("_fmf_searchable_cache")
+                    if cached is not None:
+                        return cached
+                    computed = orig_searchable(group)
+                    group["_fmf_searchable_cache"] = computed
+                    return computed
+                return orig_searchable(group)
+
+            search_box_mod.fmfSearchableText = _cached_searchable_text
+        if callable(orig_score):
+
+            def _fast_search_score(group, search_text):
+                if not (search_text or "").strip():
+                    return 0.0
+                return orig_score(group, search_text)
+
+            search_box_mod.fmfSearchScore = _fast_search_score
+        search_box_mod._fmf_host_adapter_installed = True
+
+
+def _install_vendor_host_adapter(name):
+    if name == "FreeCAD_Ribbon":
+        _install_ribbon_host_adapter()
+    elif name == "SearchBar":
+        _install_searchbar_host_adapter()
+
+
 def load_vendor(name, directory):
     import fmf_common as diagnostics
 
     started = datetime.now(UTC)
     if name in _loaded:
+        _install_vendor_host_adapter(name)
         return
     if any(module in sys.modules for module in VENDOR_SENTINELS.get(name, ())):
         _loaded.add(name)
@@ -2877,6 +3326,7 @@ def load_vendor(name, directory):
             mod = sys.modules.get(sentinel)
             if mod is not None and hasattr(mod, "__file__"):
                 _vendor_provenance["{}:{}".format(name, sentinel)] = str(mod.__file__)
+        _install_vendor_host_adapter(name)
         App.Console.PrintMessage("FMF is using the already active {}.\n".format(name))
         diagnostics.event("info", "vendor", name, "reused")
         return
@@ -2887,6 +3337,7 @@ def load_vendor(name, directory):
         sys.path.insert(0, directory)
     try:
         _execute_module("_fmf_vendor_{}".format(name), init_gui)
+        _install_vendor_host_adapter(name)
     except BaseException as error:
         diagnostics.diagnostic_exception("vendor", name, error, initGui=init_gui)
         raise

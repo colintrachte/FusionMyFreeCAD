@@ -13,7 +13,7 @@ Provides intelligent extrusion wrapping native FreeCAD PartDesign features:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from fmf_common import event, notify, transaction
 
@@ -100,8 +100,331 @@ def get_active_extrude_info() -> dict[str, Any] | None:
     return None
 
 
+_active_extrude_hud: SmartExtrudeHud | None = None
+
+
+class SmartExtrudeHud:
+    """Compact floating on-canvas HUD for signed distance and operation selection."""
+
+    OPERATIONS: ClassVar[tuple[str, ...]] = ("auto", "join", "cut", "new_body")
+    OPERATION_LABELS: ClassVar[dict[str, str]] = {
+        "auto": "Auto",
+        "join": "Join",
+        "cut": "Cut",
+        "new_body": "New Body",
+    }
+
+    def __init__(
+        self,
+        spinbox: Any,
+        checkbox_reversed: Any = None,
+        parent: Any = None,
+        operation: str = "auto",
+    ) -> None:
+        self.spinbox = spinbox
+        self.checkbox_reversed = checkbox_reversed
+        self.parent = parent
+        self._operation = operation.lower() if operation else "auto"
+        if self._operation not in self.OPERATIONS:
+            self._operation = "auto"
+        self._syncing = False
+        self._visible = False
+        self.widget: Any = None
+        self.distance_input: Any = None
+        self.operation_combo: Any = None
+        self._build_widget()
+
+    def _read_task_signed_distance(self) -> float:
+        raw_val = 10.0
+        if self.spinbox is not None and hasattr(self.spinbox, "value"):
+            try:
+                raw_val = float(self.spinbox.value())
+            except Exception:
+                raw_val = 10.0
+        is_rev = False
+        if self.checkbox_reversed is not None and hasattr(
+            self.checkbox_reversed, "isChecked"
+        ):
+            try:
+                is_rev = bool(self.checkbox_reversed.isChecked())
+            except Exception:
+                is_rev = False
+        return -abs(raw_val) if is_rev and raw_val >= 0.0 else raw_val
+
+    def _build_widget(self) -> None:
+        qt_core, qt_gui, qt_widgets = _get_qt()
+        if (
+            qt_widgets is None
+            or not hasattr(qt_widgets, "QFrame")
+            or not hasattr(qt_widgets, "QDoubleSpinBox")
+        ):
+            return
+        try:
+            frame = qt_widgets.QFrame(self.parent)
+            frame.setObjectName("FMF_SmartExtrudeHud")
+            if qt_core is not None and hasattr(qt_core, "Qt"):
+                flags = getattr(qt_core.Qt, "WindowType", qt_core.Qt)
+                tool_flag = getattr(flags, "ToolTip", None) or getattr(
+                    flags, "SubWindow", None
+                )
+                if tool_flag is not None and self.parent is None:
+                    frame.setWindowFlags(tool_flag)
+            frame.setStyleSheet(
+                "QFrame#FMF_SmartExtrudeHud {"
+                "  background-color: rgba(30, 34, 42, 235);"
+                "  border: 1px solid #3b82f6;"
+                "  border-radius: 6px;"
+                "  padding: 4px 6px;"
+                "}"
+                "QLabel { color: #e2e8f0; font-size: 11px; font-weight: 600; }"
+                "QDoubleSpinBox, QComboBox {"
+                "  background-color: #0f172a;"
+                "  color: #f8fafc;"
+                "  border: 1px solid #475569;"
+                "  border-radius: 4px;"
+                "  padding: 2px 4px;"
+                "  min-width: 72px;"
+                "}"
+            )
+            layout = qt_widgets.QHBoxLayout(frame)
+            layout.setContentsMargins(6, 4, 6, 4)
+            layout.setSpacing(6)
+
+            lbl = qt_widgets.QLabel("Dist:", frame)
+            layout.addWidget(lbl)
+
+            dist_spin = qt_widgets.QDoubleSpinBox(frame)
+            dist_spin.setObjectName("FMF_ExtrudeHudDistance")
+            dist_spin.setMinimum(-100000.0)
+            dist_spin.setMaximum(100000.0)
+            dist_spin.setDecimals(2)
+            dist_spin.setSuffix(" mm")
+            dist_spin.setValue(self._read_task_signed_distance())
+            if hasattr(dist_spin, "valueChanged") and hasattr(
+                dist_spin.valueChanged, "connect"
+            ):
+                dist_spin.valueChanged.connect(self._on_hud_distance_changed)
+            layout.addWidget(dist_spin)
+
+            combo = qt_widgets.QComboBox(frame)
+            combo.setObjectName("FMF_ExtrudeHudOperation")
+            for op_key in self.OPERATIONS:
+                combo.addItem(self.OPERATION_LABELS[op_key], op_key)
+            combo.setCurrentIndex(self.OPERATIONS.index(self._operation))
+            if hasattr(combo, "currentIndexChanged") and hasattr(
+                combo.currentIndexChanged, "connect"
+            ):
+                combo.currentIndexChanged.connect(self._on_hud_operation_changed)
+            layout.addWidget(combo)
+
+            frame.adjustSize()
+            if qt_gui is not None and hasattr(qt_gui, "QCursor"):
+                cursor_pos = qt_gui.QCursor.pos()
+                if self.parent is not None and hasattr(self.parent, "mapFromGlobal"):
+                    local_pos = self.parent.mapFromGlobal(cursor_pos)
+                    x = max(12, local_pos.x() + 18)
+                    y = max(48, local_pos.y() + 18)
+                    if hasattr(self.parent, "width") and hasattr(frame, "width"):
+                        x = min(x, max(12, self.parent.width() - frame.width() - 16))
+                    if hasattr(self.parent, "height") and hasattr(frame, "height"):
+                        y = min(y, max(48, self.parent.height() - frame.height() - 16))
+                    frame.move(x, y)
+
+            self.widget = frame
+            self.distance_input = dist_spin
+            self.operation_combo = combo
+        except Exception:
+            self.widget = None
+
+    def _on_hud_distance_changed(self, value: float) -> None:
+        if self._syncing:
+            return
+        self.set_distance(value)
+
+    def _on_hud_operation_changed(self, index: int) -> None:
+        if 0 <= index < len(self.OPERATIONS):
+            self._operation = self.OPERATIONS[index]
+
+    def distance(self) -> float:
+        """Return the current signed extrusion distance."""
+        return self._read_task_signed_distance()
+
+    def set_distance(self, signed_value: float) -> None:
+        """Apply a signed distance (+ forward, - reversed) to the active task and HUD."""
+        if self._syncing:
+            return
+        self._syncing = True
+        try:
+            want_reversed = signed_value < 0.0
+            abs_val = abs(float(signed_value))
+            if self.checkbox_reversed is not None and hasattr(
+                self.checkbox_reversed, "setChecked"
+            ):
+                self.checkbox_reversed.setChecked(want_reversed)
+            if self.spinbox is not None and hasattr(self.spinbox, "setValue"):
+                self.spinbox.setValue(abs_val)
+            if self.distance_input is not None and hasattr(
+                self.distance_input, "setValue"
+            ):
+                try:
+                    self.distance_input.setValue(float(signed_value))
+                except Exception:
+                    pass
+        finally:
+            self._syncing = False
+
+    def sync_from_task(self) -> None:
+        """Update HUD display when the task panel spinbox or reversed checkbox changes."""
+        if self._syncing:
+            return
+        self._syncing = True
+        try:
+            signed = self._read_task_signed_distance()
+            if self.distance_input is not None and hasattr(
+                self.distance_input, "setValue"
+            ):
+                self.distance_input.setValue(signed)
+        finally:
+            self._syncing = False
+
+    def operation(self) -> str:
+        return self._operation
+
+    def set_operation(self, op_name: str) -> None:
+        normalized = (op_name or "auto").strip().lower().replace(" ", "_")
+        if normalized not in self.OPERATIONS:
+            raise ValueError(f"Unsupported extrude operation: {op_name}")
+        self._operation = normalized
+        if self.operation_combo is not None and hasattr(
+            self.operation_combo, "setCurrentIndex"
+        ):
+            try:
+                self.operation_combo.setCurrentIndex(
+                    self.OPERATIONS.index(self._operation)
+                )
+            except Exception:
+                pass
+
+    def show(self) -> None:
+        self._visible = True
+        if self.widget is not None and hasattr(self.widget, "show"):
+            try:
+                self.widget.show()
+                if hasattr(self.widget, "raise_"):
+                    self.widget.raise_()
+            except Exception:
+                pass
+
+    def is_visible(self) -> bool:
+        if self.widget is not None and hasattr(self.widget, "isVisible"):
+            try:
+                return bool(self.widget.isVisible())
+            except Exception:
+                pass
+        return self._visible
+
+    def close(self) -> None:
+        self._visible = False
+        if self.widget is not None:
+            try:
+                if hasattr(self.widget, "hide"):
+                    self.widget.hide()
+                if hasattr(self.widget, "deleteLater"):
+                    self.widget.deleteLater()
+            except Exception:
+                pass
+            self.widget = None
+
+    def accept(self) -> bool:
+        """Accept the active extrude task on Enter/Return and close the HUD."""
+        gui = _get_gui()
+        control = getattr(gui, "Control", None) if gui is not None else None
+        accepted = False
+        if control is not None and hasattr(control, "accept"):
+            try:
+                control.accept()
+                accepted = True
+            except Exception:
+                accepted = False
+        close_extrude_hud()
+        return accepted
+
+    def cancel(self) -> bool:
+        """Cancel the active extrude task on Escape and close the HUD."""
+        gui = _get_gui()
+        control = getattr(gui, "Control", None) if gui is not None else None
+        rejected = False
+        if control is not None and hasattr(control, "reject"):
+            try:
+                control.reject()
+                rejected = True
+            except Exception:
+                rejected = False
+        close_extrude_hud()
+        return rejected
+
+    def handle_key(self, key: str) -> bool:
+        """Process 'Enter'/'Return' or 'Escape' keyboard shortcuts on the HUD."""
+        norm = (key or "").strip().lower()
+        if norm in ("enter", "return"):
+            self.accept()
+            return True
+        if norm in ("esc", "escape"):
+            self.cancel()
+            return True
+        return False
+
+
+def get_active_extrude_hud() -> SmartExtrudeHud | None:
+    """Return the active floating extrude HUD, if any."""
+    return _active_extrude_hud
+
+
+def close_extrude_hud() -> None:
+    """Close and dispose the active floating extrude HUD."""
+    global _active_extrude_hud
+    if _active_extrude_hud is not None:
+        _active_extrude_hud.close()
+        _active_extrude_hud = None
+
+
+def show_extrude_hud(
+    info: dict[str, Any] | None = None, operation: str = "auto"
+) -> SmartExtrudeHud | None:
+    """Create or refresh the floating cursor HUD for the active extrude task."""
+    global _active_extrude_hud
+    if info is None:
+        info = get_active_extrude_info()
+    if not info or info.get("spinbox") is None:
+        return None
+    spinbox = info["spinbox"]
+    checkbox = info.get("checkbox_reversed")
+    gui = _get_gui()
+    main_window = (
+        gui.getMainWindow() if gui is not None and hasattr(gui, "getMainWindow") else None
+    )
+    if (
+        _active_extrude_hud is not None
+        and _active_extrude_hud.spinbox is spinbox
+        and _active_extrude_hud.is_visible()
+    ):
+        _active_extrude_hud.sync_from_task()
+        return _active_extrude_hud
+
+    close_extrude_hud()
+    hud = SmartExtrudeHud(
+        spinbox=spinbox,
+        checkbox_reversed=checkbox,
+        parent=main_window,
+        operation=operation,
+    )
+    hud.show()
+    _active_extrude_hud = hud
+    return hud
+
+
 def enhance_active_extrude(info: dict[str, Any] | None = None) -> bool:
-    """Enable signed direction dragging and numeric input on the active extrude dialog."""
+    """Enable signed direction dragging, numeric input, and cursor HUD on active extrude."""
     if info is None:
         info = get_active_extrude_info()
     if not info:
@@ -120,6 +443,7 @@ def enhance_active_extrude(info: dict[str, Any] | None = None) -> bool:
         except Exception:
             pass
 
+    hooked = False
     # Hook value change so crossing zero flips reversed direction
     if (
         checkbox is not None
@@ -133,15 +457,18 @@ def enhance_active_extrude(info: dict[str, Any] | None = None) -> bool:
                         checkbox.setChecked(not checkbox.isChecked())
                     if hasattr(spinbox, "setValue"):
                         spinbox.setValue(abs(val))
+                if _active_extrude_hud is not None:
+                    _active_extrude_hud.sync_from_task()
 
             if hasattr(spinbox.valueChanged, "connect"):
                 spinbox.valueChanged.connect(_on_value_changed)
             spinbox._fmf_signed_hooked = True
-            return True
+            hooked = True
         except Exception:
             pass
 
-    return False
+    show_extrude_hud(info)
+    return hooked
 
 
 def _owning_body(profile_obj: Any, document: Any = None) -> Any | None:
@@ -520,6 +847,37 @@ def smart_extrude(
         notify("Extrude", "Select a sketch or face to extrude.", error=True)
         return {"status": "no-selection"}
 
+    closed_wire_gaps = 0
+    if (
+        getattr(profile_obj, "TypeId", "").startswith("Sketcher::")
+        or hasattr(profile_obj, "Geometry")
+    ):
+        test_face, _ = _extract_test_face(profile_obj, sub_elements)
+        if test_face is None and getattr(profile_obj, "Geometry", None):
+            try:
+                import fmf_sketch_tools
+
+                diagnosis = fmf_sketch_tools.diagnose_open_wires(
+                    profile_obj, tolerance=0.5
+                )
+                if not diagnosis["is_closed"]:
+                    if diagnosis["closable_gaps"]:
+                        repair = fmf_sketch_tools.close_open_wire_gaps(
+                            profile_obj, tolerance=0.5
+                        )
+                        closed_wire_gaps = int(repair.get("closed_count", 0))
+                        sub_elements = _normalize_profile_subs(
+                            profile_obj, sub_elements
+                        )
+                    else:
+                        notify("Extrude", diagnosis["summary"], error=True)
+                        return {
+                            "status": "open-wire",
+                            "diagnosis": diagnosis,
+                        }
+            except Exception:
+                pass
+
     target_body = _active_body(doc, profile_obj=profile_obj)
 
     effective_op = operation.lower()
@@ -611,6 +969,7 @@ def smart_extrude(
                     "body": new_body,
                     "feature": feat,
                     "auto_reversed": auto_reversed,
+                    "closed_wire_gaps": closed_wire_gaps,
                 }
 
             elif effective_op == "cut":
@@ -679,6 +1038,7 @@ def smart_extrude(
                     "body": target_body,
                     "feature": feat,
                     "auto_reversed": auto_reversed,
+                    "closed_wire_gaps": closed_wire_gaps,
                 }
 
             else:  # "join"
@@ -736,6 +1096,7 @@ def smart_extrude(
                     "body": target_body,
                     "feature": feat,
                     "auto_reversed": auto_reversed,
+                    "closed_wire_gaps": closed_wire_gaps,
                 }
 
     except Exception as exc:

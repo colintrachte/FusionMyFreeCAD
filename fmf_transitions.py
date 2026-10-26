@@ -26,9 +26,20 @@ def _record(operation, outcome, **details):
         App.Console.PrintLog("FMF: transition diagnostic event failed: {}\n".format(error))
 
 
+def _normalize_workbench_name(name):
+    if not name:
+        return ""
+    try:
+        import fmf_bootstrap
+
+        return fmf_bootstrap.fmf_workbench_for(name)
+    except Exception:
+        return name
+
+
 def _current_workbench_name():
     try:
-        return Gui.activeWorkbench().name()
+        return _normalize_workbench_name(Gui.activeWorkbench().name())
     except Exception:
         return ""
 
@@ -40,7 +51,7 @@ def _schedule_settled_pass(name):
 
     _generation += 1
     generation = _generation
-    _active_name = name or _current_workbench_name()
+    _active_name = _normalize_workbench_name(name) or _current_workbench_name()
 
     def settle():
         if generation != _generation:

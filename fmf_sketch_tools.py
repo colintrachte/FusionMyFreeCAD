@@ -2593,6 +2593,10 @@ def run_solver_diagnostics():
         return {"status": "no-sketch"}
 
     report = diagnose_sketch_solver(sketch)
+    wire_diag = diagnose_open_wires(sketch)
+    report["wire_diagnosis"] = wire_diag
+    if not wire_diag["is_closed"] and wire_diag["closable_gaps"]:
+        close_open_wire_gaps(sketch)
     if report["is_clean"]:
         msg = f"Sketch is healthy: DoF {report['dof']}, 0 conflicts, 0 redundant constraints."
         _notify_diagnostics(msg)
@@ -2637,6 +2641,223 @@ class SolverDiagnosticsCommand(SketcherCommand):
 
     def Activated(self):
         run_solver_diagnostics()
+
+
+def diagnose_open_wires(sketch, tolerance=0.5):
+    """Detect open profile wire endpoints and pair closable gaps within tolerance (mm)."""
+    geos = _geometry_list(sketch)
+    all_endpoints = []
+    for geoid, geo in enumerate(geos):
+        if is_construction(sketch, geoid, geo):
+            continue
+        pts = geometry_endpoints(geo)
+        start, end = pts.get(_POS_START), pts.get(_POS_END)
+        if start is None or end is None:
+            continue
+        all_endpoints.append({"geoid": geoid, "posid": _POS_START, "point": start})
+        all_endpoints.append({"geoid": geoid, "posid": _POS_END, "point": end})
+
+    coincident_pairs = set()
+    for c in getattr(sketch, "Constraints", []) or ():
+        if getattr(c, "Type", "") == "Coincident":
+            f_id = int(getattr(c, "First", -2000))
+            f_pos = int(getattr(c, "FirstPos", 0))
+            s_id = int(getattr(c, "Second", -2000))
+            s_pos = int(getattr(c, "SecondPos", 0))
+            coincident_pairs.add(((f_id, f_pos), (s_id, s_pos)))
+            coincident_pairs.add(((s_id, s_pos), (f_id, f_pos)))
+
+    open_pts = []
+    for i, ep in enumerate(all_endpoints):
+        matched = False
+        for j, other in enumerate(all_endpoints):
+            if i == j:
+                continue
+            if (
+                (ep["geoid"], ep["posid"]),
+                (other["geoid"], other["posid"]),
+            ) in coincident_pairs or points_equal(ep["point"], other["point"], TOLERANCE):
+                matched = True
+                break
+        if not matched:
+            open_pts.append(ep)
+
+    closable_gaps = []
+    used = set()
+    candidate_pairs = []
+    for i in range(len(open_pts)):
+        for j in range(i + 1, len(open_pts)):
+            a, b = open_pts[i], open_pts[j]
+            dist = math_hypot(a["point"][0] - b["point"][0], a["point"][1] - b["point"][1])
+            if dist <= float(tolerance):
+                candidate_pairs.append((dist, i, j, a, b))
+    candidate_pairs.sort(key=lambda item: item[0])
+
+    for dist, i, j, a, b in candidate_pairs:
+        if i in used or j in used:
+            continue
+        if a["geoid"] == b["geoid"] and len(geos) > 1:
+            continue
+        used.add(i)
+        used.add(j)
+        closable_gaps.append(
+            {
+                "first": a,
+                "second": b,
+                "distance": round(dist, 6),
+                "description": (
+                    f"Gap of {dist:.4f} mm between Edge {a['geoid'] + 1} "
+                    f"({a['point'][0]:.3f}, {a['point'][1]:.3f}) and Edge {b['geoid'] + 1} "
+                    f"({b['point'][0]:.3f}, {b['point'][1]:.3f})"
+                ),
+            }
+        )
+
+    is_closed = len(open_pts) == 0
+    if is_closed:
+        summary = "All sketch profile wires are closed."
+    elif closable_gaps:
+        summary = (
+            f"Found {len(open_pts)} open wire endpoint(s) with "
+            f"{len(closable_gaps)} closable gap(s) (<= {tolerance:.3f} mm)."
+        )
+    else:
+        coords = ", ".join(
+            f"Edge {ep['geoid'] + 1} at ({ep['point'][0]:.2f}, {ep['point'][1]:.2f})"
+            for ep in open_pts[:4]
+        )
+        summary = f"Wire is not closed: {len(open_pts)} open endpoint(s) ({coords})."
+
+    return {
+        "is_closed": is_closed,
+        "open_endpoint_count": len(open_pts),
+        "open_endpoints": open_pts,
+        "closable_gaps": closable_gaps,
+        "summary": summary,
+    }
+
+
+def close_open_wire_gaps(sketch=None, tolerance=0.5):
+    """Close open sketch profile gaps within tolerance in a single undo transaction."""
+    sketch = sketch or active_sketch()
+    if sketch is None:
+        notify("Sketch Repair", "Select or open a sketch first.", error=True)
+        return {"status": "no-sketch", "closed_count": 0}
+
+    diagnosis = diagnose_open_wires(sketch, tolerance=tolerance)
+    if diagnosis["is_closed"]:
+        return {
+            "status": "already-closed",
+            "closed_count": 0,
+            "diagnosis": diagnosis,
+            "summary": diagnosis["summary"],
+        }
+
+    gaps = diagnosis["closable_gaps"]
+    if not gaps:
+        notify("Sketch Repair", diagnosis["summary"], error=True)
+        return {
+            "status": "unclosable",
+            "closed_count": 0,
+            "diagnosis": diagnosis,
+            "summary": diagnosis["summary"],
+        }
+
+    document = getattr(sketch, "Document", None) or getattr(App, "ActiveDocument", None)
+    _open_transaction(document, "Close Sketch Wire Gap")
+    closed_count = 0
+    methods_used = []
+    try:
+        try:
+            import Sketcher
+        except ImportError:
+            Sketcher = None
+
+        for gap in gaps:
+            first = gap["first"]
+            second = gap["second"]
+            applied = False
+            if Sketcher is not None:
+                c = Sketcher.Constraint(
+                    "Coincident",
+                    first["geoid"],
+                    first["posid"],
+                    second["geoid"],
+                    second["posid"],
+                )
+                if _safe_add_constraint(sketch, c):
+                    applied = True
+                    methods_used.append("coincident")
+
+            if not applied:
+                line_id = _add_line(
+                    sketch, first["point"], second["point"], construction=False
+                )
+                if Sketcher is not None and isinstance(line_id, int) and line_id >= 0:
+                    _safe_add_constraint(
+                        sketch,
+                        Sketcher.Constraint(
+                            "Coincident",
+                            first["geoid"],
+                            first["posid"],
+                            line_id,
+                            _POS_START,
+                        ),
+                    )
+                    _safe_add_constraint(
+                        sketch,
+                        Sketcher.Constraint(
+                            "Coincident",
+                            line_id,
+                            _POS_END,
+                            second["geoid"],
+                            second["posid"],
+                        ),
+                    )
+                applied = True
+                methods_used.append("line_segment")
+
+            if applied:
+                closed_count += 1
+
+        _recompute(sketch)
+        try:
+            repair_sketch_internal_faces(sketch)
+        except Exception:
+            pass
+        _commit_transaction(document)
+    except Exception as exc:
+        _abort_transaction(document)
+        notify("Sketch Repair", f"Could not close wire gap: {exc}", error=True)
+        return {"status": "error", "closed_count": 0, "error": str(exc)}
+
+    summary = f"Closed {closed_count} open wire gap(s) in {getattr(sketch, 'Label', 'Sketch')}."
+    notify("Sketch Repair", summary)
+    return {
+        "status": "closed",
+        "closed_count": closed_count,
+        "methods": methods_used,
+        "gaps": gaps,
+        "diagnosis": diagnosis,
+        "summary": summary,
+    }
+
+
+class CloseWireGapsCommand(SketcherCommand):
+    """``FMF_CloseWireGaps`` command for one-click open-wire gap repair."""
+
+    def GetResources(self):
+        return {
+            "Pixmap": "Sketcher_ValidateSketch",
+            "MenuText": "Close Wire Gaps",
+            "ToolTip": (
+                "Detect open endpoints in the active sketch and close small gaps "
+                "in a single undoable transaction."
+            ),
+        }
+
+    def Activated(self):
+        close_open_wire_gaps()
 
 
 def _register_icon_path():
