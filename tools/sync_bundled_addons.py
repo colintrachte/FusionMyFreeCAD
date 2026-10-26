@@ -901,8 +901,7 @@ FCBINDING_PASSIVE_TRANSITION_PATCH = (
         "            return\n",
     ),
     (
-        '        super().__init__(title="")\n'
-        '        self.setObjectName("Ribbon")\n',
+        '        super().__init__(title="")\n        self.setObjectName("Ribbon")\n',
         '        super().__init__(title="")\n'
         '        self.setObjectName("Ribbon")\n'
         "        self._fmfProgrammaticTabChange = False\n"

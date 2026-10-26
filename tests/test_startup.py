@@ -796,9 +796,7 @@ def test_owned_sketch_edit_changes_only_ribbon_context(env, bootstrap, monkeypat
     assert contexts[-1] == "FMFPartWorkbench"
 
 
-def test_sketch_exit_never_competes_with_freecads_workbench_transition(
-    env, bootstrap, monkeypatch
-):
+def test_sketch_exit_never_competes_with_freecads_workbench_transition(env, bootstrap, monkeypatch):
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
     env.active_workbench = "FMFSketchWorkbench"
     bootstrap.register_commands()
@@ -814,9 +812,7 @@ def test_sketch_exit_never_competes_with_freecads_workbench_transition(
     assert contexts == ["FMFDesignWorkbench"]
 
 
-def test_stale_sketch_exit_does_not_replace_a_new_sketch_context(
-    env, bootstrap, monkeypatch
-):
+def test_stale_sketch_exit_does_not_replace_a_new_sketch_context(env, bootstrap, monkeypatch):
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
     env.active_workbench = "FMFSketchWorkbench"
     bootstrap.register_commands()
@@ -834,9 +830,7 @@ def test_stale_sketch_exit_does_not_replace_a_new_sketch_context(
     assert contexts[-1] == "FMFSketchWorkbench"
 
 
-def test_repeated_existing_sketch_edits_never_activate_a_workbench(
-    env, bootstrap, monkeypatch
-):
+def test_repeated_existing_sketch_edits_never_activate_a_workbench(env, bootstrap, monkeypatch):
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
     env.active_workbench = "FMFDesignWorkbench"
     bootstrap.register_commands()

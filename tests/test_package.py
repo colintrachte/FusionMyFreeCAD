@@ -236,6 +236,17 @@ def test_runtime_uses_the_canonical_action_registry_without_warm_global_scans():
     assert "CanonicalActionRegistry(Gui, QAction)" in bootstrap
 
 
+def test_dressup_keyboard_filter_is_not_installed_on_qapplication():
+    source = (ROOT / "fmf_dressup_tools.py").read_text(encoding="utf-8")
+    install = source[
+        source.index("def install_dressup_enhancers") : source.index(
+            "def uninstall_dressup_enhancers"
+        )
+    ]
+    assert "QApplication.instance()" not in install
+    assert "_install_numpad_shield_targets" in install
+
+
 def test_bundled_ribbon_customization_rejects_a_missing_replacement_panel():
     source = (BUNDLED / "FreeCAD-Ribbon" / "FCBinding.py").read_text(encoding="utf-8")
     assert "if newPanel is None:" in source

@@ -5,7 +5,7 @@ from __future__ import annotations
 import types
 from pathlib import Path
 
-from fake_freecad import FakeTimer
+from fake_freecad import FakeQtWidget, FakeTimer
 
 import fmf_dressup_tools as dressup
 
@@ -279,11 +279,22 @@ def test_install_and_uninstall_enhancers(env):
     """Enhancers install and uninstall idempotently without leaking filters or observers."""
     dressup.uninstall_dressup_enhancers()
 
+    task_surface = FakeQtWidget()
+    task_surface.setObjectName("Tasks")
+    task_child = FakeQtWidget()
+    task_surface.children = [task_child]
+    env.main_window.widgets.append(task_surface)
+
     dressup.install_dressup_enhancers()
     app = env.pyside.QtWidgets.QApplication.instance()
-    assert len(app.filters) >= 1
+    assert app.filters == []
+    assert dressup._numpad_shield_targets
+    assert task_surface._installed_filters == [dressup._numpad_shield_filter]
+    assert task_child._installed_filters == [dressup._numpad_shield_filter]
     assert len(env.selection_observers) >= 1
 
     dressup.uninstall_dressup_enhancers()
     assert len(app.filters) == 0
+    assert task_surface._installed_filters == []
+    assert task_child._installed_filters == []
     assert len(env.selection_observers) == 0

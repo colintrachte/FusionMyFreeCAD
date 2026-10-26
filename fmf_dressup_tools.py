@@ -96,6 +96,7 @@ _qt_core, _, _ = _get_qt()
 _QObjectBase: Any = getattr(_qt_core, "QObject", object) if _qt_core is not None else object
 
 _numpad_shield_filter: _DressUpNumpadShield | None = None
+_numpad_shield_targets: dict[int, Any] = {}
 _selection_observer: _DressUpSelectionObserver | None = None
 
 
@@ -272,6 +273,11 @@ class _DressUpNumpadShield(_QObjectBase):
             return False
 
         event_type = getattr(event, "type", lambda: None)()
+        child_added_type = getattr(qt_core.QEvent, "ChildAdded", None)
+        if event_type == child_added_type:
+            child = getattr(event, "child", lambda: None)()
+            _install_numpad_shield_target(child)
+            return False
         key_press_type = getattr(qt_core.QEvent, "KeyPress", None)
 
         # On dialog show / window activation, ensure live tracking & selection mode
@@ -510,8 +516,46 @@ class _DressUpSelectionObserver:
         pass
 
 
+def _install_numpad_shield_target(target: Any) -> None:
+    """Install the shield once on a live task or viewport widget."""
+    if target is None or _numpad_shield_filter is None:
+        return
+    key = id(target)
+    if key in _numpad_shield_targets or not hasattr(target, "installEventFilter"):
+        return
+    try:
+        target.installEventFilter(_numpad_shield_filter)
+        _numpad_shield_targets[key] = target
+    except RuntimeError:
+        return
+
+
+def _install_numpad_shield_targets(main_window: Any, widget_type: Any) -> None:
+    """Scope keyboard interception to task controls and the 3D viewport."""
+    central = main_window.centralWidget() if hasattr(main_window, "centralWidget") else None
+    viewport = getattr(central, "viewport", lambda: central)() if central is not None else None
+    _install_numpad_shield_target(viewport)
+    if viewport is not None and hasattr(viewport, "findChildren"):
+        for child in viewport.findChildren(widget_type):
+            _install_numpad_shield_target(child)
+
+    widgets = main_window.findChildren(widget_type) if hasattr(main_window, "findChildren") else ()
+    for widget in widgets:
+        try:
+            name = widget.objectName() if hasattr(widget, "objectName") else ""
+            title = widget.windowTitle() if hasattr(widget, "windowTitle") else ""
+        except RuntimeError:
+            continue
+        if name not in {"Tasks", "TaskView"} and title.replace("&", "").strip().lower() != "tasks":
+            continue
+        _install_numpad_shield_target(widget)
+        if hasattr(widget, "findChildren"):
+            for child in widget.findChildren(widget_type):
+                _install_numpad_shield_target(child)
+
+
 def install_dressup_enhancers() -> None:
-    """Install the application numpad shield and selection observer."""
+    """Install scoped numpad interception and the selection observer."""
     global _numpad_shield_filter, _selection_observer
 
     gui = _get_gui()
@@ -522,10 +566,11 @@ def install_dressup_enhancers() -> None:
         and qt_widgets is not None
         and hasattr(qt_widgets, "QApplication")
     ):
-        app = qt_widgets.QApplication.instance()
-        if app and hasattr(app, "installEventFilter"):
-            _numpad_shield_filter = _DressUpNumpadShield()
-            app.installEventFilter(_numpad_shield_filter)
+        main_window = gui.getMainWindow() if gui and hasattr(gui, "getMainWindow") else None
+        widget_type = getattr(qt_widgets, "QWidget", None)
+        if main_window is not None and widget_type is not None:
+            _numpad_shield_filter = _DressUpNumpadShield(main_window)
+            _install_numpad_shield_targets(main_window, widget_type)
 
     if (
         _selection_observer is None
@@ -542,19 +587,15 @@ def uninstall_dressup_enhancers() -> None:
     global _numpad_shield_filter, _selection_observer
 
     gui = _get_gui()
-    _qt_core, _qt_gui, qt_widgets = _get_qt()
+    _qt_core, _qt_gui, _qt_widgets = _get_qt()
 
-    if (
-        _numpad_shield_filter is not None
-        and qt_widgets is not None
-        and hasattr(qt_widgets, "QApplication")
-    ):
-        app = qt_widgets.QApplication.instance()
-        if app and hasattr(app, "removeEventFilter"):
+    if _numpad_shield_filter is not None:
+        for target in tuple(_numpad_shield_targets.values()):
             try:
-                app.removeEventFilter(_numpad_shield_filter)
-            except Exception:
+                target.removeEventFilter(_numpad_shield_filter)
+            except (AttributeError, RuntimeError):
                 pass
+        _numpad_shield_targets.clear()
         _numpad_shield_filter = None
 
     if (
