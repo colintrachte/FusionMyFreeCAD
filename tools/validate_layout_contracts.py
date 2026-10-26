@@ -24,6 +24,11 @@ COMMAND_CONTRACTS = {
         "workbench": "FMFDesignWorkbench",
         "panel": "FMF Sketch Entry_newPanel",
     },
+    "smart-extrude": {
+        "command": "FMF_SmartExtrude",
+        "workbench": "FMFDesignWorkbench",
+        "panel": "FMF Create_newPanel",
+    },
     "pad": {
         "command": "PartDesign_Pad",
         "workbench": "FMFDesignWorkbench",

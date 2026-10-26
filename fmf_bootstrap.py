@@ -639,7 +639,16 @@ def _reconcile_order(preferred, shipped):
     """Preserve known user order while inserting commands added by an update."""
     shipped = list(shipped)
     result = [item for item in preferred if item in shipped]
-    result.extend(item for item in shipped if item not in result)
+    for idx, item in enumerate(shipped):
+        if item in result:
+            continue
+        if idx == 0:
+            result.insert(0, item)
+        elif shipped[idx - 1] in result:
+            insert_at = result.index(shipped[idx - 1]) + 1
+            result.insert(insert_at, item)
+        else:
+            result.append(item)
     return result
 
 
@@ -677,11 +686,8 @@ def _apply_customization(ribbon, spec, customization=None):
                 command for command in saved.get("pinned", []) if command in shipped_order
             ]
             if saved_pinned or known_before:
-                pinned = saved_pinned + [
-                    command
-                    for command in toolbar["order"]
-                    if command in new_commands and command in shipped_pinned
-                ]
+                pinned_set = set(saved_pinned) | (new_commands & shipped_pinned)
+                pinned = [command for command in toolbar["order"] if command in pinned_set]
             else:
                 pinned = [command for command in toolbar["order"] if command in shipped_pinned]
             toolbar["overflow"] = [command for command in toolbar["order"] if command not in pinned]

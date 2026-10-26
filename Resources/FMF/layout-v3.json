@@ -120,6 +120,13 @@
         "title": "CREATE",
         "commands": [
           [
+            "FMF_SmartExtrude",
+            "General",
+            "large",
+            "Smart Extrude",
+            "PartDesign_Pad"
+          ],
+          [
             "PartDesign_Pad",
             "PartDesignWorkbench",
             "large",

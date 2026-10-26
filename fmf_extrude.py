@@ -423,7 +423,9 @@ def show_extrude_hud(
     return hud
 
 
-def enhance_active_extrude(info: dict[str, Any] | None = None) -> bool:
+def enhance_active_extrude(
+    info: dict[str, Any] | None = None, operation: str = "auto"
+) -> bool:
     """Enable signed direction dragging, numeric input, and cursor HUD on active extrude."""
     if info is None:
         info = get_active_extrude_info()
@@ -467,8 +469,45 @@ def enhance_active_extrude(info: dict[str, Any] | None = None) -> bool:
         except Exception:
             pass
 
-    show_extrude_hud(info)
+    show_extrude_hud(info, operation=operation)
     return hooked
+
+
+def _activate_body_tip_visibility(
+    body: Any, feat: Any, profile_obj: Any = None
+) -> None:
+    """Ensure the newly created feature is the visible Tip of its Body."""
+    if body is not None:
+        try:
+            body.Tip = feat
+        except Exception:
+            pass
+        if hasattr(body, "Visibility"):
+            try:
+                body.Visibility = True
+            except Exception:
+                pass
+    base_feat = getattr(feat, "BaseFeature", None)
+    if base_feat is not None and hasattr(base_feat, "Visibility"):
+        try:
+            base_feat.Visibility = False
+        except Exception:
+            pass
+    if (
+        profile_obj is not None
+        and profile_obj is not feat
+        and hasattr(profile_obj, "Visibility")
+        and getattr(profile_obj, "TypeId", "").startswith("Sketcher::")
+    ):
+        try:
+            profile_obj.Visibility = False
+        except Exception:
+            pass
+    if feat is not None and hasattr(feat, "Visibility"):
+        try:
+            feat.Visibility = True
+        except Exception:
+            pass
 
 
 def _owning_body(profile_obj: Any, document: Any = None) -> Any | None:
@@ -962,6 +1001,7 @@ def smart_extrude(
                     except Exception:
                         pass
 
+                _activate_body_tip_visibility(new_body, feat, profile_obj)
                 notify("Extrude", f"Created new Body with Pad ({abs(length):.1f} mm).")
                 return {
                     "status": "ok",
@@ -1031,6 +1071,7 @@ def smart_extrude(
                                 feat.recompute()
                             doc.recompute()
 
+                _activate_body_tip_visibility(target_body, feat, profile_obj)
                 notify("Extrude", f"Created Pocket cut ({abs(length):.1f} mm).")
                 return {
                     "status": "ok",
@@ -1089,6 +1130,7 @@ def smart_extrude(
                                 feat.recompute()
                             doc.recompute()
 
+                _activate_body_tip_visibility(target_body, feat, profile_obj)
                 notify("Extrude", f"Created Pad join ({abs(length):.1f} mm).")
                 return {
                     "status": "ok",
@@ -1134,7 +1176,17 @@ class SmartExtrudeCommand:
             notify("Extrude", "Select a sketch or face to extrude.", error=True)
             return
 
-        smart_extrude(operation="auto", document=doc)
+        res = smart_extrude(operation="auto", document=doc)
+        if res.get("status") == "ok" and res.get("feature") is not None:
+            feat = res["feature"]
+            op_used = res.get("operation", "auto")
+            gui_doc = getattr(gui, "ActiveDocument", None) if gui else None
+            if gui_doc is not None and hasattr(gui_doc, "setEdit"):
+                try:
+                    gui_doc.setEdit(getattr(feat, "Name", feat))
+                except Exception:
+                    pass
+            enhance_active_extrude(operation=op_used)
 
 
 def register(add_command: Any = None) -> None:

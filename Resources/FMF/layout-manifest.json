@@ -37,6 +37,7 @@
     "FMF_Reapply",
     "FMF_RepairReferences",
     "FMF_Restore",
+    "FMF_SmartExtrude",
     "FMF_SmartOffset",
     "FMF_SolverDiagnostics",
     "FMF_StudioViewport",
@@ -314,6 +315,12 @@
               "small",
               "Merge Sketches",
               "Sketcher_MergeSketch"
+            ],
+            "FMF_SmartExtrude": [
+              "General",
+              "large",
+              "Smart Extrude",
+              "PartDesign_Pad"
             ],
             "PartDesign_Pad": [
               "PartDesignWorkbench",

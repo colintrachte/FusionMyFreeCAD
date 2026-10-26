@@ -584,3 +584,79 @@ def test_partdesign_feature_edit_and_transition_keep_fmf_workbench(
     assert ordered.startswith(
         "FMFDesignWorkbench,FMFPartWorkbench,FMFSketchWorkbench,FMFSurfaceWorkbench"
     )
+
+
+def test_smart_extrude_is_first_button_in_create_section(layout, manifest, bootstrap):
+    """Smart Extrude is the very first large button in FMF Create_newPanel."""
+    panels = {
+        panel["name"]: panel for panel in layout["workbenches"]["FMFDesignWorkbench"]
+    }
+    create_panel = panels["FMF Create_newPanel"]
+    commands = create_panel["commands"]
+
+    assert commands[0] == [
+        "FMF_SmartExtrude",
+        "General",
+        "large",
+        "Smart Extrude",
+        "PartDesign_Pad",
+    ]
+    assert commands[1][0] == "PartDesign_Pad"
+    assert commands[2][0] == "PartDesign_Pocket"
+    assert "FMF_SmartExtrude" in manifest["primaryCommands"]
+
+    # Simulate an existing user customization saved before FMF_SmartExtrude existed
+    legacy_order = [entry[0] for entry in commands[1:] + create_panel["overflow"]]
+    legacy_pinned = [entry[0] for entry in commands[1:]]
+    custom = {
+        "layoutVersion": layout["layoutVersion"],
+        "workbenches": {
+            "FMFDesignWorkbench": {
+                "panels": {
+                    "FMF Create_newPanel": {
+                        "order": legacy_order,
+                        "pinned": legacy_pinned,
+                    }
+                }
+            }
+        },
+    }
+    ribbon, _ = bootstrap._merge_layout(apply_customization=False)
+    spec = bootstrap._layout_spec()
+    bootstrap._apply_customization(ribbon, spec, customization=custom)
+    wb_key = (
+        "FMFDesignWorkbench"
+        if "FMFDesignWorkbench" in ribbon["workbenches"]
+        else "PartDesignWorkbench"
+    )
+    toolbar = ribbon["workbenches"][wb_key]["toolbars"]["FMF Create_newPanel"]
+    assert toolbar["order"][0] == "FMF_SmartExtrude"
+    assert toolbar["order"][1] == "PartDesign_Pad"
+    assert toolbar["order"][2] == "PartDesign_Pocket"
+    assert "FMF_SmartExtrude" not in toolbar["overflow"]
+
+
+def test_smart_extrude_command_opens_interactive_edit_and_updates_tip(extrude_env):
+    """Activating FMF_SmartExtrude updates Body.Tip visibility and opens interactive edit mode."""
+    edited = []
+    gui = extrude_env.env.gui
+    gui.ActiveDocument = types.SimpleNamespace(
+        ActiveView=None,
+        setEdit=lambda name: edited.append(name),
+    )
+    extrude_env.sketch.Visibility = True
+    gui.Selection.getSelectionEx = lambda: [
+        types.SimpleNamespace(Object=extrude_env.sketch, SubElementNames=["Face1"])
+    ]
+
+    cmd = fmf_extrude.SmartExtrudeCommand()
+    cmd.Activated()
+
+    pads = [
+        o for o in extrude_env.doc.Objects if o.TypeId == "PartDesign::Pad"
+    ]
+    assert len(pads) == 1
+    feat = pads[0]
+    assert getattr(extrude_env.body, "Tip", None) is feat
+    assert extrude_env.sketch.Visibility is False
+    assert edited == [feat.Name]
