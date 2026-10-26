@@ -32,12 +32,13 @@ class MockVec:
     @property
     def Length(self) -> float:
         import math
+
         return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z) or 1.0
 
     def normalize(self) -> MockVec:
-        l = self.Length
-        if l > 1e-9:
-            return MockVec(self.x / l, self.y / l, self.z / l, rev=self._rev)
+        vec_len = self.Length
+        if vec_len > 1e-9:
+            return MockVec(self.x / vec_len, self.y / vec_len, self.z / vec_len, rev=self._rev)
         return self
 
 
@@ -794,11 +795,14 @@ def test_smart_extrude_task_panel_unified_style_structure(extrude_env):
 
 def test_smart_extrude_dragger_switch_orientation(monkeypatch):
     """SmartExtrudeDragger toggles SoSwitch children without destroying nodekit parts."""
+
     class MockCoinVal:
         def __init__(self, val):
             self._val = val
+
         def getValue(self):
             return self._val
+
         def setValue(self, v):
             self._val = v
 
@@ -807,10 +811,13 @@ def test_smart_extrude_dragger_switch_orientation(monkeypatch):
             self.whichChild = MockCoinVal(0)
             self.children = []
             self._refs = 0
+
         def addChild(self, c):
             self.children.append(c)
+
         def ref(self):
             self._refs += 1
+
         def unref(self):
             self._refs = max(0, self._refs - 1)
 
@@ -901,7 +908,7 @@ def test_rotation_from_x_to_vector_quaternions():
 
 
 def test_extract_world_face_frame_dynamic(extrude_env):
-    """Verify _extract_world_face_frame calculates world normal, placement, and bounds dynamically."""
+    """Verify _extract_world_face_frame calculates world normal and bounds dynamically."""
     doc = extrude_env.doc
     body = extrude_env.body
     sketch = extrude_env.sketch
@@ -939,7 +946,7 @@ def test_extract_world_face_frame_dynamic(extrude_env):
     sketch.Shape = types.SimpleNamespace(Faces=[mock_face], Wires=[])
     sketch.InternalShape = None
 
-    face, center, normal, scale = fmf_extrude._extract_world_face_frame(sketch, None, doc)
+    face, _center, normal, scale = fmf_extrude._extract_world_face_frame(sketch, None, doc)
 
     assert face is not None
     # Normal must be dynamically derived from sketch rotation (0, 1, 0), not hardcoded (0, 0, 1)
@@ -951,12 +958,15 @@ def test_extract_world_face_frame_dynamic(extrude_env):
 
 
 def test_dragger_motion_cb_is_read_only_and_defers_switch(monkeypatch):
-    """_on_motion_cb does not mutate SoSwitch during Coin traversal; _dispatch_motion updates it on Qt event loop."""
+    """_on_motion_cb does not mutate SoSwitch during Coin traversal; defers to Qt loop."""
+
     class MockCoinVal:
         def __init__(self, val):
             self._val = val
+
         def getValue(self):
             return self._val
+
         def setValue(self, v):
             self._val = v
 
@@ -986,7 +996,7 @@ def test_dragger_motion_cb_is_read_only_and_defers_switch(monkeypatch):
     dispatched = []
     dragger.on_drag_distance = lambda val: dispatched.append(val)
 
-    # In traversal callback: switch MUST NOT change yet and dispatch must be deferred to Qt event loop
+    # In traversal callback: switch MUST NOT change yet (deferred to Qt event loop)
     dragger._on_motion_cb()
     assert dragger._latest_drag_val == -15.0
     assert dragger._switch_normal.whichChild.getValue() == 0
@@ -1012,7 +1022,9 @@ def test_dragger_update_preview_does_not_synchronously_redraw(extrude_env):
     extrude_env.env.gui.ActiveDocument = types.SimpleNamespace(ActiveView=active_view)
 
     dragger = fmf_extrude.SmartExtrudeDragger()
-    dragger.preview_sep = types.SimpleNamespace(removeAllChildren=lambda: None, addChild=lambda n: None)
+    dragger.preview_sep = types.SimpleNamespace(
+        removeAllChildren=lambda: None, addChild=lambda n: None
+    )
     dragger._get_coin = lambda: types.SimpleNamespace(SoSeparator=lambda: None)
 
     dragger.update_preview(None, None, "join", None)
@@ -1021,6 +1033,7 @@ def test_dragger_update_preview_does_not_synchronously_redraw(extrude_env):
 
 def test_dragger_detach_invalidates_queued_motion(monkeypatch):
     """A queued callback from a detached Coin dragger must not touch its replacement."""
+
     class MockCoinVal:
         def getValue(self):
             return (12.0, 0.0, 0.0)
@@ -1030,9 +1043,9 @@ def test_dragger_detach_invalidates_queued_motion(monkeypatch):
         fmf_extrude,
         "_get_qt",
         lambda: (
-            types.SimpleNamespace(QTimer=types.SimpleNamespace(
-                singleShot=lambda _ms, cb: scheduled.append(cb)
-            )),
+            types.SimpleNamespace(
+                QTimer=types.SimpleNamespace(singleShot=lambda _ms, cb: scheduled.append(cb))
+            ),
             None,
             None,
         ),
@@ -1088,4 +1101,3 @@ def test_smart_extrude_command_never_instantiates_hud(extrude_env):
     assert len(shown_dialogs) == 1
     # HUD must remain None
     assert fmf_extrude.get_active_extrude_hud() is None
-

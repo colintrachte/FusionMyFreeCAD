@@ -278,12 +278,13 @@ class FakeVector:
     @property
     def Length(self):
         import math
+
         return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
 
     def normalize(self):
-        l = self.Length
-        if l > 1e-9:
-            return FakeVector(self.x / l, self.y / l, self.z / l)
+        vec_len = self.Length
+        if vec_len > 1e-9:
+            return FakeVector(self.x / vec_len, self.y / vec_len, self.z / vec_len)
         return FakeVector(0.0, 0.0, 0.0)
 
     def dot(self, other):

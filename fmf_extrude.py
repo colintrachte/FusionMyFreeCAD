@@ -785,16 +785,16 @@ def _extract_world_face_frame(
         if norm_vec is not None:
             if hasattr(norm_vec, "normalize"):
                 norm_vec = norm_vec.normalize()
-            l = getattr(norm_vec, "Length", None)
-            if l is None:
-                l = math.sqrt(
+            vec_len = getattr(norm_vec, "Length", None)
+            if vec_len is None:
+                vec_len = math.sqrt(
                     float(norm_vec.x) ** 2 + float(norm_vec.y) ** 2 + float(norm_vec.z) ** 2
                 )
-            if l > 1e-6:
+            if vec_len > 1e-6:
                 normal_xyz = (
-                    float(norm_vec.x) / l,
-                    float(norm_vec.y) / l,
-                    float(norm_vec.z) / l,
+                    float(norm_vec.x) / vec_len,
+                    float(norm_vec.y) / vec_len,
+                    float(norm_vec.z) / vec_len,
                 )
     except Exception:
         pass
@@ -1615,12 +1615,8 @@ class SmartExtrudeDragger:
 
     def _dispatch_motion(self, generation: int | None = None) -> None:
         self._motion_scheduled = False
-        if (
-            not self._attached
-            or (
-                generation is not None
-                and generation != self._attachment_generation
-            )
+        if not self._attached or (
+            generation is not None and generation != self._attachment_generation
         ):
             return
         val = self._latest_drag_val
@@ -2428,9 +2424,7 @@ class SmartExtrudeTaskPanel:
                     if hasattr(self.operation_combo, "setCurrentIndex"):
                         keys = [k for k, _ in self.OPERATION_ITEMS]
                         if session.operation_mode in keys:
-                            self.operation_combo.setCurrentIndex(
-                                keys.index(session.operation_mode)
-                            )
+                            self.operation_combo.setCurrentIndex(keys.index(session.operation_mode))
                 except Exception:
                     pass
 
