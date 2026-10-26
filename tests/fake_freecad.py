@@ -275,6 +275,27 @@ class FakeVector:
     def __rmul__(self, scalar):
         return self.__mul__(scalar)
 
+    @property
+    def Length(self):
+        import math
+        return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
+
+    def normalize(self):
+        l = self.Length
+        if l > 1e-9:
+            return FakeVector(self.x / l, self.y / l, self.z / l)
+        return FakeVector(0.0, 0.0, 0.0)
+
+    def dot(self, other):
+        return self.x * other.x + self.y * other.y + self.z * other.z
+
+    def cross(self, other):
+        return FakeVector(
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x,
+        )
+
     def __repr__(self):
         return f"FakeVector({self.x}, {self.y}, {self.z})"
 

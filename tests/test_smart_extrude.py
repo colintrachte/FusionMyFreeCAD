@@ -29,6 +29,17 @@ class MockVec:
             rev=self._rev or (other < 0),
         )
 
+    @property
+    def Length(self) -> float:
+        import math
+        return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z) or 1.0
+
+    def normalize(self) -> MockVec:
+        l = self.Length
+        if l > 1e-9:
+            return MockVec(self.x / l, self.y / l, self.z / l, rev=self._rev)
+        return self
+
 
 @pytest.fixture
 def extrude_env(env):
@@ -856,4 +867,213 @@ def test_smart_extrude_dragger_switch_orientation(monkeypatch):
     dragger_inst._set_arrow_direction(True)
     assert dragger_inst._switch_normal.whichChild.getValue() == 1
     assert dragger_inst._switch_active.whichChild.getValue() == 1
+
+
+def test_rotation_from_x_to_vector_quaternions():
+    """Verify SbRotation from (1, 0, 0) handles parallel, antiparallel, and 3D diagonal vectors."""
+    import math
+
+    class MockSbVec3f:
+        def __init__(self, x=0.0, y=0.0, z=0.0):
+            self.x, self.y, self.z = float(x), float(y), float(z)
+
+    class MockSbRotation:
+        def __init__(self, axis, angle):
+            self.axis = axis
+            self.angle = angle
+
+        def multVec(self, vec):
+            # Standard Rodrigues formula for rotation about axis by angle
+            ax, ay, az = self.axis.x, self.axis.y, self.axis.z
+            vx, vy, vz = vec.x, vec.y, vec.z
+            c = math.cos(self.angle)
+            s = math.sin(self.angle)
+            dot = ax * vx + ay * vy + az * vz
+            # v * c + (axis x v) * s + axis * dot * (1 - c)
+            cx = ay * vz - az * vy
+            cy = az * vx - ax * vz
+            cz = ax * vy - ay * vx
+            rx = vx * c + cx * s + ax * dot * (1.0 - c)
+            ry = vy * c + cy * s + ay * dot * (1.0 - c)
+            rz = vz * c + cz * s + az * dot * (1.0 - c)
+            return MockSbVec3f(rx, ry, rz)
+
+    mock_coin = types.SimpleNamespace(
+        SbVec3f=MockSbVec3f,
+        SbRotation=MockSbRotation,
+    )
+
+    # 1. Parallel (1, 0, 0)
+    rot_par = fmf_extrude._rotation_from_x_to_vector((1.0, 0.0, 0.0), mock_coin)
+    res_par = rot_par.multVec(MockSbVec3f(1.0, 0.0, 0.0))
+    assert abs(res_par.x - 1.0) < 1e-5
+    assert abs(res_par.y) < 1e-5
+    assert abs(res_par.z) < 1e-5
+
+    # 2. Antiparallel (-1, 0, 0)
+    rot_anti = fmf_extrude._rotation_from_x_to_vector((-1.0, 0.0, 0.0), mock_coin)
+    res_anti = rot_anti.multVec(MockSbVec3f(1.0, 0.0, 0.0))
+    assert abs(res_anti.x - (-1.0)) < 1e-5
+    assert abs(res_anti.y) < 1e-5
+    assert abs(res_anti.z) < 1e-5
+
+    # 3. Orthogonal +Z (0, 0, 1)
+    rot_z = fmf_extrude._rotation_from_x_to_vector((0.0, 0.0, 1.0), mock_coin)
+    res_z = rot_z.multVec(MockSbVec3f(1.0, 0.0, 0.0))
+    assert abs(res_z.x) < 1e-5
+    assert abs(res_z.y) < 1e-5
+    assert abs(res_z.z - 1.0) < 1e-5
+
+    # 4. Orthogonal +Y (0, 1, 0)
+    rot_y = fmf_extrude._rotation_from_x_to_vector((0.0, 1.0, 0.0), mock_coin)
+    res_y = rot_y.multVec(MockSbVec3f(1.0, 0.0, 0.0))
+    assert abs(res_y.x) < 1e-5
+    assert abs(res_y.y - 1.0) < 1e-5
+    assert abs(res_y.z) < 1e-5
+
+    # 5. Diagonal 3D vector (1/sqrt(3), 1/sqrt(3), 1/sqrt(3))
+    s = 1.0 / math.sqrt(3.0)
+    rot_diag = fmf_extrude._rotation_from_x_to_vector((s, s, s), mock_coin)
+    res_diag = rot_diag.multVec(MockSbVec3f(1.0, 0.0, 0.0))
+    assert abs(res_diag.x - s) < 1e-5
+    assert abs(res_diag.y - s) < 1e-5
+    assert abs(res_diag.z - s) < 1e-5
+
+
+def test_extract_world_face_frame_dynamic(extrude_env):
+    """Verify _extract_world_face_frame calculates world normal, placement, and bounds dynamically."""
+    doc = extrude_env.doc
+    body = extrude_env.body
+    sketch = extrude_env.sketch
+
+    # Body has placement offset (100, 50, 20)
+    body.Placement = types.SimpleNamespace(
+        Base=MockVec(100.0, 50.0, 20.0),
+        multiply=lambda p: types.SimpleNamespace(
+            Base=MockVec(p.Base.x + 100.0, p.Base.y + 50.0, p.Base.z + 20.0),
+            multiply=lambda p2: p2,
+        ),
+    )
+    body.getGlobalPlacement = lambda: body.Placement
+
+    # Sketch is on XZ plane: Rotation takes (0, 0, 1) to (0, 1, 0)
+    sketch_pl = types.SimpleNamespace(
+        Base=MockVec(0.0, 0.0, 0.0),
+        Rotation=types.SimpleNamespace(
+            multVec=lambda v: MockVec(0.0, 1.0, 0.0),
+        ),
+    )
+    sketch.Placement = sketch_pl
+    sketch.getGlobalPlacement = lambda: sketch_pl
+
+    mock_face = types.SimpleNamespace(
+        CenterOfMass=MockVec(10.0, 20.0, 30.0),
+        BoundBox=types.SimpleNamespace(DiagonalLength=45.0, Center=MockVec(10.0, 20.0, 30.0)),
+        ParameterRange=(-10.0, 10.0, 5.0, 15.0),
+        normalAt=lambda u, v: MockVec(0.0, 1.0, 0.0),
+        Placement=types.SimpleNamespace(
+            Base=MockVec(0.0, 0.0, 0.0),
+            multiply=lambda p: p,
+        ),
+    )
+    sketch.Shape = types.SimpleNamespace(Faces=[mock_face], Wires=[])
+    sketch.InternalShape = None
+
+    face, center, normal, scale = fmf_extrude._extract_world_face_frame(sketch, None, doc)
+
+    assert face is not None
+    # Normal must be dynamically derived from sketch rotation (0, 1, 0), not hardcoded (0, 0, 1)
+    assert abs(normal[0]) < 1e-5
+    assert abs(normal[1] - 1.0) < 1e-5
+    assert abs(normal[2]) < 1e-5
+    # Scale matches diagonal
+    assert abs(scale - 45.0) < 1e-5
+
+
+def test_dragger_motion_cb_is_read_only_and_defers_switch(monkeypatch):
+    """_on_motion_cb does not mutate SoSwitch during Coin traversal; _dispatch_motion updates it on Qt event loop."""
+    class MockCoinVal:
+        def __init__(self, val):
+            self._val = val
+        def getValue(self):
+            return self._val
+        def setValue(self, v):
+            self._val = v
+
+    class MockSwitch:
+        def __init__(self):
+            self.whichChild = MockCoinVal(0)
+
+    scheduled = []
+    mock_timer = types.SimpleNamespace(
+        singleShot=lambda ms, cb: scheduled.append(cb)
+    )
+    monkeypatch.setattr(
+        fmf_extrude,
+        "_get_qt",
+        lambda: (types.SimpleNamespace(QTimer=mock_timer), None, None),
+    )
+
+    dragger = fmf_extrude.SmartExtrudeDragger()
+    dragger.dragger = types.SimpleNamespace(
+        translation=MockCoinVal((-15.0, 0.0, 0.0)),
+    )
+    dragger._switch_normal = MockSwitch()
+    dragger._switch_active = MockSwitch()
+
+    dispatched = []
+    dragger.on_drag_distance = lambda val: dispatched.append(val)
+
+    # In traversal callback: switch MUST NOT change yet and dispatch must be deferred to Qt event loop
+    dragger._on_motion_cb()
+    assert dragger._latest_drag_val == -15.0
+    assert dragger._switch_normal.whichChild.getValue() == 0
+    assert dragger._switch_active.whichChild.getValue() == 0
+    assert len(scheduled) == 1
+    assert dispatched == []
+
+    # When scheduled Qt callback fires outside traversal:
+    scheduled[0]()
+    assert dragger._switch_normal.whichChild.getValue() == 1
+    assert dragger._switch_active.whichChild.getValue() == 1
+    assert dispatched == [-15.0]
+
+
+def test_dragger_update_preview_calls_active_view_redraw(extrude_env):
+    """update_preview explicitly calls active_view.redraw() to prevent viewport freeze while dragging."""
+    redrawn = []
+    active_view = types.SimpleNamespace(
+        getSceneGraph=lambda: object(),
+        redraw=lambda: redrawn.append(True),
+    )
+    extrude_env.env.gui.ActiveDocument = types.SimpleNamespace(ActiveView=active_view)
+
+    dragger = fmf_extrude.SmartExtrudeDragger()
+    dragger.preview_sep = types.SimpleNamespace(removeAllChildren=lambda: None, addChild=lambda n: None)
+    dragger._get_coin = lambda: types.SimpleNamespace(SoSeparator=lambda: None)
+
+    dragger.update_preview(None, None, "join", None)
+    assert redrawn == [True]
+
+
+def test_smart_extrude_command_never_instantiates_hud(extrude_env):
+    """FMF_SmartExtrude never invokes HUD to prevent clutter and deleted-widget exceptions."""
+    shown_dialogs = []
+    gui = extrude_env.env.gui
+    gui.Control = types.SimpleNamespace(
+        showDialog=lambda p: shown_dialogs.append(p),
+        activeDialog=lambda: None,
+        closeDialog=lambda: None,
+    )
+    extrude_env.sketch.Visibility = True
+    gui.Selection.getSelectionEx = lambda: [
+        types.SimpleNamespace(Object=extrude_env.sketch, SubElementNames=["Face1"])
+    ]
+
+    cmd = fmf_extrude.SmartExtrudeCommand()
+    cmd.Activated()
+
+    assert len(shown_dialogs) == 1
+    # HUD must remain None
+    assert fmf_extrude.get_active_extrude_hud() is None
 

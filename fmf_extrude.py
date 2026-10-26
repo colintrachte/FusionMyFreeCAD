@@ -13,6 +13,7 @@ Provides intelligent extrusion wrapping native FreeCAD PartDesign features:
 
 from __future__ import annotations
 
+import math
 from typing import Any, ClassVar
 
 from fmf_common import event, notify, transaction
@@ -665,6 +666,160 @@ def _extract_test_face(
     return None, False
 
 
+def _rotation_from_x_to_vector(vec: Any, coin: Any) -> Any:
+    """Compute a numerically stable SbRotation from (1, 0, 0) to unit vector vec.
+
+    Handles parallel (1, 0, 0), antiparallel (-1, 0, 0), and arbitrary 3D directions
+    without NaN or gimbal degeneracy.
+    """
+    if coin is None:
+        return None
+    vx = float(getattr(vec, "x", vec[0] if isinstance(vec, (tuple, list)) else 0.0))
+    vy = float(getattr(vec, "y", vec[1] if isinstance(vec, (tuple, list)) else 0.0))
+    vz = float(getattr(vec, "z", vec[2] if isinstance(vec, (tuple, list)) else 0.0))
+
+    length = math.sqrt(vx * vx + vy * vy + vz * vz)
+    if length > 1e-9:
+        vx, vy, vz = vx / length, vy / length, vz / length
+    else:
+        return coin.SbRotation(coin.SbVec3f(0.0, 0.0, 1.0), 0.0)
+
+    dot = max(-1.0, min(1.0, vx))
+    if dot >= 0.999999:
+        return coin.SbRotation(coin.SbVec3f(0.0, 0.0, 1.0), 0.0)
+    if dot <= -0.999999:
+        return coin.SbRotation(coin.SbVec3f(0.0, 0.0, 1.0), float(math.pi))
+
+    cx, cy, cz = 0.0, -vz, vy
+    c_len = math.sqrt(cy * cy + cz * cz)
+    if c_len > 1e-9:
+        cy, cz = cy / c_len, cz / c_len
+    else:
+        cy, cz = 1.0, 0.0
+    angle = math.acos(dot)
+    return coin.SbRotation(coin.SbVec3f(cx, cy, cz), float(angle))
+
+
+def _extract_world_face_frame(
+    profile_obj: Any,
+    sub_elements: list[str] | None = None,
+    document: Any = None,
+) -> tuple[Any | None, tuple[float, float, float], tuple[float, float, float], float]:
+    """Extract face, center (x, y, z), unit normal (x, y, z), and scale in world coordinates.
+
+    Applies owning PartDesign::Body global placement when profile_obj is a sketch or feature
+    whose Shape resides in body-local coordinates, ensuring boolean penetration and 3D dragger
+    frames are exact in world space.
+    """
+    app = _get_app()
+    face, needs_placement_transform = _extract_test_face(profile_obj, sub_elements)
+    if face is None:
+        return None, (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), 50.0
+
+    # 1. Placement alignment for sketch-local internal face
+    try:
+        pl = getattr(profile_obj, "Placement", None)
+        if needs_placement_transform and pl is not None and hasattr(face, "Placement"):
+            face.Placement = pl.multiply(face.Placement)
+    except Exception:
+        pass
+
+    # 2. Body-local to world coordinate transformation
+    parent_body = None
+    if profile_obj is not None and getattr(profile_obj, "TypeId", "") != "PartDesign::Body":
+        parent_body = getattr(profile_obj, "_Body", None) or (
+            getattr(profile_obj, "getParentGeoFeatureGroup", lambda: None)()
+        )
+        if parent_body is None and document is not None:
+            for obj in getattr(document, "Objects", ()) or ():
+                if getattr(obj, "TypeId", "") == "PartDesign::Body":
+                    group = getattr(obj, "Group", ()) or ()
+                    if profile_obj in group:
+                        parent_body = obj
+                        break
+
+    if parent_body is not None:
+        try:
+            body_pl = getattr(
+                parent_body,
+                "getGlobalPlacement",
+                lambda: getattr(parent_body, "Placement", None),
+            )()
+            if body_pl is not None and hasattr(face, "Placement"):
+                face.Placement = body_pl.multiply(face.Placement)
+        except Exception:
+            pass
+
+    # 3. Dynamic Normal Vector calculation
+    normal_xyz = (0.0, 0.0, 1.0)
+    try:
+        norm_vec = None
+        # Sketches / 2D objects: getGlobalPlacement orientation is authoritative
+        if profile_obj is not None and (
+            getattr(profile_obj, "TypeId", "").startswith("Sketcher::")
+            or hasattr(profile_obj, "Geometry")
+        ):
+            gpl = getattr(
+                profile_obj,
+                "getGlobalPlacement",
+                lambda: getattr(profile_obj, "Placement", None),
+            )()
+            rot = getattr(gpl, "Rotation", None)
+            if (
+                rot is not None
+                and hasattr(rot, "multVec")
+                and app is not None
+                and hasattr(app, "Vector")
+            ):
+                norm_vec = rot.multVec(app.Vector(0.0, 0.0, 1.0))
+        # Faces on 3D geometry: sample normal at parametric center (u_mid, v_mid)
+        if norm_vec is None:
+            pr = getattr(face, "ParameterRange", None)
+            if pr and len(pr) == 4 and hasattr(face, "normalAt"):
+                u_mid = 0.5 * (float(pr[0]) + float(pr[1]))
+                v_mid = 0.5 * (float(pr[2]) + float(pr[3]))
+                norm_vec = face.normalAt(u_mid, v_mid)
+            elif hasattr(face, "normalAt"):
+                norm_vec = face.normalAt(0.0, 0.0)
+
+        if norm_vec is not None:
+            if hasattr(norm_vec, "normalize"):
+                norm_vec = norm_vec.normalize()
+            l = getattr(norm_vec, "Length", None)
+            if l is None:
+                l = math.sqrt(
+                    float(norm_vec.x) ** 2 + float(norm_vec.y) ** 2 + float(norm_vec.z) ** 2
+                )
+            if l > 1e-6:
+                normal_xyz = (
+                    float(norm_vec.x) / l,
+                    float(norm_vec.y) / l,
+                    float(norm_vec.z) / l,
+                )
+    except Exception:
+        pass
+
+    # 4. Center of Mass & Characteristic Scale
+    center_xyz = (0.0, 0.0, 0.0)
+    scale = 50.0
+    try:
+        com = getattr(face, "CenterOfMass", None)
+        bb = getattr(face, "BoundBox", None)
+        if com is not None and hasattr(com, "x"):
+            center_xyz = (float(com.x), float(com.y), float(com.z))
+        elif bb is not None and hasattr(bb, "Center"):
+            c = bb.Center
+            center_xyz = (float(c.x), float(c.y), float(c.z))
+        if bb is not None:
+            diag = getattr(bb, "DiagonalLength", 0.0)
+            if diag > 1.0:
+                scale = float(diag)
+    except Exception:
+        pass
+
+    return face, center_xyz, normal_xyz, scale
+
+
 def _candidate_bodies(document: Any, preferred_body: Any = None) -> list[Any]:
     """Return candidate PartDesign::Body objects with existing solids, preferred first."""
     bodies: list[Any] = []
@@ -699,6 +854,7 @@ def classify_operation(
     allow_auto_reverse: bool = True,
     document: Any = None,
     prepared_face: Any = None,
+    prepared_normal: tuple[float, float, float] | None = None,
 ) -> dict[str, Any]:
     """Classify the extrusion as join, cut, or new_body based on geometry."""
     app = _get_app()
@@ -720,11 +876,14 @@ def classify_operation(
     primary_body = candidates[0]
     body_shape = getattr(primary_body, "Shape", None)
 
-    # Extract face for test extrusion
+    # Extract face and frame for test extrusion
     if prepared_face is None:
-        face, needs_placement_transform = _extract_test_face(profile_obj, sub_elements)
+        face, _c, normal_xyz, _scale = _extract_world_face_frame(
+            profile_obj, sub_elements, document
+        )
     else:
-        face, needs_placement_transform = prepared_face, False
+        face = prepared_face
+        normal_xyz = prepared_normal or (0.0, 0.0, 1.0)
 
     if face is None:
         return {
@@ -736,19 +895,16 @@ def classify_operation(
         }
 
     try:
-        # Placement alignment (only apply when face is in sketch-local InternalShape coordinates)
-        pl = getattr(profile_obj, "Placement", None)
-        if needs_placement_transform and pl is not None and hasattr(face, "Placement"):
-            face.Placement = pl.multiply(face.Placement)
-
-        # Normal vector
+        # Normal vector in world coordinates
         normal = None
-        if hasattr(face, "normalAt"):
-            normal = face.normalAt(0, 0)
-        if normal is None and app and hasattr(app, "Vector"):
-            rot = getattr(getattr(face, "Placement", None), "Rotation", None)
-            if rot and hasattr(rot, "multVec"):
-                normal = rot.multVec(app.Vector(0, 0, 1))
+        if app and hasattr(app, "Vector"):
+            normal = app.Vector(normal_xyz[0], normal_xyz[1], normal_xyz[2])
+        elif hasattr(face, "normalAt"):
+            pr = getattr(face, "ParameterRange", None)
+            if pr and len(pr) == 4:
+                normal = face.normalAt(0.5 * (pr[0] + pr[1]), 0.5 * (pr[2] + pr[3]))
+            else:
+                normal = face.normalAt(0, 0)
 
         if normal is None:
             return {
@@ -1348,10 +1504,7 @@ class SmartExtrudeDragger:
             self.dragger_sep.addChild(self.origin_trans)
 
             self.axis_rot = coin.SoRotation()
-            nx, ny, nz = float(normal[0]), float(normal[1]), float(normal[2])
-            self.axis_rot.rotation.setValue(
-                coin.SbRotation(coin.SbVec3f(1.0, 0.0, 0.0), coin.SbVec3f(nx, ny, nz))
-            )
+            self.axis_rot.rotation.setValue(_rotation_from_x_to_vector(normal, coin))
             self.dragger_sep.addChild(self.axis_rot)
 
             # Pre-allocated materials for normal and active states
@@ -1437,9 +1590,7 @@ class SmartExtrudeDragger:
             return
         try:
             val = self.dragger.translation.getValue()
-            signed_x = float(val[0])
-            self._set_arrow_direction(signed_x < 0.0)
-            self._latest_drag_val = signed_x
+            self._latest_drag_val = float(val[0])
             if not self._motion_scheduled:
                 self._motion_scheduled = True
                 qt_core, _, _ = _get_qt()
@@ -1454,7 +1605,11 @@ class SmartExtrudeDragger:
     def _dispatch_motion(self) -> None:
         self._motion_scheduled = False
         val = self._latest_drag_val
-        if val is not None and callable(self.on_drag_distance):
+        if val is None:
+            return
+        # Arrow direction switch is safe on Qt event loop outside Coin traversal
+        self._set_arrow_direction(val < 0.0)
+        if callable(self.on_drag_distance):
             try:
                 self.on_drag_distance(val)
             except Exception:
@@ -1542,18 +1697,50 @@ class SmartExtrudeDragger:
                 if node is not None:
                     tool_sep.addChild(node)
                     self.preview_sep.addChild(tool_sep)
+
+            # Trigger immediate 3D viewport redraw to ensure active dragging renders in real-time
+            gui = _get_gui()
+            if gui is not None:
+                try:
+                    active_doc = getattr(gui, "ActiveDocument", None)
+                    active_view = getattr(active_doc, "ActiveView", None) if active_doc else None
+                    if active_view is not None:
+                        if hasattr(active_view, "redraw"):
+                            active_view.redraw()
+                        elif hasattr(active_view, "update"):
+                            active_view.update()
+                except Exception:
+                    pass
         except Exception:
             pass
 
     def detach(self) -> None:
         """Remove Coin3D preview and dragger nodes and restore body visibility."""
         self._restore_hidden_body()
+        if self.dragger is not None:
+            try:
+                self.dragger.removeMotionCallback(self._on_motion_cb)
+            except Exception:
+                pass
         if self.scene_graph is not None and self.root_sep is not None:
             try:
                 self.scene_graph.removeChild(self.root_sep)
             except Exception:
                 pass
         self.scene_graph = None
+
+        gui = _get_gui()
+        if gui is not None:
+            try:
+                active_doc = getattr(gui, "ActiveDocument", None)
+                active_view = getattr(active_doc, "ActiveView", None) if active_doc else None
+                if active_view is not None:
+                    if hasattr(active_view, "redraw"):
+                        active_view.redraw()
+                    elif hasattr(active_view, "update"):
+                        active_view.update()
+            except Exception:
+                pass
 
         for node_attr in (
             "dragger",
@@ -1653,35 +1840,10 @@ class SmartExtrudeSession:
             return self._cached_face_frame
         if self.profile_obj is None:
             return None, (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)
-        face, needs_pl = _extract_test_face(self.profile_obj, self.sub_elements)
-        if face is None:
-            return None, (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)
-        try:
-            pl = getattr(self.profile_obj, "Placement", None)
-            if needs_pl and pl is not None and hasattr(face, "Placement"):
-                face.Placement = pl.multiply(face.Placement)
-        except Exception:
-            pass
-
-        normal_xyz = (0.0, 0.0, 1.0)
-        try:
-            if hasattr(face, "normalAt"):
-                n = face.normalAt(0, 0)
-                if n is not None:
-                    normal_xyz = (float(n.x), float(n.y), float(n.z))
-        except Exception:
-            pass
-
-        center_xyz = (0.0, 0.0, 0.0)
-        try:
-            com = getattr(face, "CenterOfMass", None) or getattr(
-                getattr(face, "BoundBox", None), "Center", None
-            )
-            if com is not None:
-                center_xyz = (float(com.x), float(com.y), float(com.z))
-        except Exception:
-            pass
-
+        face, center_xyz, normal_xyz, scale = _extract_world_face_frame(
+            self.profile_obj, self.sub_elements, self.document
+        )
+        self.profile_scale = scale
         self._cached_face_frame = (face, center_xyz, normal_xyz)
         return self._cached_face_frame
 
@@ -1700,6 +1862,9 @@ class SmartExtrudeSession:
         self._target_body_explicit = False
 
         if pick_initial_direction and profile_obj is not None:
+            face, _c, n_xyz, _s = _extract_world_face_frame(
+                profile_obj, self.sub_elements, self.document
+            )
             init_cls = classify_operation(
                 profile_obj=profile_obj,
                 sub_elements=self.sub_elements,
@@ -1708,6 +1873,8 @@ class SmartExtrudeSession:
                 target_body=default_body,
                 allow_auto_reverse=True,
                 document=self.document,
+                prepared_face=face,
+                prepared_normal=n_xyz,
             )
             if init_cls.get("auto_reverse", False):
                 self.signed_distance = -self.signed_distance
@@ -1769,6 +1936,7 @@ class SmartExtrudeSession:
         default_body = self.target_body or _active_body(self.document, profile_obj=self.profile_obj)
         abs_len = abs(self.signed_distance)
         is_rev = self.signed_distance < 0.0
+        face, _center_xyz, normal_xyz = self._extract_world_face_and_frame()
 
         if self.operation_mode == "auto":
             cls = classify_operation(
@@ -1779,7 +1947,8 @@ class SmartExtrudeSession:
                 target_body=default_body,
                 allow_auto_reverse=False,
                 document=None if self._target_body_explicit else self.document,
-                prepared_face=self._extract_world_face_and_frame()[0],
+                prepared_face=face,
+                prepared_normal=normal_xyz,
             )
             self.resolved_operation = cls["operation"]
             if cls.get("target_body") is not None or self.resolved_operation == "new_body":
@@ -2190,54 +2359,78 @@ class SmartExtrudeTaskPanel:
             op_upper = op.replace("_", " ").upper()
             badge_text = f"AUTO: {op_upper}" if session.operation_mode == "auto" else op_upper
             if self.badge_label is not None:
-                if hasattr(self.badge_label, "setText"):
-                    self.badge_label.setText(badge_text)
-                if hasattr(self.badge_label, "setStyleSheet"):
-                    style = self.BADGE_STYLES.get(op, self.BADGE_STYLES["join"])
-                    self.badge_label.setStyleSheet(
-                        "padding: 2px 8px; border-radius: 4px; font-weight: bold; "
-                        f"font-size: 10px; {style}"
-                    )
+                try:
+                    if hasattr(self.badge_label, "setText"):
+                        self.badge_label.setText(badge_text)
+                    if hasattr(self.badge_label, "setStyleSheet"):
+                        style = self.BADGE_STYLES.get(op, self.BADGE_STYLES["join"])
+                        self.badge_label.setStyleSheet(
+                            "padding: 2px 8px; border-radius: 4px; font-weight: bold; "
+                            f"font-size: 10px; {style}"
+                        )
+                except Exception:
+                    pass
 
-            if self.profile_label is not None and hasattr(self.profile_label, "setText"):
-                if session.profile_obj is not None:
-                    lbl = getattr(
-                        session.profile_obj,
-                        "Label",
-                        getattr(session.profile_obj, "Name", "Profile"),
-                    )
-                    sub_str = (
-                        f" ({session.sub_elements[0]})"
-                        if session.sub_elements and session.sub_elements[0]
-                        else ""
-                    )
-                    self.profile_label.setText(f"1 selected ({lbl}{sub_str})")
-                else:
-                    self.profile_label.setText("Select Profile...")
+            if self.profile_label is not None:
+                try:
+                    if hasattr(self.profile_label, "setText"):
+                        if session.profile_obj is not None:
+                            lbl = getattr(
+                                session.profile_obj,
+                                "Label",
+                                getattr(session.profile_obj, "Name", "Profile"),
+                            )
+                            sub_str = (
+                                f" ({session.sub_elements[0]})"
+                                if session.sub_elements and session.sub_elements[0]
+                                else ""
+                            )
+                            self.profile_label.setText(f"1 selected ({lbl}{sub_str})")
+                        else:
+                            self.profile_label.setText("Select Profile...")
+                except Exception:
+                    pass
 
-            if self.distance_spin is not None and hasattr(self.distance_spin, "setValue"):
-                self.distance_spin.setValue(session.signed_distance)
+            if self.distance_spin is not None:
+                try:
+                    if hasattr(self.distance_spin, "setValue"):
+                        self.distance_spin.setValue(session.signed_distance)
+                except Exception:
+                    pass
 
-            if self.direction_combo is not None and hasattr(
-                self.direction_combo, "setCurrentIndex"
-            ):
-                self.direction_combo.setCurrentIndex(1 if session.symmetric else 0)
+            if self.direction_combo is not None:
+                try:
+                    if hasattr(self.direction_combo, "setCurrentIndex"):
+                        self.direction_combo.setCurrentIndex(1 if session.symmetric else 0)
+                except Exception:
+                    pass
 
-            if self.taper_spin is not None and hasattr(self.taper_spin, "setValue"):
-                self.taper_spin.setValue(session.taper_angle)
+            if self.taper_spin is not None:
+                try:
+                    if hasattr(self.taper_spin, "setValue"):
+                        self.taper_spin.setValue(session.taper_angle)
+                except Exception:
+                    pass
 
-            if self.operation_combo is not None and hasattr(
-                self.operation_combo, "setCurrentIndex"
-            ):
-                keys = [k for k, _ in self.OPERATION_ITEMS]
-                if session.operation_mode in keys:
-                    self.operation_combo.setCurrentIndex(keys.index(session.operation_mode))
+            if self.operation_combo is not None:
+                try:
+                    if hasattr(self.operation_combo, "setCurrentIndex"):
+                        keys = [k for k, _ in self.OPERATION_ITEMS]
+                        if session.operation_mode in keys:
+                            self.operation_combo.setCurrentIndex(
+                                keys.index(session.operation_mode)
+                            )
+                except Exception:
+                    pass
 
-            if self.reason_label is not None and hasattr(self.reason_label, "setText"):
-                self.reason_label.setText(session.reason)
-
-            if _active_extrude_hud is not None:
-                _active_extrude_hud.sync_from_task()
+            if self.reason_label is not None:
+                try:
+                    if hasattr(self.reason_label, "setText"):
+                        self.reason_label.setText(session.reason)
+                except Exception:
+                    pass
+        except Exception:
+            pass
         finally:
             self._syncing_ui = False
 
@@ -2245,7 +2438,6 @@ class SmartExtrudeTaskPanel:
         """Called by FreeCAD when the user clicks OK or presses Enter."""
         global _active_extrude_session
         self._remove_selection_observer()
-        close_extrude_hud()
         res = self.session.commit()
         _active_extrude_session = None
         return res.get("status") == "ok"
@@ -2254,7 +2446,6 @@ class SmartExtrudeTaskPanel:
         """Called by FreeCAD when the user clicks Cancel or presses Escape."""
         global _active_extrude_session
         self._remove_selection_observer()
-        close_extrude_hud()
         self.session.cancel()
         _active_extrude_session = None
         return True
@@ -2330,11 +2521,6 @@ class SmartExtrudeCommand:
                 event("error", "extrude", "task_dialog", f"show_failed:{type(exc).__name__}")
                 notify("Extrude", "Could not open the Smart Extrude task panel.", error=True)
                 return
-            if panel.distance_spin is not None:
-                show_extrude_hud(
-                    {"spinbox": panel.distance_spin, "checkbox_reversed": None},
-                    operation=session.operation_mode,
-                )
             return
 
         # Headless / non-TaskView fallback: execute directly
