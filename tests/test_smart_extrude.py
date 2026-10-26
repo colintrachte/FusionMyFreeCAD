@@ -512,6 +512,19 @@ def test_open_wire_diagnostic_and_one_click_undoable_close(extrude_env, monkeypa
     assert diag_after["is_closed"] is True
     assert diag_after["open_endpoint_count"] == 0
 
+    # Smart Extrude offers repair for a small gap but never mutates the sketch silently.
+    sketch.Geometry = [
+        make_edge((0.0, 0.0), (10.0, 0.0)),
+        make_edge((10.0, 0.0), (10.0, 10.0)),
+        make_edge((10.0, 10.0), (0.0, 0.08)),
+    ]
+    sketch.Shape = types.SimpleNamespace(Faces=[], Wires=[])
+    offered = fmf_extrude.smart_extrude(
+        operation="join", length=10.0, profile=(sketch, []), document=doc
+    )
+    assert offered["status"] == "repair-available"
+    assert len(sketch.Geometry) == 3
+
     # Verify smart_extrude refuses a large unclosable gap (> 0.5 mm) with an actionable diagnostic
     sketch_large_gap = doc.addObject("Sketcher::SketchObject", "SketchLargeGap")
     sketch_large_gap.Geometry = [
@@ -533,38 +546,21 @@ def test_open_wire_diagnostic_and_one_click_undoable_close(extrude_env, monkeypa
     assert "Wire is not closed" in ext_res["diagnosis"]["summary"]
 
 
-def test_partdesign_feature_edit_and_transition_keep_fmf_workbench(
-    env, bootstrap, monkeypatch
-):
+def test_partdesign_feature_edit_and_transition_keep_fmf_workbench(env, bootstrap, monkeypatch):
     """Native PartDesign/Sketcher activations map to FMF workbenches."""
     import sys
 
     import fmf_transitions
     import fmf_workbenches
 
-    env.param("User parameter:BaseApp/Preferences/Mod/FMF").SetBool(
-        "UseOwnedWorkbenches", True
-    )
-    assert (
-        fmf_transitions._normalize_workbench_name("PartDesignWorkbench")
-        == "FMFDesignWorkbench"
-    )
-    assert (
-        fmf_transitions._normalize_workbench_name("SketcherWorkbench")
-        == "FMFSketchWorkbench"
-    )
-    assert (
-        fmf_transitions._normalize_workbench_name("PartWorkbench") == "FMFPartWorkbench"
-    )
-    assert (
-        fmf_transitions._normalize_workbench_name("SurfaceWorkbench")
-        == "FMFSurfaceWorkbench"
-    )
+    env.param("User parameter:BaseApp/Preferences/Mod/FMF").SetBool("UseOwnedWorkbenches", True)
+    assert fmf_transitions._normalize_workbench_name("PartDesignWorkbench") == "FMFDesignWorkbench"
+    assert fmf_transitions._normalize_workbench_name("SketcherWorkbench") == "FMFSketchWorkbench"
+    assert fmf_transitions._normalize_workbench_name("PartWorkbench") == "FMFPartWorkbench"
+    assert fmf_transitions._normalize_workbench_name("SurfaceWorkbench") == "FMFSurfaceWorkbench"
 
     monkeypatch.setitem(sys.modules, "PartDesign", types.ModuleType("PartDesign"))
-    monkeypatch.setitem(
-        sys.modules, "PartDesignGui", types.ModuleType("PartDesignGui")
-    )
+    monkeypatch.setitem(sys.modules, "PartDesignGui", types.ModuleType("PartDesignGui"))
     gear_mod = types.ModuleType("PartDesign.InvoluteGearFeature")
     gear_mod.CommandInvoluteGear = lambda: object()
     sprocket_mod = types.ModuleType("PartDesign.SprocketFeature")
@@ -578,9 +574,9 @@ def test_partdesign_feature_edit_and_transition_keep_fmf_workbench(
     assert "PartDesign_Sprocket" in env.commands
 
     bootstrap.set_owned_workbench_visibility(True)
-    ordered = env.param(
-        "User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon"
-    ).GetString("TabOrder", "")
+    ordered = env.param("User parameter:BaseApp/Preferences/Mod/FreeCAD-Ribbon").GetString(
+        "TabOrder", ""
+    )
     assert ordered.startswith(
         "FMFDesignWorkbench,FMFPartWorkbench,FMFSketchWorkbench,FMFSurfaceWorkbench"
     )
@@ -588,9 +584,7 @@ def test_partdesign_feature_edit_and_transition_keep_fmf_workbench(
 
 def test_smart_extrude_is_first_button_in_create_section(layout, manifest, bootstrap):
     """Smart Extrude is the very first large button in FMF Create_newPanel."""
-    panels = {
-        panel["name"]: panel for panel in layout["workbenches"]["FMFDesignWorkbench"]
-    }
+    panels = {panel["name"]: panel for panel in layout["workbenches"]["FMFDesignWorkbench"]}
     create_panel = panels["FMF Create_newPanel"]
     commands = create_panel["commands"]
 
@@ -724,3 +718,69 @@ def test_smart_extrude_session_interactive_workflow(extrude_env):
     session.flip_direction()
     assert session.signed_distance == 10.0
     assert session.resolved_operation == "join"
+
+
+def test_removed_intersect_operation_is_rejected(extrude_env):
+    result = fmf_extrude.smart_extrude(
+        operation="intersect",
+        profile=(extrude_env.sketch, []),
+        document=extrude_env.doc,
+    )
+    assert result == {
+        "status": "unsupported-operation",
+        "operation": "intersect",
+    }
+
+
+def test_failed_session_commit_can_be_retried(extrude_env, monkeypatch):
+    session = fmf_extrude.SmartExtrudeSession(
+        document=extrude_env.doc,
+        profile=(extrude_env.sketch, []),
+    )
+    results = iter(({"status": "error"}, {"status": "ok"}))
+    monkeypatch.setattr(fmf_extrude, "smart_extrude", lambda **_kwargs: next(results))
+
+    assert session.commit()["status"] == "error"
+    assert session.commit()["status"] == "ok"
+    assert session.commit()["status"] == "already-committed"
+
+
+def test_explicit_target_body_limits_auto_classification(extrude_env, monkeypatch):
+    session = fmf_extrude.SmartExtrudeSession(
+        document=extrude_env.doc,
+        profile=(extrude_env.sketch, []),
+    )
+    captured = {}
+
+    def classify(**kwargs):
+        captured.update(kwargs)
+        return {
+            "operation": "join",
+            "target_body": kwargs["target_body"],
+            "reason": "explicit target",
+        }
+
+    monkeypatch.setattr(fmf_extrude, "classify_operation", classify)
+    session.set_target_body(extrude_env.body)
+
+    assert captured["target_body"] is extrude_env.body
+    assert captured["document"] is None
+
+
+def test_command_does_not_close_an_unrelated_active_dialog(extrude_env):
+    shown = []
+    closed = []
+    gui = extrude_env.env.gui
+    gui.Control = types.SimpleNamespace(
+        showDialog=lambda panel: shown.append(panel),
+        activeDialog=lambda: object(),
+        closeDialog=lambda: closed.append(True),
+    )
+    gui.Selection.getSelectionEx = lambda: [
+        types.SimpleNamespace(Object=extrude_env.sketch, SubElementNames=["Face1"])
+    ]
+
+    fmf_extrude.SmartExtrudeCommand().Activated()
+
+    assert shown == []
+    assert closed == []

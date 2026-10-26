@@ -142,9 +142,7 @@ class SmartExtrudeHud:
             except Exception:
                 raw_val = 10.0
         is_rev = False
-        if self.checkbox_reversed is not None and hasattr(
-            self.checkbox_reversed, "isChecked"
-        ):
+        if self.checkbox_reversed is not None and hasattr(self.checkbox_reversed, "isChecked"):
             try:
                 is_rev = bool(self.checkbox_reversed.isChecked())
             except Exception:
@@ -164,9 +162,7 @@ class SmartExtrudeHud:
             frame.setObjectName("FMF_SmartExtrudeHud")
             if qt_core is not None and hasattr(qt_core, "Qt"):
                 flags = getattr(qt_core.Qt, "WindowType", qt_core.Qt)
-                tool_flag = getattr(flags, "ToolTip", None) or getattr(
-                    flags, "SubWindow", None
-                )
+                tool_flag = getattr(flags, "ToolTip", None) or getattr(flags, "SubWindow", None)
                 if tool_flag is not None and self.parent is None:
                     frame.setWindowFlags(tool_flag)
             frame.setStyleSheet(
@@ -200,9 +196,7 @@ class SmartExtrudeHud:
             dist_spin.setDecimals(2)
             dist_spin.setSuffix(" mm")
             dist_spin.setValue(self._read_task_signed_distance())
-            if hasattr(dist_spin, "valueChanged") and hasattr(
-                dist_spin.valueChanged, "connect"
-            ):
+            if hasattr(dist_spin, "valueChanged") and hasattr(dist_spin.valueChanged, "connect"):
                 dist_spin.valueChanged.connect(self._on_hud_distance_changed)
             layout.addWidget(dist_spin)
 
@@ -257,15 +251,11 @@ class SmartExtrudeHud:
         try:
             want_reversed = signed_value < 0.0
             abs_val = abs(float(signed_value))
-            if self.checkbox_reversed is not None and hasattr(
-                self.checkbox_reversed, "setChecked"
-            ):
+            if self.checkbox_reversed is not None and hasattr(self.checkbox_reversed, "setChecked"):
                 self.checkbox_reversed.setChecked(want_reversed)
             if self.spinbox is not None and hasattr(self.spinbox, "setValue"):
                 self.spinbox.setValue(abs_val)
-            if self.distance_input is not None and hasattr(
-                self.distance_input, "setValue"
-            ):
+            if self.distance_input is not None and hasattr(self.distance_input, "setValue"):
                 try:
                     self.distance_input.setValue(float(signed_value))
                 except Exception:
@@ -280,9 +270,7 @@ class SmartExtrudeHud:
         self._syncing = True
         try:
             signed = self._read_task_signed_distance()
-            if self.distance_input is not None and hasattr(
-                self.distance_input, "setValue"
-            ):
+            if self.distance_input is not None and hasattr(self.distance_input, "setValue"):
                 self.distance_input.setValue(signed)
         finally:
             self._syncing = False
@@ -295,13 +283,9 @@ class SmartExtrudeHud:
         if normalized not in self.OPERATIONS:
             raise ValueError(f"Unsupported extrude operation: {op_name}")
         self._operation = normalized
-        if self.operation_combo is not None and hasattr(
-            self.operation_combo, "setCurrentIndex"
-        ):
+        if self.operation_combo is not None and hasattr(self.operation_combo, "setCurrentIndex"):
             try:
-                self.operation_combo.setCurrentIndex(
-                    self.OPERATIONS.index(self._operation)
-                )
+                self.operation_combo.setCurrentIndex(self.OPERATIONS.index(self._operation))
             except Exception:
                 pass
 
@@ -400,9 +384,7 @@ def show_extrude_hud(
     spinbox = info["spinbox"]
     checkbox = info.get("checkbox_reversed")
     gui = _get_gui()
-    main_window = (
-        gui.getMainWindow() if gui is not None and hasattr(gui, "getMainWindow") else None
-    )
+    main_window = gui.getMainWindow() if gui is not None and hasattr(gui, "getMainWindow") else None
     if (
         _active_extrude_hud is not None
         and _active_extrude_hud.spinbox is spinbox
@@ -423,9 +405,7 @@ def show_extrude_hud(
     return hud
 
 
-def enhance_active_extrude(
-    info: dict[str, Any] | None = None, operation: str = "auto"
-) -> bool:
+def enhance_active_extrude(info: dict[str, Any] | None = None, operation: str = "auto") -> bool:
     """Enable signed direction dragging, numeric input, and cursor HUD on active extrude."""
     if info is None:
         info = get_active_extrude_info()
@@ -453,6 +433,7 @@ def enhance_active_extrude(
         and not getattr(spinbox, "_fmf_signed_hooked", False)
     ):
         try:
+
             def _on_value_changed(val: float) -> None:
                 if val < 0.0:
                     if hasattr(checkbox, "isChecked") and hasattr(checkbox, "setChecked"):
@@ -473,9 +454,7 @@ def enhance_active_extrude(
     return hooked
 
 
-def _activate_body_tip_visibility(
-    body: Any, feat: Any, profile_obj: Any = None
-) -> None:
+def _activate_body_tip_visibility(body: Any, feat: Any, profile_obj: Any = None) -> None:
     """Ensure the newly created feature is the visible Tip of its Body."""
     if body is not None:
         try:
@@ -540,11 +519,7 @@ def _active_body(document: Any = None, profile_obj: Any = None) -> Any:
         return owner
 
     # 2. Check active object in active view (standard FreeCAD PartDesign active body)
-    active_view = (
-        getattr(getattr(gui, "ActiveDocument", None), "ActiveView", None)
-        if gui
-        else None
-    )
+    active_view = getattr(getattr(gui, "ActiveDocument", None), "ActiveView", None) if gui else None
     if active_view and hasattr(active_view, "getActiveObject"):
         try:
             pd_body = active_view.getActiveObject("pdbody")
@@ -668,9 +643,7 @@ def _extract_test_face(
 
         # Standard FreeCAD SketchObject has 0 Shape.Faces and 1+ closed Shape.Wires
         prof_wires = getattr(prof_shape, "Wires", []) or []
-        closed_wires = [
-            w for w in prof_wires if getattr(w, "isClosed", lambda: False)()
-        ]
+        closed_wires = [w for w in prof_wires if getattr(w, "isClosed", lambda: False)()]
         if closed_wires:
             try:
                 import Part
@@ -725,6 +698,7 @@ def classify_operation(
     target_body: Any = None,
     allow_auto_reverse: bool = True,
     document: Any = None,
+    prepared_face: Any = None,
 ) -> dict[str, Any]:
     """Classify the extrusion as join, cut, or new_body based on geometry."""
     app = _get_app()
@@ -732,9 +706,7 @@ def classify_operation(
         reversed_dir = not reversed_dir
         length = abs(length)
 
-    candidates = [
-        b for b in _candidate_bodies(document, target_body) if _body_has_solids(b)
-    ]
+    candidates = [b for b in _candidate_bodies(document, target_body) if _body_has_solids(b)]
 
     if not candidates:
         return {
@@ -749,7 +721,10 @@ def classify_operation(
     body_shape = getattr(primary_body, "Shape", None)
 
     # Extract face for test extrusion
-    face, needs_placement_transform = _extract_test_face(profile_obj, sub_elements)
+    if prepared_face is None:
+        face, needs_placement_transform = _extract_test_face(profile_obj, sub_elements)
+    else:
+        face, needs_placement_transform = prepared_face, False
 
     if face is None:
         return {
@@ -791,9 +766,7 @@ def classify_operation(
 
         prism = face.extrude(dir_vec)
         prism_vol = (
-            getattr(prism, "Volume", 0.0)
-            if not getattr(prism, "isNull", lambda: True)()
-            else 0.0
+            getattr(prism, "Volume", 0.0) if not getattr(prism, "isNull", lambda: True)() else 0.0
         )
 
         # 1. Volumetric penetration test across candidate bodies (Cut)
@@ -1017,34 +990,21 @@ def smart_extrude(
         notify("Extrude", "Select a sketch or face to extrude.", error=True)
         return {"status": "no-selection"}
 
-    closed_wire_gaps = 0
-    if (
-        getattr(profile_obj, "TypeId", "").startswith("Sketcher::")
-        or hasattr(profile_obj, "Geometry")
+    if getattr(profile_obj, "TypeId", "").startswith("Sketcher::") or hasattr(
+        profile_obj, "Geometry"
     ):
         test_face, _ = _extract_test_face(profile_obj, sub_elements)
         if test_face is None and getattr(profile_obj, "Geometry", None):
             try:
                 import fmf_sketch_tools
 
-                diagnosis = fmf_sketch_tools.diagnose_open_wires(
-                    profile_obj, tolerance=0.5
-                )
+                diagnosis = fmf_sketch_tools.diagnose_open_wires(profile_obj, tolerance=0.5)
                 if not diagnosis["is_closed"]:
-                    if diagnosis["closable_gaps"]:
-                        repair = fmf_sketch_tools.close_open_wire_gaps(
-                            profile_obj, tolerance=0.5
-                        )
-                        closed_wire_gaps = int(repair.get("closed_count", 0))
-                        sub_elements = _normalize_profile_subs(
-                            profile_obj, sub_elements
-                        )
-                    else:
-                        notify("Extrude", diagnosis["summary"], error=True)
-                        return {
-                            "status": "open-wire",
-                            "diagnosis": diagnosis,
-                        }
+                    notify("Extrude", diagnosis["summary"], error=True)
+                    return {
+                        "status": "repair-available" if diagnosis["closable_gaps"] else "open-wire",
+                        "diagnosis": diagnosis,
+                    }
             except Exception:
                 pass
 
@@ -1052,6 +1012,9 @@ def smart_extrude(
         target_body = _active_body(doc, profile_obj=profile_obj)
 
     effective_op = operation.lower()
+    if effective_op not in {"auto", "join", "cut", "new_body"}:
+        notify("Extrude", f"Unsupported operation: {operation}", error=True)
+        return {"status": "unsupported-operation", "operation": effective_op}
     auto_reversed = False
     was_auto = effective_op == "auto"
 
@@ -1073,7 +1036,7 @@ def smart_extrude(
             auto_reversed = True
         # FreeCAD's PartDesign::Pocket uses an inverted profile normal (-normal when Reversed=False,
         # +normal when Reversed=True), opposite to PartDesign::Pad.
-        if effective_op in ("cut", "intersect") and cls_result.get("confidence", 0.0) >= 0.8:
+        if effective_op == "cut" and cls_result.get("confidence", 0.0) >= 0.8:
             reversed_dir = not reversed_dir
 
     try:
@@ -1127,9 +1090,7 @@ def smart_extrude(
                     feat.recompute()
                 doc.recompute()
 
-                _bind_cross_body_profile_if_needed(
-                    new_body, feat, profile_obj, sub_elements, doc
-                )
+                _bind_cross_body_profile_if_needed(new_body, feat, profile_obj, sub_elements, doc)
                 _activate_body_tip_visibility(new_body, feat, profile_obj)
                 notify("Extrude", f"Created new Body with Pad ({abs(length):.1f} mm).")
                 return {
@@ -1138,10 +1099,9 @@ def smart_extrude(
                     "body": new_body,
                     "feature": feat,
                     "auto_reversed": auto_reversed,
-                    "closed_wire_gaps": closed_wire_gaps,
                 }
 
-            elif effective_op in ("cut", "intersect"):
+            elif effective_op == "cut":
                 prev_body_shape = getattr(target_body, "Shape", None)
                 prev_vol = (
                     getattr(prev_body_shape, "Volume", 0.0)
@@ -1150,19 +1110,13 @@ def smart_extrude(
                     else 0.0
                 )
 
-                feat_label = "Intersect" if effective_op == "intersect" else "Pocket"
+                feat_label = "Pocket"
                 if hasattr(target_body, "newObject"):
                     feat = target_body.newObject("PartDesign::Pocket", feat_label)
                 else:
                     feat = doc.addObject("PartDesign::Pocket", feat_label)
                     if hasattr(target_body, "addObject"):
                         target_body.addObject(feat)
-
-                if effective_op == "intersect" and hasattr(feat, "Operation"):
-                    try:
-                        feat.Operation = "Common"
-                    except Exception:
-                        pass
 
                 feat.Profile = (profile_obj, sub_elements)
                 _apply_extrude_common_props(
@@ -1181,9 +1135,7 @@ def smart_extrude(
                 if shape is not None and hasattr(feat, "Reversed"):
                     solids = getattr(shape, "Solids", ())
                     new_vol = getattr(shape, "Volume", 0.0) if len(solids) > 0 else 0.0
-                    did_cut = len(solids) > 0 and (
-                        prev_vol <= 0.0 or new_vol < prev_vol - 1e-4
-                    )
+                    did_cut = len(solids) > 0 and (prev_vol <= 0.0 or new_vol < prev_vol - 1e-4)
                     if not did_cut:
                         feat.Reversed = not reversed_dir
                         if hasattr(feat, "recompute"):
@@ -1220,7 +1172,6 @@ def smart_extrude(
                     "body": target_body,
                     "feature": feat,
                     "auto_reversed": auto_reversed,
-                    "closed_wire_gaps": closed_wire_gaps,
                 }
 
             else:  # "join"
@@ -1284,7 +1235,6 @@ def smart_extrude(
                     "body": target_body,
                     "feature": feat,
                     "auto_reversed": auto_reversed,
-                    "closed_wire_gaps": closed_wire_gaps,
                 }
 
     except Exception as exc:
@@ -1298,7 +1248,6 @@ class SmartExtrudeDragger:
     OPERATION_COLORS: ClassVar[dict[str, tuple[float, float, float]]] = {
         "join": (0.18, 0.62, 0.98),
         "cut": (0.94, 0.24, 0.24),
-        "intersect": (0.95, 0.68, 0.15),
         "new_body": (0.18, 0.80, 0.52),
     }
 
@@ -1382,9 +1331,7 @@ class SmartExtrudeDragger:
             self.detach()
             return False
 
-    def _build_arrow_geometry(
-        self, active: bool, flip_head: bool, operation: str
-    ) -> Any:
+    def _build_arrow_geometry(self, active: bool, flip_head: bool, operation: str) -> Any:
         coin = self._get_coin()
         sep = coin.SoSeparator()
         mat = coin.SoMaterial()
@@ -1403,11 +1350,7 @@ class SmartExtrudeDragger:
         sep.addChild(base_sphere)
 
         # Rotate local +Y (SoCylinder/SoCone axis) to +X (or -X when flipped past zero)
-        target_dir = (
-            coin.SbVec3f(-1.0, 0.0, 0.0)
-            if flip_head
-            else coin.SbVec3f(1.0, 0.0, 0.0)
-        )
+        target_dir = coin.SbVec3f(-1.0, 0.0, 0.0) if flip_head else coin.SbVec3f(1.0, 0.0, 0.0)
         rot = coin.SoRotation()
         rot.rotation.setValue(coin.SbRotation(coin.SbVec3f(0.0, 1.0, 0.0), target_dir))
         sep.addChild(rot)
@@ -1502,14 +1445,12 @@ class SmartExtrudeDragger:
 
             # For Cut / Intersect, temporarily hide target_body and render result_shape live
             if (
-                operation in ("cut", "intersect")
+                operation == "cut"
                 and target_body is not None
                 and result_shape is not None
                 and hasattr(result_shape, "writeInventor")
             ):
-                if self._hidden_body is None and getattr(
-                    target_body, "Visibility", True
-                ):
+                if self._hidden_body is None and getattr(target_body, "Visibility", True):
                     try:
                         target_body.Visibility = False
                         self._hidden_body = target_body
@@ -1536,9 +1477,7 @@ class SmartExtrudeDragger:
                 tool_mat = coin.SoMaterial()
                 rgb = self.OPERATION_COLORS.get(operation, (0.18, 0.62, 0.98))
                 tool_mat.diffuseColor.setValue(*rgb)
-                tool_mat.transparency.setValue(
-                    0.50 if operation in ("cut", "intersect") else 0.32
-                )
+                tool_mat.transparency.setValue(0.50 if operation == "cut" else 0.32)
                 tool_sep.addChild(tool_mat)
                 inp = coin.SoInput()
                 inp.setBuffer(prism_shape.writeInventor())
@@ -1573,7 +1512,6 @@ class SmartExtrudeSession:
         "auto",
         "join",
         "cut",
-        "intersect",
         "new_body",
     )
 
@@ -1603,6 +1541,17 @@ class SmartExtrudeSession:
         self.dragger = SmartExtrudeDragger(on_drag_distance=self._on_dragger_moved)
         self._listeners: list[Any] = []
         self._committed = False
+        self._target_body_explicit = False
+        self._cached_face_frame: (
+            tuple[
+                Any | None,
+                tuple[float, float, float],
+                tuple[float, float, float],
+            ]
+            | None
+        ) = None
+        self._drag_update_scheduled = False
+        self._closed = False
 
         if profile is not None and profile[0] is not None:
             self.set_profile(profile[0], profile[1], pick_initial_direction=True)
@@ -1626,6 +1575,8 @@ class SmartExtrudeSession:
         self,
     ) -> tuple[Any | None, tuple[float, float, float], tuple[float, float, float]]:
         """Return (world_face, center_xyz, normal_xyz)."""
+        if self._cached_face_frame is not None:
+            return self._cached_face_frame
         if self.profile_obj is None:
             return None, (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)
         face, needs_pl = _extract_test_face(self.profile_obj, self.sub_elements)
@@ -1657,7 +1608,8 @@ class SmartExtrudeSession:
         except Exception:
             pass
 
-        return face, center_xyz, normal_xyz
+        self._cached_face_frame = (face, center_xyz, normal_xyz)
+        return self._cached_face_frame
 
     def set_profile(
         self,
@@ -1668,8 +1620,10 @@ class SmartExtrudeSession:
         """Set or switch the active extrusion profile and attach the 3D arrow dragger."""
         self.profile_obj = profile_obj
         self.sub_elements = _normalize_profile_subs(profile_obj, sub_elements)
+        self._cached_face_frame = None
         default_body = _active_body(self.document, profile_obj=profile_obj)
         self.target_body = default_body
+        self._target_body_explicit = False
 
         if pick_initial_direction and profile_obj is not None:
             init_cls = classify_operation(
@@ -1695,11 +1649,23 @@ class SmartExtrudeSession:
         self.evaluate()
 
     def _on_dragger_moved(self, new_signed_distance: float) -> None:
-        self.set_signed_distance(new_signed_distance, from_dragger=True)
+        self.signed_distance = float(new_signed_distance)
+        if self._drag_update_scheduled or self._closed:
+            return
+        qt_core, _qt_gui, _qt_widgets = _get_qt()
+        timer = getattr(qt_core, "QTimer", None) if qt_core is not None else None
+        if timer is not None and hasattr(timer, "singleShot"):
+            self._drag_update_scheduled = True
+            timer.singleShot(16, self._flush_drag_update)
+        else:
+            self.evaluate(sync_dragger=False)
 
-    def set_signed_distance(
-        self, value: float, from_dragger: bool = False
-    ) -> None:
+    def _flush_drag_update(self) -> None:
+        self._drag_update_scheduled = False
+        if not self._closed:
+            self.evaluate(sync_dragger=False)
+
+    def set_signed_distance(self, value: float, from_dragger: bool = False) -> None:
         """Set signed extrusion distance (+ forward, - reversed) and re-evaluate live operation."""
         self.signed_distance = float(value)
         self.evaluate(sync_dragger=not from_dragger)
@@ -1725,6 +1691,7 @@ class SmartExtrudeSession:
 
     def set_target_body(self, body: Any) -> None:
         self.target_body = body
+        self._target_body_explicit = body is not None
         self.evaluate()
 
     def evaluate(self, sync_dragger: bool = True) -> dict[str, Any]:
@@ -1737,9 +1704,7 @@ class SmartExtrudeSession:
             self._notify_listeners()
             return {"status": "no-profile"}
 
-        default_body = self.target_body or _active_body(
-            self.document, profile_obj=self.profile_obj
-        )
+        default_body = self.target_body or _active_body(self.document, profile_obj=self.profile_obj)
         abs_len = abs(self.signed_distance)
         is_rev = self.signed_distance < 0.0
 
@@ -1751,7 +1716,8 @@ class SmartExtrudeSession:
                 reversed_dir=is_rev,
                 target_body=default_body,
                 allow_auto_reverse=False,
-                document=self.document,
+                document=None if self._target_body_explicit else self.document,
+                prepared_face=self._extract_world_face_and_frame()[0],
             )
             self.resolved_operation = cls["operation"]
             if cls.get("target_body") is not None or self.resolved_operation == "new_body":
@@ -1772,9 +1738,7 @@ class SmartExtrudeSession:
                     "Label",
                     getattr(self.target_body, "Name", "Body"),
                 )
-                self.reason = (
-                    f"{self.resolved_operation.replace('_', ' ').title()} on {target_lbl}"
-                )
+                self.reason = f"{self.resolved_operation.replace('_', ' ').title()} on {target_lbl}"
 
         # Build live 3D preview shapes
         face, _center_xyz, normal_xyz = self._extract_world_face_and_frame()
@@ -1808,20 +1772,12 @@ class SmartExtrudeSession:
                 ):
                     if self.resolved_operation == "cut" and hasattr(body_shape, "cut"):
                         self.result_shape = body_shape.cut(self.prism_shape)
-                    elif self.resolved_operation == "intersect" and hasattr(
-                        body_shape, "common"
-                    ):
-                        self.result_shape = body_shape.common(self.prism_shape)
-                    elif self.resolved_operation == "join" and hasattr(
-                        body_shape, "fuse"
-                    ):
+                    elif self.resolved_operation == "join" and hasattr(body_shape, "fuse"):
                         self.result_shape = body_shape.fuse(self.prism_shape)
             except Exception:
                 pass
 
-        self.dragger.sync_position(
-            self.signed_distance, self.resolved_operation
-        )
+        self.dragger.sync_position(self.signed_distance, self.resolved_operation)
         self.dragger.update_preview(
             self.prism_shape,
             self.result_shape,
@@ -1846,14 +1802,13 @@ class SmartExtrudeSession:
             notify("Extrude", "Select a sketch or face to extrude.", error=True)
             return {"status": "no-selection"}
 
-        self._committed = True
         op = self.resolved_operation
         abs_len = max(abs(self.signed_distance), 0.01)
         world_rev = self.signed_distance < 0.0
         # PartDesign::Pocket extrudes along -normal when Reversed=False, opposite to Pad
-        feat_rev = (not world_rev) if op in ("cut", "intersect") else world_rev
+        feat_rev = (not world_rev) if op == "cut" else world_rev
 
-        return smart_extrude(
+        result = smart_extrude(
             operation=op,
             length=abs_len,
             reversed_dir=feat_rev,
@@ -1864,9 +1819,14 @@ class SmartExtrudeSession:
             taper_angle=self.taper_angle,
             allow_auto_reverse=False,
         )
+        if result.get("status") == "ok":
+            self._committed = True
+            self._closed = True
+        return result
 
     def cancel(self) -> None:
         """Cancel the interactive session and remove all temporary preview geometry."""
+        self._closed = True
         self.dragger.detach()
 
 
@@ -1884,9 +1844,7 @@ class _ProfileSelectionObserver:
     def __init__(self, on_selection_changed: Any) -> None:
         self._callback = on_selection_changed
 
-    def addSelection(
-        self, doc: str, obj: str, sub: str, _pnt: Any = None
-    ) -> None:
+    def addSelection(self, doc: str, obj: str, sub: str, _pnt: Any = None) -> None:
         if callable(self._callback):
             self._callback(doc, obj, sub)
 
@@ -1898,14 +1856,12 @@ class SmartExtrudeTaskPanel:
         ("auto", "Auto (Join / Cut / New Body)"),
         ("join", "Join"),
         ("cut", "Cut"),
-        ("intersect", "Intersect"),
         ("new_body", "New Body"),
     )
 
     BADGE_STYLES: ClassVar[dict[str, str]] = {
         "join": "background-color: #1d4ed8; color: #ffffff; border: 1px solid #60a5fa;",
         "cut": "background-color: #b91c1c; color: #ffffff; border: 1px solid #f87171;",
-        "intersect": "background-color: #b45309; color: #ffffff; border: 1px solid #fbbf24;",
         "new_body": "background-color: #047857; color: #ffffff; border: 1px solid #34d399;",
     }
 
@@ -1990,16 +1946,12 @@ class SmartExtrudeTaskPanel:
             self.direction_combo.addItem("One Side", "one_side")
             self.direction_combo.addItem("Symmetric", "symmetric")
             if hasattr(self.direction_combo, "currentIndexChanged"):
-                self.direction_combo.currentIndexChanged.connect(
-                    self._on_direction_mode_changed
-                )
+                self.direction_combo.currentIndexChanged.connect(self._on_direction_mode_changed)
             dir_row.addWidget(self.direction_combo)
 
             self.flip_btn = qt_widgets.QPushButton("Flip ⇄", root)
             self.flip_btn.setObjectName("FMF_ExtrudeFlipBtn")
-            self.flip_btn.setToolTip(
-                "Reverse extrusion direction (or drag arrow past 0)"
-            )
+            self.flip_btn.setToolTip("Reverse extrusion direction (or drag arrow past 0)")
             if hasattr(self.flip_btn, "clicked"):
                 self.flip_btn.clicked.connect(self._on_flip_clicked)
             dir_row.addWidget(self.flip_btn)
@@ -2043,9 +1995,7 @@ class SmartExtrudeTaskPanel:
             for op_key, op_label in self.OPERATION_ITEMS:
                 self.operation_combo.addItem(op_label, op_key)
             if hasattr(self.operation_combo, "currentIndexChanged"):
-                self.operation_combo.currentIndexChanged.connect(
-                    self._on_operation_changed
-                )
+                self.operation_combo.currentIndexChanged.connect(self._on_operation_changed)
             op_row.addWidget(self.operation_combo)
             outer.addLayout(op_row)
 
@@ -2098,20 +2048,14 @@ class SmartExtrudeTaskPanel:
     def _remove_selection_observer(self) -> None:
         gui = _get_gui()
         sel = getattr(gui, "Selection", None) if gui else None
-        if (
-            self._observer is not None
-            and sel is not None
-            and hasattr(sel, "removeObserver")
-        ):
+        if self._observer is not None and sel is not None and hasattr(sel, "removeObserver"):
             try:
                 sel.removeObserver(self._observer)
             except Exception:
                 pass
         self._observer = None
 
-    def _on_viewport_selection(
-        self, _doc_name: str, obj_name: str, sub_name: str
-    ) -> None:
+    def _on_viewport_selection(self, _doc_name: str, obj_name: str, sub_name: str) -> None:
         if not self._selecting_profile and self.session.profile_obj is not None:
             return
         if self.session.document is None:
@@ -2126,9 +2070,7 @@ class SmartExtrudeTaskPanel:
                     break
         if obj is None:
             return
-        is_sketch = getattr(obj, "TypeId", "").startswith("Sketcher::") or hasattr(
-            obj, "Geometry"
-        )
+        is_sketch = getattr(obj, "TypeId", "").startswith("Sketcher::") or hasattr(obj, "Geometry")
         is_face = bool(
             sub_name and (sub_name.startswith("Face") or sub_name.startswith("InternalFace"))
         )
@@ -2189,11 +2131,7 @@ class SmartExtrudeTaskPanel:
         try:
             op = session.resolved_operation
             op_upper = op.replace("_", " ").upper()
-            badge_text = (
-                f"AUTO → {op_upper}"
-                if session.operation_mode == "auto"
-                else op_upper
-            )
+            badge_text = f"AUTO → {op_upper}" if session.operation_mode == "auto" else op_upper
             if self.badge_label is not None:
                 if hasattr(self.badge_label, "setText"):
                     self.badge_label.setText(badge_text)
@@ -2203,9 +2141,7 @@ class SmartExtrudeTaskPanel:
                         f"padding: 2px 8px; border-radius: 4px; font-weight: bold; {style}"
                     )
 
-            if self.profile_label is not None and hasattr(
-                self.profile_label, "setText"
-            ):
+            if self.profile_label is not None and hasattr(self.profile_label, "setText"):
                 if session.profile_obj is not None:
                     lbl = getattr(
                         session.profile_obj,
@@ -2221,9 +2157,7 @@ class SmartExtrudeTaskPanel:
                 else:
                     self.profile_label.setText("Click a sketch or face...")
 
-            if self.distance_spin is not None and hasattr(
-                self.distance_spin, "setValue"
-            ):
+            if self.distance_spin is not None and hasattr(self.distance_spin, "setValue"):
                 self.distance_spin.setValue(session.signed_distance)
 
             if self.operation_combo is not None and hasattr(
@@ -2231,9 +2165,7 @@ class SmartExtrudeTaskPanel:
             ):
                 keys = [k for k, _ in self.OPERATION_ITEMS]
                 if session.operation_mode in keys:
-                    self.operation_combo.setCurrentIndex(
-                        keys.index(session.operation_mode)
-                    )
+                    self.operation_combo.setCurrentIndex(keys.index(session.operation_mode))
 
             if self.reason_label is not None and hasattr(self.reason_label, "setText"):
                 self.reason_label.setText(session.reason)
@@ -2309,18 +2241,29 @@ class SmartExtrudeCommand:
 
         control = getattr(gui, "Control", None) if gui else None
         if control is not None and hasattr(control, "showDialog"):
-            if hasattr(control, "activeDialog") and hasattr(control, "closeDialog"):
+            if hasattr(control, "activeDialog"):
                 try:
                     if control.activeDialog():
-                        control.closeDialog()
+                        notify(
+                            "Extrude",
+                            "Finish or cancel the current task before starting Smart Extrude.",
+                            error=True,
+                        )
+                        return
                 except Exception:
-                    pass
+                    event("warning", "extrude", "task_dialog", "active_dialog_check_failed")
             session = SmartExtrudeSession(
                 document=doc,
                 profile=(profile_obj, sub_elements) if profile_obj is not None else None,
             )
             panel = SmartExtrudeTaskPanel(session)
-            control.showDialog(panel)
+            try:
+                control.showDialog(panel)
+            except Exception as exc:
+                panel.reject()
+                event("error", "extrude", "task_dialog", f"show_failed:{type(exc).__name__}")
+                notify("Extrude", "Could not open the Smart Extrude task panel.", error=True)
+                return
             if panel.distance_spin is not None:
                 show_extrude_hud(
                     {"spinbox": panel.distance_spin, "checkbox_reversed": None},
