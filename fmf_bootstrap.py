@@ -2657,6 +2657,7 @@ def register_commands():
     import fmf_datum_tools
     import fmf_dressup_tools
     import fmf_export
+    import fmf_extrude
     import fmf_parameters_dock
     import fmf_repair_tools
     import fmf_sketch_tools
@@ -2666,6 +2667,7 @@ def register_commands():
     fmf_datum_tools.register()
     fmf_dressup_tools.register()
     fmf_export.register()
+    fmf_extrude.register()
     fmf_parameters_dock.register()
     fmf_repair_tools.register()
     fmf_viewport.register()

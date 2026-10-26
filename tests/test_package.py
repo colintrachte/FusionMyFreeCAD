@@ -1008,6 +1008,7 @@ def test_fresh_extracted_archive_startup(tmp_path, env, monkeypatch):
     assert "FMF_CreateSketch" in env.commands
     assert "FMF_ParameterDock" in env.commands
     assert "FMF_DatumMidplane" in env.commands
+    assert "FMF_SmartExtrude" in env.commands
     assert "FMF_StudioViewport" in env.commands
 
 
