@@ -1,5 +1,5 @@
 {
-  "layoutVersion": "1.9.0",
+  "layoutVersion": "1.9.5",
   "targetFreeCAD": "1.1.x",
   "authoredIcons": [
     "FMF_AddMidline",
@@ -37,7 +37,6 @@
     "FMF_Reapply",
     "FMF_RepairReferences",
     "FMF_Restore",
-    "FMF_SmartExtrude",
     "FMF_SmartOffset",
     "FMF_SolverDiagnostics",
     "FMF_StudioViewport",
@@ -315,12 +314,6 @@
               "small",
               "Merge Sketches",
               "Sketcher_MergeSketch"
-            ],
-            "FMF_SmartExtrude": [
-              "General",
-              "large",
-              "Smart Extrude",
-              "PartDesign_Pad"
             ],
             "PartDesign_Pad": [
               "PartDesignWorkbench",

@@ -12,15 +12,15 @@ format, and everything it changes can be undone from inside FreeCAD.
 
 ## Status
 
-Version **1.9.0** is available from
-[GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.9.0) as a
+Version **1.9.5** is available from
+[GitHub Releases](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.9.5) as a
 self-contained archive. FMF has not yet been submitted to FreeCAD's add-on index;
 catalog publication remains separate work.
 
 ## Install
 
-Download `FMF-1.9.0.zip` from the
-[1.9.0 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.9.0), extract its
+Download `FMF-1.9.5.zip` from the
+[1.9.5 release](https://github.com/colintrachte/FusionMyFreeCAD/releases/tag/v1.9.5), extract its
 top-level `FMF` folder into FreeCAD's user `Mod` directory, and restart FreeCAD. Full
 platform-by-platform steps, verification, update, and removal instructions are in
 [`docs/user-guide/INSTALL-FREECAD-ADDON.md`](docs/user-guide/INSTALL-FREECAD-ADDON.md).

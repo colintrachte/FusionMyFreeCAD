@@ -70,7 +70,6 @@ def test_normal_startup_registers_everything(env, bootstrap, monkeypatch):
         "FMF_ReviewShortcuts",
         "FMF_Restore",
         "FMF_RestoreViewport",
-        "FMF_SmartExtrude",
         "FMF_SmartOffset",
         "FMF_SolverDiagnostics",
         "FMF_StudioViewport",

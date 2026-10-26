@@ -56,10 +56,6 @@ def test_command_resources_and_activation(extrude_env):
     res = cmd.GetResources()
     assert res["Pixmap"] == "PartDesign_Pad"
     assert "Smart Extrude" in res["MenuText"]
-    assert cmd.IsActive() is True
-
-    # When no doc exists
-    extrude_env.env.app.ActiveDocument = None
     assert cmd.IsActive() is False
 
 
@@ -593,52 +589,16 @@ def test_partdesign_feature_edit_and_transition_keep_fmf_workbench(env, bootstra
     )
 
 
-def test_smart_extrude_is_first_button_in_create_section(layout, manifest, bootstrap):
-    """Smart Extrude is the very first large button in FMF Create_newPanel."""
+def test_smart_extrude_is_disabled_and_removed_from_ribbon(layout, manifest):
+    """Smart Extrude is disabled and removed from FMF Create_newPanel per user request."""
     panels = {panel["name"]: panel for panel in layout["workbenches"]["FMFDesignWorkbench"]}
     create_panel = panels["FMF Create_newPanel"]
     commands = create_panel["commands"]
 
-    assert commands[0] == [
-        "FMF_SmartExtrude",
-        "General",
-        "large",
-        "Smart Extrude",
-        "PartDesign_Pad",
-    ]
-    assert commands[1][0] == "PartDesign_Pad"
-    assert commands[2][0] == "PartDesign_Pocket"
-    assert "FMF_SmartExtrude" in manifest["primaryCommands"]
-
-    # Simulate an existing user customization saved before FMF_SmartExtrude existed
-    legacy_order = [entry[0] for entry in commands[1:] + create_panel["overflow"]]
-    legacy_pinned = [entry[0] for entry in commands[1:]]
-    custom = {
-        "layoutVersion": layout["layoutVersion"],
-        "workbenches": {
-            "FMFDesignWorkbench": {
-                "panels": {
-                    "FMF Create_newPanel": {
-                        "order": legacy_order,
-                        "pinned": legacy_pinned,
-                    }
-                }
-            }
-        },
-    }
-    ribbon, _ = bootstrap._merge_layout(apply_customization=False)
-    spec = bootstrap._layout_spec()
-    bootstrap._apply_customization(ribbon, spec, customization=custom)
-    wb_key = (
-        "FMFDesignWorkbench"
-        if "FMFDesignWorkbench" in ribbon["workbenches"]
-        else "PartDesignWorkbench"
-    )
-    toolbar = ribbon["workbenches"][wb_key]["toolbars"]["FMF Create_newPanel"]
-    assert toolbar["order"][0] == "FMF_SmartExtrude"
-    assert toolbar["order"][1] == "PartDesign_Pad"
-    assert toolbar["order"][2] == "PartDesign_Pocket"
-    assert "FMF_SmartExtrude" not in toolbar["overflow"]
+    assert commands[0][0] == "PartDesign_Pad"
+    assert "FMF_SmartExtrude" not in manifest["primaryCommands"]
+    cmd = fmf_extrude.SmartExtrudeCommand()
+    assert cmd.IsActive() is False
 
 
 def test_smart_extrude_command_opens_interactive_edit_and_updates_tip(extrude_env):
@@ -1005,8 +965,9 @@ def test_dragger_motion_cb_is_read_only_and_defers_switch(monkeypatch):
             self.whichChild = MockCoinVal(0)
 
     scheduled = []
+    delays = []
     mock_timer = types.SimpleNamespace(
-        singleShot=lambda ms, cb: scheduled.append(cb)
+        singleShot=lambda ms, cb: (delays.append(ms), scheduled.append(cb))
     )
     monkeypatch.setattr(
         fmf_extrude,
@@ -1015,6 +976,7 @@ def test_dragger_motion_cb_is_read_only_and_defers_switch(monkeypatch):
     )
 
     dragger = fmf_extrude.SmartExtrudeDragger()
+    dragger._attached = True
     dragger.dragger = types.SimpleNamespace(
         translation=MockCoinVal((-15.0, 0.0, 0.0)),
     )
@@ -1030,6 +992,7 @@ def test_dragger_motion_cb_is_read_only_and_defers_switch(monkeypatch):
     assert dragger._switch_normal.whichChild.getValue() == 0
     assert dragger._switch_active.whichChild.getValue() == 0
     assert len(scheduled) == 1
+    assert delays == [16]
     assert dispatched == []
 
     # When scheduled Qt callback fires outside traversal:
@@ -1039,8 +1002,8 @@ def test_dragger_motion_cb_is_read_only_and_defers_switch(monkeypatch):
     assert dispatched == [-15.0]
 
 
-def test_dragger_update_preview_calls_active_view_redraw(extrude_env):
-    """update_preview explicitly calls active_view.redraw() to prevent viewport freeze while dragging."""
+def test_dragger_update_preview_does_not_synchronously_redraw(extrude_env):
+    """Preview mutations rely on Coin notifications instead of re-entering the viewer."""
     redrawn = []
     active_view = types.SimpleNamespace(
         getSceneGraph=lambda: object(),
@@ -1053,7 +1016,56 @@ def test_dragger_update_preview_calls_active_view_redraw(extrude_env):
     dragger._get_coin = lambda: types.SimpleNamespace(SoSeparator=lambda: None)
 
     dragger.update_preview(None, None, "join", None)
-    assert redrawn == [True]
+    assert redrawn == []
+
+
+def test_dragger_detach_invalidates_queued_motion(monkeypatch):
+    """A queued callback from a detached Coin dragger must not touch its replacement."""
+    class MockCoinVal:
+        def getValue(self):
+            return (12.0, 0.0, 0.0)
+
+    scheduled = []
+    monkeypatch.setattr(
+        fmf_extrude,
+        "_get_qt",
+        lambda: (
+            types.SimpleNamespace(QTimer=types.SimpleNamespace(
+                singleShot=lambda _ms, cb: scheduled.append(cb)
+            )),
+            None,
+            None,
+        ),
+    )
+
+    dispatched = []
+    dragger = fmf_extrude.SmartExtrudeDragger(dispatched.append)
+    dragger.dragger = types.SimpleNamespace(
+        translation=MockCoinVal(),
+        removeMotionCallback=lambda callback: None,
+    )
+    dragger._attached = True
+    dragger._on_motion_cb()
+
+    assert len(scheduled) == 1
+    dragger.detach()
+    scheduled[0]()
+    assert dispatched == []
+
+
+def test_dragger_removes_the_registered_callback_object():
+    """Pivy receives the identical callable object for callback add and removal."""
+    removed = []
+    dragger = fmf_extrude.SmartExtrudeDragger()
+    registered = dragger._motion_callback
+    dragger.dragger = types.SimpleNamespace(
+        removeMotionCallback=lambda callback: removed.append(callback)
+    )
+
+    dragger.detach()
+
+    assert removed == [registered]
+    assert removed[0] is registered
 
 
 def test_smart_extrude_command_never_instantiates_hud(extrude_env):

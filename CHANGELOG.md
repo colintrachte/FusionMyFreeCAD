@@ -2,6 +2,36 @@
 
 All notable user-visible changes to FMF are recorded here.
 
+## 1.9.5 — 2026-10-26
+
+### UI Stability & Ribbon Lifecycle
+
+- Fixed Ribbon and SearchBar state degradation when opening task panels (e.g. Pad, Pocket): ribbon panels and controls now retain their styling, positions, and active state without graying out or rearranging.
+- Reordered default FMF workbenches to reflect the natural design workflow: **FMF Design**, **FMF Part**, **FMF Sketch**, and **FMF Surface**.
+- Removed unnecessary SearchBar polling and focus event churn, eliminating UI latency on input and tool switching.
+- Suppressed harmless startup warning popups and cleaned up log spam during initial FreeCAD launch.
+
+### Document & Project Lifecycle
+
+- Auto-created blank starter projects are now tracked and automatically discarded on exit if no user edits or features were added, eliminating phantom document save prompts on closing FreeCAD.
+- Centralized lifecycle and persistence coordination across window state changes, workbench switches, and application shutdown.
+
+### Geometry & Feature Robustness
+
+- Improved multi-body feature assignment: features created while multiple PartDesign bodies are present now strictly assign to their owning parent Body solid.
+- Resolved sketch wire recovery and profile validation: sketches with external geometry or multi-region faces now extract closed planar faces reliably, preventing empty-solid errors.
+- Fixed Pocket normal orientation issues on transformed bodies.
+- Scoped keyboard event filters on dress-up tools to prevent application-level `GUIApplication::notify` crashes and event leakage.
+
+### Performance & Telemetry
+
+- Integrated continuous A/B performance telemetry and latency benchmarking harness to monitor startup time, workbench activation latency, and command responsiveness.
+
+### Upgrade notes
+
+- Replace the entire existing `Mod/FMF` folder with the new `FMF-1.9.5` package; do not merge with an older version.
+- Restart FreeCAD after updating to ensure updated layouts and Python modules load cleanly.
+
 ## 1.9.0 — 2026-10-17
 
 ### Clean release baseline

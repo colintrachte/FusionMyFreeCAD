@@ -2843,7 +2843,7 @@ def register_commands():
     fmf_datum_tools.register()
     fmf_dressup_tools.register()
     fmf_export.register()
-    fmf_extrude.register()
+    # fmf_extrude.register()  # Disabled per user request
     fmf_parameters_dock.register()
     fmf_repair_tools.register()
     fmf_viewport.register()

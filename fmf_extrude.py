@@ -1424,6 +1424,12 @@ class SmartExtrudeDragger:
         self._hidden_body: Any = None
         self._latest_drag_val: float | None = None
         self._motion_scheduled = False
+        # Pivy removes callbacks by the Python callable originally registered.
+        # Accessing ``self._on_motion_cb`` again creates a different bound-method
+        # object, so retain one stable callback for the complete attachment.
+        self._motion_callback = self._on_motion_cb
+        self._attachment_generation = 0
+        self._attached = False
 
     def _get_coin(self) -> Any | None:
         try:
@@ -1474,6 +1480,8 @@ class SmartExtrudeDragger:
     ) -> bool:
         """Attach the signed 3D arrow dragger and preview root to the active 3D view."""
         self.detach()
+        self._attachment_generation += 1
+        generation = self._attachment_generation
         gui = _get_gui()
         coin = self._get_coin()
         if gui is None or coin is None:
@@ -1490,7 +1498,6 @@ class SmartExtrudeDragger:
             self.scene_graph = sg
 
             self.root_sep = coin.SoSeparator()
-            self.root_sep.ref()
 
             self.preview_sep = coin.SoSeparator()
             self.dragger_sep = coin.SoSeparator()
@@ -1509,13 +1516,11 @@ class SmartExtrudeDragger:
 
             # Pre-allocated materials for normal and active states
             self._mat_normal = coin.SoMaterial()
-            self._mat_normal.ref()
             rgb = self.OPERATION_COLORS.get(operation, (0.18, 0.62, 0.98))
             self._mat_normal.diffuseColor.setValue(*rgb)
             self._mat_normal.emissiveColor.setValue(rgb[0] * 0.25, rgb[1] * 0.25, rgb[2] * 0.25)
 
             self._mat_active = coin.SoMaterial()
-            self._mat_active.ref()
             self._mat_active.diffuseColor.setValue(1.0, 0.85, 0.15)
             self._mat_active.emissiveColor.setValue(0.35, 0.28, 0.0)
 
@@ -1523,13 +1528,11 @@ class SmartExtrudeDragger:
             init_idx = 1 if signed_distance < 0.0 else 0
 
             self._switch_normal = coin.SoSwitch()
-            self._switch_normal.ref()
             self._switch_normal.addChild(self._build_arrow_cone_shaft(False))
             self._switch_normal.addChild(self._build_arrow_cone_shaft(True))
             self._switch_normal.whichChild.setValue(init_idx)
 
             self._switch_active = coin.SoSwitch()
-            self._switch_active.ref()
             self._switch_active.addChild(self._build_arrow_cone_shaft(False))
             self._switch_active.addChild(self._build_arrow_cone_shaft(True))
             self._switch_active.whichChild.setValue(init_idx)
@@ -1543,7 +1546,6 @@ class SmartExtrudeDragger:
             translator_active_sep.addChild(self._switch_active)
 
             self.dragger = coin.SoTranslate1Dragger()
-            self.dragger.ref()
             self.dragger.setPart("translator", translator_sep)
             self.dragger.setPart("translatorActive", translator_active_sep)
             self.dragger.setPart("feedback", coin.SoSeparator())
@@ -1555,9 +1557,10 @@ class SmartExtrudeDragger:
             finally:
                 self._updating_dragger = False
 
-            self.dragger.addMotionCallback(self._on_motion_cb)
+            self.dragger.addMotionCallback(self._motion_callback)
             self.dragger_sep.addChild(self.dragger)
             sg.addChild(self.root_sep)
+            self._attached = self._attachment_generation == generation
             return True
         except Exception:
             self.detach()
@@ -1591,19 +1594,35 @@ class SmartExtrudeDragger:
         try:
             val = self.dragger.translation.getValue()
             self._latest_drag_val = float(val[0])
-            if not self._motion_scheduled:
+            if self._attached and not self._motion_scheduled:
                 self._motion_scheduled = True
+                generation = self._attachment_generation
                 qt_core, _, _ = _get_qt()
                 timer = getattr(qt_core, "QTimer", None) if qt_core else None
                 if timer is not None and hasattr(timer, "singleShot"):
-                    timer.singleShot(0, self._dispatch_motion)
+                    # A small delay both coalesces rapid motion events and ensures
+                    # Coin's complete input-event dispatch has unwound before any
+                    # scenegraph or FreeCAD document work begins.
+                    timer.singleShot(
+                        16,
+                        lambda generation=generation: self._dispatch_motion(generation),
+                    )
                 else:
-                    self._dispatch_motion()
+                    # Running inline would mutate Coin while it is traversing.
+                    self._motion_scheduled = False
         except Exception:
             pass
 
-    def _dispatch_motion(self) -> None:
+    def _dispatch_motion(self, generation: int | None = None) -> None:
         self._motion_scheduled = False
+        if (
+            not self._attached
+            or (
+                generation is not None
+                and generation != self._attachment_generation
+            )
+        ):
+            return
         val = self._latest_drag_val
         if val is None:
             return
@@ -1698,28 +1717,25 @@ class SmartExtrudeDragger:
                     tool_sep.addChild(node)
                     self.preview_sep.addChild(tool_sep)
 
-            # Trigger immediate 3D viewport redraw to ensure active dragging renders in real-time
-            gui = _get_gui()
-            if gui is not None:
-                try:
-                    active_doc = getattr(gui, "ActiveDocument", None)
-                    active_view = getattr(active_doc, "ActiveView", None) if active_doc else None
-                    if active_view is not None:
-                        if hasattr(active_view, "redraw"):
-                            active_view.redraw()
-                        elif hasattr(active_view, "update"):
-                            active_view.update()
-                except Exception:
-                    pass
+            # Coin field and child-list notifications request the normal viewer
+            # update.  A synchronous ActiveView.redraw() here can re-enter Coin
+            # while it is completing the drag event and has caused native access
+            # violations on Windows.
         except Exception:
             pass
 
     def detach(self) -> None:
         """Remove Coin3D preview and dragger nodes and restore body visibility."""
+        # Invalidate queued Qt callbacks before touching native objects.  A stale
+        # callback must never dereference a dragger from an earlier attachment.
+        self._attached = False
+        self._attachment_generation += 1
+        self._latest_drag_val = None
+        self._motion_scheduled = False
         self._restore_hidden_body()
         if self.dragger is not None:
             try:
-                self.dragger.removeMotionCallback(self._on_motion_cb)
+                self.dragger.removeMotionCallback(self._motion_callback)
             except Exception:
                 pass
         if self.scene_graph is not None and self.root_sep is not None:
@@ -1750,20 +1766,15 @@ class SmartExtrudeDragger:
             "_mat_normal",
             "_mat_active",
         ):
-            node = getattr(self, node_attr, None)
-            if node is not None:
-                try:
-                    node.unref()
-                except Exception:
-                    pass
-                setattr(self, node_attr, None)
+            # Scenegraph parents own their children.  Pivy wrappers must not
+            # manually unref nodes after removal because the final native owner
+            # may already have released them.
+            setattr(self, node_attr, None)
 
         self.preview_sep = None
         self.dragger_sep = None
         self.origin_trans = None
         self.axis_rot = None
-        self._latest_drag_val = None
-        self._motion_scheduled = False
 
 
 class SmartExtrudeSession:
@@ -2462,8 +2473,8 @@ class SmartExtrudeCommand:
         }
 
     def IsActive(self) -> bool:
-        app = _get_app()
-        return getattr(app, "ActiveDocument", None) is not None if app else False
+        # Disabled per user request
+        return False
 
     def Activated(self) -> None:
         app = _get_app()
@@ -2535,8 +2546,5 @@ class SmartExtrudeCommand:
 
 
 def register(add_command: Any = None) -> None:
-    """Register FMF_SmartExtrude command."""
-    gui = _get_gui()
-    register_with = add_command or (getattr(gui, "addCommand", None) if gui else None)
-    if callable(register_with):
-        register_with("FMF_SmartExtrude", SmartExtrudeCommand())
+    """Register FMF_SmartExtrude command (disabled per user request)."""
+    return
