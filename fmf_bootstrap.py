@@ -2205,22 +2205,81 @@ class _PadSelectionObserver:
                     profile = getattr(p, "Profile", None)
                     if profile and isinstance(profile, (tuple, list)) and len(profile) >= 2:
                         if profile[0] == sketch_obj:
-                            p_subs = profile[1]
-                            if not p_subs or p_subs == [""] or p_subs == ("",) or not p.isValid():
-                                target_pad = p
-                                break
+                            target_pad = p
+                            break
 
             if target_pad:
                 self._busy = True
                 previous_profile = target_pad.Profile
-                previous_visibility = sketch_obj.Visibility
+                previous_reversed = getattr(target_pad, "Reversed", False)
+                previous_visibility = getattr(sketch_obj, "Visibility", True)
+
+                # Determine accumulated or toggled profile sub-elements
+                current_subs = []
+                if (
+                    isinstance(previous_profile, (tuple, list))
+                    and len(previous_profile) >= 2
+                    and previous_profile[0] == sketch_obj
+                ):
+                    raw_subs = previous_profile[1]
+                    if isinstance(raw_subs, (tuple, list)):
+                        current_subs = [str(s) for s in raw_subs if s and s != ""]
+
+                if sub_part in current_subs:
+                    current_subs.remove(sub_part)
+                else:
+                    current_subs.append(sub_part)
+
+                new_subs = current_subs if current_subs else [""]
+                new_profile = (sketch_obj, new_subs)
+
                 try:
-                    target_pad.Profile = (sketch_obj, [sub_part])
+                    target_pad.Profile = new_profile
                     target_pad.recompute()
                     doc.recompute()
+
+                    # Guard against empty shape upon boolean fuse (e.g. Spool Holder.FCStd reversed)
+                    shape = getattr(target_pad, "Shape", None)
+                    if shape is not None:
+                        has_solids = (
+                            not getattr(shape, "isNull", lambda: False)()
+                            and len(getattr(shape, "Solids", ())) > 0
+                        )
+                        if not has_solids and hasattr(target_pad, "Reversed"):
+                            target_pad.Reversed = not previous_reversed
+                            target_pad.recompute()
+                            doc.recompute()
+                            flipped_shape = getattr(target_pad, "Shape", None)
+                            flipped_has_solids = (
+                                flipped_shape is not None
+                                and not getattr(flipped_shape, "isNull", lambda: True)()
+                                and len(getattr(flipped_shape, "Solids", ())) > 0
+                            )
+                            if flipped_has_solids:
+                                try:
+                                    import fmf_common as diagnostics
+
+                                    diagnostics.event(
+                                        "info",
+                                        "pad",
+                                        "auto_reverse",
+                                        "recovered_empty_solid",
+                                        reversed=target_pad.Reversed,
+                                    )
+                                except Exception:
+                                    pass
+                            else:
+                                # Revert if flipping also fails to produce a solid
+                                target_pad.Reversed = previous_reversed
+                                target_pad.Profile = previous_profile
+                                target_pad.recompute()
+                                doc.recompute()
+
                     sketch_obj.Visibility = False
                 except Exception:
                     target_pad.Profile = previous_profile
+                    if hasattr(target_pad, "Reversed"):
+                        target_pad.Reversed = previous_reversed
                     sketch_obj.Visibility = previous_visibility
                     raise
                 finally:
