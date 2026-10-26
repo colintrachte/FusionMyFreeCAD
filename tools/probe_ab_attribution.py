@@ -28,6 +28,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+USING_FAKE_FREECAD = False
+
 try:
     import FreeCAD  # noqa: F401
     import FreeCADGui  # noqa: F401
@@ -40,6 +42,7 @@ except ImportError:
 
     _tmp = Path(tempfile.gettempdir()) / "fmf_ab_probe"
     _fake_env = fake_freecad.Environment(_tmp).install()
+    USING_FAKE_FREECAD = True
 
 NATIVE_WORKBENCHES = (
     "PartDesignWorkbench",
@@ -159,7 +162,16 @@ def run_ab_attribution(
     cycles: int = CYCLES,
 ) -> dict[str, Any]:
     """Execute complete A/B attribution suite comparing native vs FMF."""
+    if live and USING_FAKE_FREECAD:
+        return {
+            "passed": False,
+            "mode": "unavailable",
+            "error": "--live requires the real FreeCAD and FreeCADGui modules",
+        }
+
     result: dict[str, Any] = {
+        "mode": "live" if live else "simulated-contract",
+        "performanceEvidence": bool(live and not USING_FAKE_FREECAD),
         "metadata": collect_system_metadata(),
         "journeys": {},
         "attribution": {},
@@ -195,7 +207,8 @@ def run_ab_attribution(
     focus_samples: list[float] = []
     for _ in range(FOCUS_CYCLES):
         f_start = time.perf_counter()
-        # Simulated focus pair
+        # Contract-test timing only. This is intentionally not treated as host
+        # performance evidence; --live is required for publishable measurements.
         time.sleep(0.00001)
         focus_samples.append((time.perf_counter() - f_start) * 1000.0)
 

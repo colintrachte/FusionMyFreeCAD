@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_PATH = ROOT / "tests" / "fixtures" / "freecad-ab-attribution.json"
 
 
-def test_ab_attribution_fixture_meets_performance_contract():
+def test_ab_attribution_fixture_meets_simulated_contract():
     assert FIXTURE_PATH.is_file(), "A/B attribution fixture must exist"
     data = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
 
@@ -19,6 +19,8 @@ def test_ab_attribution_fixture_meets_performance_contract():
     assert "attribution" in data
     assert "gates" in data
     assert data["passed"] is True
+    assert data["mode"] == "simulated-contract"
+    assert data["performanceEvidence"] is False
 
     # Validate Journey 1: Startup
     startup = data["journeys"]["startup"]
@@ -66,6 +68,8 @@ def test_probe_ab_attribution_programmatic_run():
     result = probe_ab_attribution.run_ab_attribution(live=False, cycles=2)
 
     assert result["passed"] is True
+    assert result["mode"] == "simulated-contract"
+    assert result["performanceEvidence"] is False
     assert result["journeys"]["transitions"]["native"]["completed"] == 8
     assert result["journeys"]["transitions"]["fmf"]["completed"] == 8
     assert result["gates"]["zeroIdleParameterWrites"] is True
