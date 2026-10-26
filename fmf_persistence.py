@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 _parameters_dirty: bool = False
+_flush_count: int = 0
 
 
 def _get_app() -> Any | None:
@@ -34,11 +35,12 @@ def is_parameters_dirty() -> bool:
 
 def flush_parameters(*, force: bool = False) -> bool:
     """Save parameters to disk if dirty or forced, resetting the dirty flag."""
-    global _parameters_dirty
+    global _parameters_dirty, _flush_count
     if not _parameters_dirty and not force:
         return False
 
     _parameters_dirty = False
+    _flush_count += 1
     app = _get_app()
     if app is not None:
         save_fn = getattr(app, "saveParameter", None)
@@ -51,7 +53,16 @@ def flush_parameters(*, force: bool = False) -> bool:
     return False
 
 
+def snapshot() -> dict[str, Any]:
+    """Return inspectable persistence dirty state and flush metrics."""
+    return {
+        "parameters_dirty": _parameters_dirty,
+        "flush_count": _flush_count,
+    }
+
+
 def reset() -> None:
-    """Reset the dirty flag without saving."""
-    global _parameters_dirty
+    """Reset the dirty flag and flush count without saving."""
+    global _parameters_dirty, _flush_count
     _parameters_dirty = False
+    _flush_count = 0

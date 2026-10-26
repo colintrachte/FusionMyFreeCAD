@@ -40,3 +40,20 @@ def test_persistence_reset():
     assert persistence.is_parameters_dirty() is True
     persistence.reset()
     assert persistence.is_parameters_dirty() is False
+
+
+def test_persistence_snapshot_and_flush_count(env):
+    snap = persistence.snapshot()
+    assert snap["parameters_dirty"] is False
+    assert snap["flush_count"] == 0
+
+    persistence.mark_parameters_dirty()
+    assert persistence.snapshot()["parameters_dirty"] is True
+
+    persistence.flush_parameters()
+    snap2 = persistence.snapshot()
+    assert snap2["parameters_dirty"] is False
+    assert snap2["flush_count"] == 1
+
+    persistence.reset()
+    assert persistence.snapshot()["flush_count"] == 0
