@@ -838,6 +838,9 @@ class FakeLayout:
     def addLayout(self, layout):
         self.layouts.append(layout)
 
+    def addRow(self, label, widget):
+        self.widgets.append(widget)
+
     def setContentsMargins(self, *args):
         pass
 
@@ -845,6 +848,9 @@ class FakeLayout:
         pass
 
     def addStretch(self, *args):
+        pass
+
+    def setLabelAlignment(self, *args):
         pass
 
 
@@ -973,6 +979,71 @@ class FakePushButton(FakeQtWidget):
 
     def setToolTip(self, tip):
         self._tooltip = tip
+
+
+class FakeSpinBox(FakeQtWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._min = 0.0
+        self._max = 100.0
+        self._val = 0.0
+        self._decimals = 2
+        self._step = 1.0
+        self._suffix = ""
+        self.valueChanged = Signal()
+
+    def setMinimum(self, val):
+        self._min = float(val)
+
+    def setMaximum(self, val):
+        self._max = float(val)
+
+    def minimum(self):
+        return self._min
+
+    def maximum(self):
+        return self._max
+
+    def setDecimals(self, d):
+        self._decimals = int(d)
+
+    def setSingleStep(self, s):
+        self._step = float(s)
+
+    def setSuffix(self, s):
+        self._suffix = str(s)
+
+    def setValue(self, val):
+        self._val = float(val)
+        self.valueChanged.emit(self._val)
+
+    def value(self):
+        return self._val
+
+
+class FakeComboBox(FakeQtWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._items = []
+        self._idx = 0
+        self.currentIndexChanged = Signal()
+
+    def addItem(self, text, data=None):
+        self._items.append((text, data))
+
+    def count(self):
+        return len(self._items)
+
+    def clear(self):
+        self._items.clear()
+        self._idx = 0
+
+    def setCurrentIndex(self, idx):
+        self._idx = int(idx)
+        self.currentIndexChanged.emit(self._idx)
+
+    def currentIndex(self):
+        return self._idx
 
 
 class FakeTableWidgetItem:
@@ -1376,6 +1447,10 @@ def _qt_modules():
     qtwidgets.QToolButton = FakeQtWidget
     qtwidgets.QLineEdit = FakeQtWidget
     qtwidgets.QPushButton = FakePushButton
+    qtwidgets.QLabel = FakePushButton
+    qtwidgets.QDoubleSpinBox = FakeSpinBox
+    qtwidgets.QComboBox = FakeComboBox
+    qtwidgets.QFormLayout = FakeLayout
     qtwidgets.QTableWidget = FakeTableWidget
     qtwidgets.QTableWidgetItem = FakeTableWidgetItem
     qtwidgets.QHeaderView = FakeHeaderView

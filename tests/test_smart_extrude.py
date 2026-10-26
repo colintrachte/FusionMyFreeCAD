@@ -784,3 +784,76 @@ def test_command_does_not_close_an_unrelated_active_dialog(extrude_env):
 
     assert shown == []
     assert closed == []
+
+
+def test_smart_extrude_task_panel_unified_style_structure(extrude_env):
+    """SmartExtrudeTaskPanel has no Flip button and supports signed distance."""
+    gui = extrude_env.env.gui
+    gui.Control = types.SimpleNamespace(
+        showDialog=lambda p: None,
+        activeDialog=lambda: None,
+        closeDialog=lambda: None,
+    )
+    gui.Selection.getSelectionEx = lambda: [
+        types.SimpleNamespace(Object=extrude_env.sketch, SubElementNames=["Face1"])
+    ]
+
+    session = fmf_extrude.SmartExtrudeSession(
+        document=extrude_env.doc,
+        profile=(extrude_env.sketch, ["Face1"]),
+    )
+    panel = fmf_extrude.SmartExtrudeTaskPanel(session)
+
+    # 1. Flip button must be completely eliminated from the UI
+    assert panel.flip_btn is None
+
+    # 2. Distance field must be signed (permitting negative values to reverse direction)
+    assert panel.distance_spin is not None
+    assert panel.distance_spin.minimum() <= -1000.0
+    assert panel.distance_spin.maximum() >= 1000.0
+
+    # 3. Direction combo has One Side and Symmetric
+    assert panel.direction_combo is not None
+    assert panel.direction_combo.count() == 2
+
+    # 4. Live Operation Badge reflects active operation
+    assert panel.badge_label is not None
+    assert "AUTO" in panel.badge_label.text()
+
+
+def test_smart_extrude_dragger_switch_orientation(monkeypatch):
+    """SmartExtrudeDragger toggles SoSwitch children without destroying nodekit parts."""
+    class MockCoinVal:
+        def __init__(self, val):
+            self._val = val
+        def getValue(self):
+            return self._val
+        def setValue(self, v):
+            self._val = v
+
+    class MockSwitch:
+        def __init__(self):
+            self.whichChild = MockCoinVal(0)
+            self.children = []
+            self._refs = 0
+        def addChild(self, c):
+            self.children.append(c)
+        def ref(self):
+            self._refs += 1
+        def unref(self):
+            self._refs = max(0, self._refs - 1)
+
+    dragger_inst = fmf_extrude.SmartExtrudeDragger()
+    dragger_inst._switch_normal = MockSwitch()
+    dragger_inst._switch_active = MockSwitch()
+
+    # Positive distance -> Child 0 (+X)
+    dragger_inst._set_arrow_direction(False)
+    assert dragger_inst._switch_normal.whichChild.getValue() == 0
+    assert dragger_inst._switch_active.whichChild.getValue() == 0
+
+    # Negative distance -> Child 1 (-X)
+    dragger_inst._set_arrow_direction(True)
+    assert dragger_inst._switch_normal.whichChild.getValue() == 1
+    assert dragger_inst._switch_active.whichChild.getValue() == 1
+

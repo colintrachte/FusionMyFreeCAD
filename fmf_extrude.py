@@ -1260,10 +1260,14 @@ class SmartExtrudeDragger:
         self.origin_trans: Any = None
         self.axis_rot: Any = None
         self.dragger: Any = None
+        self._switch_normal: Any = None
+        self._switch_active: Any = None
+        self._mat_normal: Any = None
+        self._mat_active: Any = None
         self._updating_dragger = False
-        self._last_flip: bool | None = None
-        self._last_op: str | None = None
         self._hidden_body: Any = None
+        self._latest_drag_val: float | None = None
+        self._motion_scheduled = False
 
     def _get_coin(self) -> Any | None:
         try:
@@ -1273,83 +1277,14 @@ class SmartExtrudeDragger:
         except ImportError:
             return None
 
-    def attach(
-        self,
-        center: tuple[float, float, float],
-        normal: tuple[float, float, float],
-        signed_distance: float,
-        operation: str = "join",
-    ) -> bool:
-        """Attach the signed 3D arrow dragger and preview root to the active 3D view."""
-        self.detach()
-        gui = _get_gui()
-        coin = self._get_coin()
-        if gui is None or coin is None:
-            return False
-        active_doc = getattr(gui, "ActiveDocument", None)
-        active_view = getattr(active_doc, "ActiveView", None) if active_doc else None
-        if active_view is None or not hasattr(active_view, "getSceneGraph"):
-            return False
-        try:
-            sg = active_view.getSceneGraph()
-            if sg is None:
-                return False
-
-            self.scene_graph = sg
-            self.root_sep = coin.SoSeparator()
-            self.preview_sep = coin.SoSeparator()
-            self.dragger_sep = coin.SoSeparator()
-            self.root_sep.addChild(self.preview_sep)
-            self.root_sep.addChild(self.dragger_sep)
-
-            self.origin_trans = coin.SoTranslation()
-            self.origin_trans.translation.setValue(
-                float(center[0]), float(center[1]), float(center[2])
-            )
-            self.dragger_sep.addChild(self.origin_trans)
-
-            self.axis_rot = coin.SoRotation()
-            nx, ny, nz = float(normal[0]), float(normal[1]), float(normal[2])
-            self.axis_rot.rotation.setValue(
-                coin.SbRotation(coin.SbVec3f(1.0, 0.0, 0.0), coin.SbVec3f(nx, ny, nz))
-            )
-            self.dragger_sep.addChild(self.axis_rot)
-
-            self.dragger = coin.SoTranslate1Dragger()
-            self._rebuild_arrow_parts(signed_distance < 0.0, operation)
-            self._updating_dragger = True
-            try:
-                self.dragger.translation.setValue(float(signed_distance), 0.0, 0.0)
-            finally:
-                self._updating_dragger = False
-
-            self.dragger.addMotionCallback(self._on_motion_cb)
-            self.dragger_sep.addChild(self.dragger)
-            sg.addChild(self.root_sep)
-            return True
-        except Exception:
-            self.detach()
-            return False
-
-    def _build_arrow_geometry(self, active: bool, flip_head: bool, operation: str) -> Any:
+    def _build_arrow_cone_shaft(self, flip_head: bool) -> Any:
         coin = self._get_coin()
         sep = coin.SoSeparator()
-        mat = coin.SoMaterial()
-        if active:
-            mat.diffuseColor.setValue(1.0, 0.85, 0.15)
-            mat.emissiveColor.setValue(0.35, 0.28, 0.0)
-        else:
-            rgb = self.OPERATION_COLORS.get(operation, (0.18, 0.62, 0.98))
-            mat.diffuseColor.setValue(*rgb)
-            mat.emissiveColor.setValue(rgb[0] * 0.25, rgb[1] * 0.25, rgb[2] * 0.25)
-        sep.addChild(mat)
 
-        # Base sphere at the arrow anchor
         base_sphere = coin.SoSphere()
         base_sphere.radius = 1.6
         sep.addChild(base_sphere)
 
-        # Rotate local +Y (SoCylinder/SoCone axis) to +X (or -X when flipped past zero)
         target_dir = coin.SbVec3f(-1.0, 0.0, 0.0) if flip_head else coin.SbVec3f(1.0, 0.0, 0.0)
         rot = coin.SoRotation()
         rot.rotation.setValue(coin.SbRotation(coin.SbVec3f(0.0, 1.0, 0.0), target_dir))
@@ -1374,21 +1309,126 @@ class SmartExtrudeDragger:
         sep.addChild(cone)
         return sep
 
-    def _rebuild_arrow_parts(self, flip_head: bool, operation: str) -> None:
-        if self.dragger is None:
-            return
-        if self._last_flip == flip_head and self._last_op == operation:
-            return
-        self._last_flip = flip_head
-        self._last_op = operation
+    def attach(
+        self,
+        center: tuple[float, float, float],
+        normal: tuple[float, float, float],
+        signed_distance: float,
+        operation: str = "join",
+    ) -> bool:
+        """Attach the signed 3D arrow dragger and preview root to the active 3D view."""
+        self.detach()
+        gui = _get_gui()
+        coin = self._get_coin()
+        if gui is None or coin is None:
+            return False
+        active_doc = getattr(gui, "ActiveDocument", None)
+        active_view = getattr(active_doc, "ActiveView", None) if active_doc else None
+        if active_view is None or not hasattr(active_view, "getSceneGraph"):
+            return False
         try:
-            self.dragger.setPart(
-                "translator", self._build_arrow_geometry(False, flip_head, operation)
+            sg = active_view.getSceneGraph()
+            if sg is None:
+                return False
+
+            self.scene_graph = sg
+
+            self.root_sep = coin.SoSeparator()
+            self.root_sep.ref()
+
+            self.preview_sep = coin.SoSeparator()
+            self.dragger_sep = coin.SoSeparator()
+            self.root_sep.addChild(self.preview_sep)
+            self.root_sep.addChild(self.dragger_sep)
+
+            self.origin_trans = coin.SoTranslation()
+            self.origin_trans.translation.setValue(
+                float(center[0]), float(center[1]), float(center[2])
             )
-            self.dragger.setPart(
-                "translatorActive",
-                self._build_arrow_geometry(True, flip_head, operation),
+            self.dragger_sep.addChild(self.origin_trans)
+
+            self.axis_rot = coin.SoRotation()
+            nx, ny, nz = float(normal[0]), float(normal[1]), float(normal[2])
+            self.axis_rot.rotation.setValue(
+                coin.SbRotation(coin.SbVec3f(1.0, 0.0, 0.0), coin.SbVec3f(nx, ny, nz))
             )
+            self.dragger_sep.addChild(self.axis_rot)
+
+            # Pre-allocated materials for normal and active states
+            self._mat_normal = coin.SoMaterial()
+            self._mat_normal.ref()
+            rgb = self.OPERATION_COLORS.get(operation, (0.18, 0.62, 0.98))
+            self._mat_normal.diffuseColor.setValue(*rgb)
+            self._mat_normal.emissiveColor.setValue(rgb[0] * 0.25, rgb[1] * 0.25, rgb[2] * 0.25)
+
+            self._mat_active = coin.SoMaterial()
+            self._mat_active.ref()
+            self._mat_active.diffuseColor.setValue(1.0, 0.85, 0.15)
+            self._mat_active.emissiveColor.setValue(0.35, 0.28, 0.0)
+
+            # Pre-build forward (+X, child 0) and reverse (-X, child 1) arrow geometry in SoSwitch
+            init_idx = 1 if signed_distance < 0.0 else 0
+
+            self._switch_normal = coin.SoSwitch()
+            self._switch_normal.ref()
+            self._switch_normal.addChild(self._build_arrow_cone_shaft(False))
+            self._switch_normal.addChild(self._build_arrow_cone_shaft(True))
+            self._switch_normal.whichChild.setValue(init_idx)
+
+            self._switch_active = coin.SoSwitch()
+            self._switch_active.ref()
+            self._switch_active.addChild(self._build_arrow_cone_shaft(False))
+            self._switch_active.addChild(self._build_arrow_cone_shaft(True))
+            self._switch_active.whichChild.setValue(init_idx)
+
+            translator_sep = coin.SoSeparator()
+            translator_sep.addChild(self._mat_normal)
+            translator_sep.addChild(self._switch_normal)
+
+            translator_active_sep = coin.SoSeparator()
+            translator_active_sep.addChild(self._mat_active)
+            translator_active_sep.addChild(self._switch_active)
+
+            self.dragger = coin.SoTranslate1Dragger()
+            self.dragger.ref()
+            self.dragger.setPart("translator", translator_sep)
+            self.dragger.setPart("translatorActive", translator_active_sep)
+            self.dragger.setPart("feedback", coin.SoSeparator())
+            self.dragger.setPart("feedbackActive", coin.SoSeparator())
+
+            self._updating_dragger = True
+            try:
+                self.dragger.translation.setValue(float(signed_distance), 0.0, 0.0)
+            finally:
+                self._updating_dragger = False
+
+            self.dragger.addMotionCallback(self._on_motion_cb)
+            self.dragger_sep.addChild(self.dragger)
+            sg.addChild(self.root_sep)
+            return True
+        except Exception:
+            self.detach()
+            return False
+
+    def sync_operation_color(self, operation: str) -> None:
+        """Update arrow color in-place to match resolved operation (no node recreation)."""
+        if self._mat_normal is None:
+            return
+        rgb = self.OPERATION_COLORS.get(operation, (0.18, 0.62, 0.98))
+        try:
+            self._mat_normal.diffuseColor.setValue(*rgb)
+            self._mat_normal.emissiveColor.setValue(rgb[0] * 0.25, rgb[1] * 0.25, rgb[2] * 0.25)
+        except Exception:
+            pass
+
+    def _set_arrow_direction(self, is_negative: bool) -> None:
+        """Toggle arrow head orientation across 0 in-place via SoSwitch."""
+        idx = 1 if is_negative else 0
+        try:
+            if self._switch_normal is not None and self._switch_normal.whichChild.getValue() != idx:
+                self._switch_normal.whichChild.setValue(idx)
+            if self._switch_active is not None and self._switch_active.whichChild.getValue() != idx:
+                self._switch_active.whichChild.setValue(idx)
         except Exception:
             pass
 
@@ -1398,15 +1438,32 @@ class SmartExtrudeDragger:
         try:
             val = self.dragger.translation.getValue()
             signed_x = float(val[0])
-            # Snap very small values near zero only if not actively crossing
-            if callable(self.on_drag_distance):
-                self.on_drag_distance(signed_x)
+            self._set_arrow_direction(signed_x < 0.0)
+            self._latest_drag_val = signed_x
+            if not self._motion_scheduled:
+                self._motion_scheduled = True
+                qt_core, _, _ = _get_qt()
+                timer = getattr(qt_core, "QTimer", None) if qt_core else None
+                if timer is not None and hasattr(timer, "singleShot"):
+                    timer.singleShot(0, self._dispatch_motion)
+                else:
+                    self._dispatch_motion()
         except Exception:
             pass
 
+    def _dispatch_motion(self) -> None:
+        self._motion_scheduled = False
+        val = self._latest_drag_val
+        if val is not None and callable(self.on_drag_distance):
+            try:
+                self.on_drag_distance(val)
+            except Exception:
+                pass
+
     def sync_position(self, signed_distance: float, operation: str) -> None:
-        """Update the 3D arrow position and orientation without triggering motion feedback."""
-        self._rebuild_arrow_parts(signed_distance < 0.0, operation)
+        """Update 3D arrow position and orientation without triggering motion feedback."""
+        self._set_arrow_direction(signed_distance < 0.0)
+        self.sync_operation_color(operation)
         if self.dragger is None:
             return
         self._updating_dragger = True
@@ -1443,7 +1500,7 @@ class SmartExtrudeDragger:
             if target_body is not self._hidden_body:
                 self._restore_hidden_body()
 
-            # For Cut / Intersect, temporarily hide target_body and render result_shape live
+            # For Cut, temporarily hide target_body and render result_shape live
             if (
                 operation == "cut"
                 and target_body is not None
@@ -1497,12 +1554,29 @@ class SmartExtrudeDragger:
             except Exception:
                 pass
         self.scene_graph = None
-        self.root_sep = None
+
+        for node_attr in (
+            "dragger",
+            "root_sep",
+            "_switch_normal",
+            "_switch_active",
+            "_mat_normal",
+            "_mat_active",
+        ):
+            node = getattr(self, node_attr, None)
+            if node is not None:
+                try:
+                    node.unref()
+                except Exception:
+                    pass
+                setattr(self, node_attr, None)
+
         self.preview_sep = None
         self.dragger_sep = None
-        self.dragger = None
-        self._last_flip = None
-        self._last_op = None
+        self.origin_trans = None
+        self.axis_rot = None
+        self._latest_drag_val = None
+        self._motion_scheduled = False
 
 
 class SmartExtrudeSession:
@@ -1650,18 +1724,6 @@ class SmartExtrudeSession:
 
     def _on_dragger_moved(self, new_signed_distance: float) -> None:
         self.signed_distance = float(new_signed_distance)
-        if self._drag_update_scheduled or self._closed:
-            return
-        qt_core, _qt_gui, _qt_widgets = _get_qt()
-        timer = getattr(qt_core, "QTimer", None) if qt_core is not None else None
-        if timer is not None and hasattr(timer, "singleShot"):
-            self._drag_update_scheduled = True
-            timer.singleShot(16, self._flush_drag_update)
-        else:
-            self.evaluate(sync_dragger=False)
-
-    def _flush_drag_update(self) -> None:
-        self._drag_update_scheduled = False
         if not self._closed:
             self.evaluate(sync_dragger=False)
 
@@ -1777,7 +1839,10 @@ class SmartExtrudeSession:
             except Exception:
                 pass
 
-        self.dragger.sync_position(self.signed_distance, self.resolved_operation)
+        if sync_dragger:
+            self.dragger.sync_position(self.signed_distance, self.resolved_operation)
+        else:
+            self.dragger.sync_operation_color(self.resolved_operation)
         self.dragger.update_preview(
             self.prism_shape,
             self.result_shape,
@@ -1899,124 +1964,116 @@ class SmartExtrudeTaskPanel:
             root = qt_widgets.QWidget()
             root.setObjectName("FMF_SmartExtrudeTaskPanel")
             if hasattr(root, "setWindowTitle"):
-                root.setWindowTitle("Smart Extrude")
+                root.setWindowTitle("Extrude")
             root.setStyleSheet(
                 "QWidget#FMF_SmartExtrudeTaskPanel {"
                 "  background-color: #1e222a; color: #e2e8f0; font-size: 12px;"
                 "}"
-                "QLabel { color: #cbd5e1; }"
+                "QLabel { color: #94a3b8; font-size: 12px; }"
                 "QDoubleSpinBox, QComboBox, QPushButton {"
                 "  background-color: #0f172a; color: #f8fafc;"
-                "  border: 1px solid #334155; border-radius: 4px; padding: 4px 6px;"
+                "  border: 1px solid #334155; border-radius: 4px; padding: 4px 8px;"
+                "  min-height: 22px; font-size: 12px;"
                 "}"
+                "QDoubleSpinBox:focus, QComboBox:focus { border-color: #3b82f6; }"
                 "QPushButton:hover { border-color: #3b82f6; background-color: #1e293b; }"
+                "QPushButton#FMF_ExtrudeSelectProfileBtn { text-align: left; }"
             )
 
             outer = qt_widgets.QVBoxLayout(root)
-            outer.setContentsMargins(10, 10, 10, 10)
-            outer.setSpacing(8)
+            outer.setContentsMargins(12, 12, 12, 12)
+            outer.setSpacing(10)
 
             # 1. Header + Live Operation Badge
             header_row = qt_widgets.QHBoxLayout()
-            title_lbl = qt_widgets.QLabel("<b>SMART EXTRUDE</b>", root)
+            title_lbl = qt_widgets.QLabel("<b>EXTRUDE</b>", root)
+            title_lbl.setStyleSheet("font-size: 13px; color: #f1f5f9; letter-spacing: 0.5px;")
             header_row.addWidget(title_lbl)
+            header_row.addStretch(1)
             self.badge_label = qt_widgets.QLabel("AUTO: JOIN", root)
             self.badge_label.setObjectName("FMF_ExtrudeOperationBadge")
+            self.badge_label.setStyleSheet(
+                "padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; "
+                + self.BADGE_STYLES["join"]
+            )
             header_row.addWidget(self.badge_label)
             outer.addLayout(header_row)
 
-            # 2. Profile selector row
-            prof_row = qt_widgets.QHBoxLayout()
-            prof_row.addWidget(qt_widgets.QLabel("Profile:", root))
-            self.profile_label = qt_widgets.QLabel("None", root)
-            self.profile_label.setObjectName("FMF_ExtrudeProfileLabel")
-            prof_row.addWidget(self.profile_label)
-            self.select_profile_btn = qt_widgets.QPushButton("Select", root)
+            # Form layout for sleek key-value alignment (matching Fusion 360)
+            form = qt_widgets.QFormLayout()
+            form.setSpacing(8)
+            form.setContentsMargins(0, 0, 0, 0)
+            if hasattr(form, "setLabelAlignment"):
+                _qt_core, _, _ = _get_qt()
+                align_left = getattr(getattr(_qt_core, "Qt", None), "AlignLeft", None)
+                if align_left:
+                    form.setLabelAlignment(align_left)
+
+            # 2. Profile selector button
+            self.select_profile_btn = qt_widgets.QPushButton("Select Profile...", root)
             self.select_profile_btn.setObjectName("FMF_ExtrudeSelectProfileBtn")
+            self.select_profile_btn.setToolTip("Click to select or change sketch/face profile")
             if hasattr(self.select_profile_btn, "clicked"):
                 self.select_profile_btn.clicked.connect(self._on_toggle_select_profile)
-            prof_row.addWidget(self.select_profile_btn)
-            outer.addLayout(prof_row)
+            self.profile_label = self.select_profile_btn
+            form.addRow("Profile", self.select_profile_btn)
 
-            # 3. Direction row (One Side / Symmetric + Flip button)
-            dir_row = qt_widgets.QHBoxLayout()
-            dir_row.addWidget(qt_widgets.QLabel("Direction:", root))
+            # 3. Direction (One Side / Symmetric - NO FLIP BUTTON)
             self.direction_combo = qt_widgets.QComboBox(root)
             self.direction_combo.setObjectName("FMF_ExtrudeDirectionCombo")
             self.direction_combo.addItem("One Side", "one_side")
             self.direction_combo.addItem("Symmetric", "symmetric")
             if hasattr(self.direction_combo, "currentIndexChanged"):
                 self.direction_combo.currentIndexChanged.connect(self._on_direction_mode_changed)
-            dir_row.addWidget(self.direction_combo)
+            form.addRow("Direction", self.direction_combo)
 
-            self.flip_btn = qt_widgets.QPushButton("Flip ⇄", root)
-            self.flip_btn.setObjectName("FMF_ExtrudeFlipBtn")
-            self.flip_btn.setToolTip("Reverse extrusion direction (or drag arrow past 0)")
-            if hasattr(self.flip_btn, "clicked"):
-                self.flip_btn.clicked.connect(self._on_flip_clicked)
-            dir_row.addWidget(self.flip_btn)
-            outer.addLayout(dir_row)
-
-            # 4. Signed Distance row
-            dist_row = qt_widgets.QHBoxLayout()
-            dist_row.addWidget(qt_widgets.QLabel("Distance:", root))
+            # 4. Signed Distance (negative value reverses direction past 0)
             self.distance_spin = qt_widgets.QDoubleSpinBox(root)
             self.distance_spin.setObjectName("lengthEdit")
             self.distance_spin.setMinimum(-100000.0)
             self.distance_spin.setMaximum(100000.0)
             self.distance_spin.setDecimals(2)
+            self.distance_spin.setSingleStep(1.0)
             self.distance_spin.setSuffix(" mm")
             self.distance_spin.setValue(self.session.signed_distance)
             if hasattr(self.distance_spin, "valueChanged"):
                 self.distance_spin.valueChanged.connect(self._on_distance_changed)
-            dist_row.addWidget(self.distance_spin)
-            outer.addLayout(dist_row)
+            form.addRow("Distance", self.distance_spin)
 
-            # 5. Taper Angle row
-            taper_row = qt_widgets.QHBoxLayout()
-            taper_row.addWidget(qt_widgets.QLabel("Taper Angle:", root))
+            # 5. Taper Angle
             self.taper_spin = qt_widgets.QDoubleSpinBox(root)
             self.taper_spin.setObjectName("FMF_ExtrudeTaperSpin")
             self.taper_spin.setMinimum(-89.0)
             self.taper_spin.setMaximum(89.0)
             self.taper_spin.setDecimals(1)
+            self.taper_spin.setSingleStep(1.0)
             self.taper_spin.setSuffix(" °")
             self.taper_spin.setValue(self.session.taper_angle)
             if hasattr(self.taper_spin, "valueChanged"):
                 self.taper_spin.valueChanged.connect(self._on_taper_changed)
-            taper_row.addWidget(self.taper_spin)
-            outer.addLayout(taper_row)
+            form.addRow("Taper Angle", self.taper_spin)
 
-            # 6. Operation row (Auto / Join / Cut / Intersect / New Body)
-            op_row = qt_widgets.QHBoxLayout()
-            op_row.addWidget(qt_widgets.QLabel("Operation:", root))
+            # 6. Operation mode
             self.operation_combo = qt_widgets.QComboBox(root)
             self.operation_combo.setObjectName("FMF_ExtrudeOperationCombo")
             for op_key, op_label in self.OPERATION_ITEMS:
                 self.operation_combo.addItem(op_label, op_key)
             if hasattr(self.operation_combo, "currentIndexChanged"):
                 self.operation_combo.currentIndexChanged.connect(self._on_operation_changed)
-            op_row.addWidget(self.operation_combo)
-            outer.addLayout(op_row)
+            form.addRow("Operation", self.operation_combo)
 
-            # 7. Target Body row
-            body_row = qt_widgets.QHBoxLayout()
-            body_row.addWidget(qt_widgets.QLabel("Target Body:", root))
-            self.body_combo = qt_widgets.QComboBox(root)
-            self.body_combo.setObjectName("FMF_ExtrudeTargetBodyCombo")
-            self._populate_body_combo()
-            if hasattr(self.body_combo, "currentIndexChanged"):
-                self.body_combo.currentIndexChanged.connect(self._on_body_changed)
-            body_row.addWidget(self.body_combo)
-            outer.addLayout(body_row)
+            outer.addLayout(form)
 
-            # 8. Status / diagnostic explanation
+            # 7. Subtle 1-line reason hint at bottom
             self.reason_label = qt_widgets.QLabel(self.session.reason, root)
             self.reason_label.setObjectName("FMF_ExtrudeReasonLabel")
+            self.reason_label.setStyleSheet("color: #64748b; font-size: 11px; padding-top: 4px;")
             if hasattr(self.reason_label, "setWordWrap"):
                 self.reason_label.setWordWrap(True)
             outer.addWidget(self.reason_label)
 
+            self.flip_btn = None
+            self.body_combo = None
             self.form = root
         except Exception:
             self.form = None
@@ -2131,14 +2188,15 @@ class SmartExtrudeTaskPanel:
         try:
             op = session.resolved_operation
             op_upper = op.replace("_", " ").upper()
-            badge_text = f"AUTO → {op_upper}" if session.operation_mode == "auto" else op_upper
+            badge_text = f"AUTO: {op_upper}" if session.operation_mode == "auto" else op_upper
             if self.badge_label is not None:
                 if hasattr(self.badge_label, "setText"):
                     self.badge_label.setText(badge_text)
                 if hasattr(self.badge_label, "setStyleSheet"):
                     style = self.BADGE_STYLES.get(op, self.BADGE_STYLES["join"])
                     self.badge_label.setStyleSheet(
-                        f"padding: 2px 8px; border-radius: 4px; font-weight: bold; {style}"
+                        "padding: 2px 8px; border-radius: 4px; font-weight: bold; "
+                        f"font-size: 10px; {style}"
                     )
 
             if self.profile_label is not None and hasattr(self.profile_label, "setText"):
@@ -2153,12 +2211,20 @@ class SmartExtrudeTaskPanel:
                         if session.sub_elements and session.sub_elements[0]
                         else ""
                     )
-                    self.profile_label.setText(f"{lbl}{sub_str}")
+                    self.profile_label.setText(f"1 selected ({lbl}{sub_str})")
                 else:
-                    self.profile_label.setText("Click a sketch or face...")
+                    self.profile_label.setText("Select Profile...")
 
             if self.distance_spin is not None and hasattr(self.distance_spin, "setValue"):
                 self.distance_spin.setValue(session.signed_distance)
+
+            if self.direction_combo is not None and hasattr(
+                self.direction_combo, "setCurrentIndex"
+            ):
+                self.direction_combo.setCurrentIndex(1 if session.symmetric else 0)
+
+            if self.taper_spin is not None and hasattr(self.taper_spin, "setValue"):
+                self.taper_spin.setValue(session.taper_angle)
 
             if self.operation_combo is not None and hasattr(
                 self.operation_combo, "setCurrentIndex"
