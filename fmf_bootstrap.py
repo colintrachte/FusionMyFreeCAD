@@ -132,9 +132,7 @@ def bind_ribbon_button(command_id, button):
     try:
         registry = native_action_registry()
         if registry.resolve(command_id, allow_scan=False) is None:
-            default_action = (
-                button.defaultAction() if hasattr(button, "defaultAction") else None
-            )
+            default_action = button.defaultAction() if hasattr(button, "defaultAction") else None
             if default_action is not None:
                 registry._remember(command_id, default_action)
     except Exception:
@@ -1954,6 +1952,7 @@ class _SketchEditWorkbenchObserver:
 
         obj = getattr(view_provider, "Object", None)
         if obj is not None and obj.isDerivedFrom("PartDesign::Feature"):
+
             def _on_partdesign_feature_in_edit():
                 show_ribbon_context(fmf_workbench_for("PartDesignWorkbench"))
                 try:
@@ -2019,6 +2018,7 @@ class _SketchEditWorkbenchObserver:
     def slotResetEdit(self, view_provider):
         obj = getattr(view_provider, "Object", None)
         if obj is not None and obj.isDerivedFrom("PartDesign::Feature"):
+
             def _on_partdesign_feature_reset_edit():
                 show_ribbon_context(fmf_workbench_for("PartDesignWorkbench"))
                 try:
@@ -3000,9 +3000,7 @@ def _install_ribbon_host_adapter():
     original_select = getattr(modern_menu, "selectFmfWorkbenchContext", None)
     if callable(original_select):
 
-        def _adapted_select_fmf_workbench_context(
-            self, workbenchName, buildIfNeeded=True
-        ):
+        def _adapted_select_fmf_workbench_context(self, workbenchName, buildIfNeeded=True):
             target_name = fmf_workbench_for(workbenchName) or workbenchName
             try:
                 tab_bar = self.tabBar() if hasattr(self, "tabBar") else None
@@ -3043,18 +3041,14 @@ def _install_ribbon_host_adapter():
                 pass
             try:
                 tab_bar = self.tabBar()
-                current_tab = fmf_workbench_for(
-                    tab_bar.tabData(tab_bar.currentIndex())
-                )
+                current_tab = fmf_workbench_for(tab_bar.tabData(tab_bar.currentIndex()))
                 if current_tab in auth_list:
                     return True
             except Exception:
                 pass
             return bool(original_auth(self))
 
-        modern_menu._fmfAuthoritativeWorkbenchActive = (
-            _adapted_authoritative_workbench_active
-        )
+        modern_menu._fmfAuthoritativeWorkbenchActive = _adapted_authoritative_workbench_active
 
     original_add_search = getattr(modern_menu, "AddSearchBar", None)
     if callable(original_add_search):
@@ -3124,9 +3118,7 @@ def _install_searchbar_host_adapter():
                     try:
                         mw = Gui.getMainWindow()
                         mouse_bar = (
-                            mw.findChild(QToolBar, "SearchBarAtMouse")
-                            if mw is not None
-                            else None
+                            mw.findChild(QToolBar, "SearchBarAtMouse") if mw is not None else None
                         )
                         if (
                             mouse_bar is not None
@@ -3149,9 +3141,7 @@ def _install_searchbar_host_adapter():
                     try:
                         mw = Gui.getMainWindow()
                         mouse_bar = (
-                            mw.findChild(QToolBar, "SearchBarAtMouse")
-                            if mw is not None
-                            else None
+                            mw.findChild(QToolBar, "SearchBarAtMouse") if mw is not None else None
                         )
                         if (
                             mouse_bar is not None
@@ -3175,9 +3165,7 @@ def _install_searchbar_host_adapter():
 
                 shortcut_key = "S"
                 try:
-                    custom_shortcuts = App.ParamGet(
-                        "User parameter:BaseApp/Preferences/Shortcut"
-                    )
+                    custom_shortcuts = App.ParamGet("User parameter:BaseApp/Preferences/Shortcut")
                     if "SearchBar" in custom_shortcuts.GetStrings():
                         shortcut_key = custom_shortcuts.GetString("SearchBar") or "S"
                 except Exception:
@@ -3203,10 +3191,7 @@ def _install_searchbar_host_adapter():
                 else:
                     if (
                         event.modifiers()
-                        & (
-                            Qt.KeyboardModifier.ControlModifier
-                            | Qt.KeyboardModifier.AltModifier
-                        )
+                        & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier)
                     ) or key_val != target_seq:
                         return False
 

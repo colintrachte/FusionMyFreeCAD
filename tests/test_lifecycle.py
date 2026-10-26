@@ -18,9 +18,7 @@ def clean_lifecycle():
 
 def test_observer_registration_and_teardown():
     detached = []
-    target = types.SimpleNamespace(
-        removeObserver=lambda obs: detached.append(("target", obs))
-    )
+    target = types.SimpleNamespace(removeObserver=lambda obs: detached.append(("target", obs)))
     obs = object()
 
     lifecycle.register_observer("selection", "pad", target, obs)
@@ -50,9 +48,7 @@ def test_observer_custom_detach_function():
 
 def test_filter_registration_and_teardown():
     removed = []
-    widget = types.SimpleNamespace(
-        removeEventFilter=lambda flt: removed.append(flt)
-    )
+    widget = types.SimpleNamespace(removeEventFilter=lambda flt: removed.append(flt))
     flt = object()
 
     lifecycle.register_filter("task_shield", widget, flt)

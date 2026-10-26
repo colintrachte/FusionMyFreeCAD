@@ -2790,9 +2790,7 @@ def close_open_wire_gaps(sketch=None, tolerance=0.5):
                     methods_used.append("coincident")
 
             if not applied:
-                line_id = _add_line(
-                    sketch, first["point"], second["point"], construction=False
-                )
+                line_id = _add_line(sketch, first["point"], second["point"], construction=False)
                 if Sketcher is not None and isinstance(line_id, int) and line_id >= 0:
                     _safe_add_constraint(
                         sketch,

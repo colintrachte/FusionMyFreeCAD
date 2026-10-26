@@ -107,8 +107,7 @@ def snapshot() -> dict[str, Any]:
     """Inspect active lifecycle counts and registrations."""
     return {
         "observers": {
-            f"{cat}:{name}": bool(target)
-            for (cat, name), (target, _, _) in _observers.items()
+            f"{cat}:{name}": bool(target) for (cat, name), (target, _, _) in _observers.items()
         },
         "observer_count": len(_observers),
         "filters": list(_filters.keys()),

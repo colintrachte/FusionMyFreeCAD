@@ -105,12 +105,8 @@ class ChromeController:
                 except (AttributeError, RuntimeError):
                     pass
 
-            if desired.toolbars_hidden and (
-                force or prev is None or not prev.toolbars_hidden
-            ):
-                ribbon_widget = (
-                    ribbon_dock.widget() if hasattr(ribbon_dock, "widget") else None
-                )
+            if desired.toolbars_hidden and (force or prev is None or not prev.toolbars_hidden):
+                ribbon_widget = ribbon_dock.widget() if hasattr(ribbon_dock, "widget") else None
                 if ribbon_widget is not None and hasattr(ribbon_widget, "hideClassicToolbars"):
                     try:
                         ribbon_widget.hideClassicToolbars()
