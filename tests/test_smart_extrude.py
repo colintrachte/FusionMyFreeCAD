@@ -75,6 +75,76 @@ def test_resolve_profile_sketch_and_subelements(extrude_env):
     assert obj == sketch
     assert subs == ["InternalFace1"]
 
+    # 4. Sketch with 1 unclosed external wire and 1 closed InternalShape face
+    open_wire = types.SimpleNamespace(isClosed=lambda: False)
+    sketch.Shape = types.SimpleNamespace(Wires=[open_wire], Faces=[])
+    sketch.InternalShape = types.SimpleNamespace(Faces=[object()])
+    obj, subs = fmf_extrude.resolve_profile(sel)
+    assert obj == sketch
+    assert subs == ["InternalFace1"]
+
+
+def test_active_body_prefers_owning_body_in_multibody_document(extrude_env):
+    """When a document has multiple bodies, _active_body selects the body owning the profile."""
+    doc = extrude_env.doc
+    body1 = extrude_env.body
+    sketch_in_b1 = extrude_env.sketch
+    body1.Group.remove(sketch_in_b1)
+
+    body2 = doc.addObject("PartDesign::Body", "Body001")
+    body2.addObject(sketch_in_b1)
+
+    resolved = fmf_extrude._active_body(doc, profile_obj=sketch_in_b1)
+    assert resolved == body2
+
+
+def test_smart_extrude_negative_length_and_pocket_normal_inversion(extrude_env):
+    """Negative length flips direction, and auto-cut accounts for Pocket normal inversion."""
+    doc = extrude_env.doc
+    body = extrude_env.body
+    sketch = extrude_env.sketch
+
+    body_shape = types.SimpleNamespace(
+        isNull=lambda: False,
+        Solids=[object()],
+        Volume=1000.0,
+    )
+    body_shape.common = lambda prism: types.SimpleNamespace(
+        isNull=lambda: False,
+        Volume=200.0 if getattr(prism, "_is_neg", False) else 0.0,
+    )
+    body_shape.distToShape = lambda prism: (0.0,)
+    body.Shape = body_shape
+
+    def mock_extrude(vec):
+        return types.SimpleNamespace(
+            isNull=lambda: False,
+            Volume=250.0,
+            _is_neg=(vec.z < 0),
+        )
+
+    mock_face = types.SimpleNamespace(
+        extrude=mock_extrude,
+        normalAt=lambda u, v: MockVec(0, 0, 1),
+    )
+    sketch.Shape = types.SimpleNamespace(Faces=[mock_face], Wires=[])
+    sketch.InternalShape = None
+
+    # Extruding -10.0 along -Z penetrates body -> auto-classified as Cut (PartDesign::Pocket)
+    # Since Pocket extrudes along -normal when Reversed=False, Reversed should be False.
+    res = fmf_extrude.smart_extrude(
+        operation="auto",
+        length=-10.0,
+        reversed_dir=False,
+        profile=(sketch, []),
+        document=doc,
+    )
+    assert res["status"] == "ok"
+    assert res["operation"] == "cut"
+    assert res["feature"].TypeId == "PartDesign::Pocket"
+    assert res["feature"].Length == 10.0
+    assert res["feature"].Reversed is False
+
 
 def test_classify_operation_no_body():
     """Without an active body or existing solid, extrude defaults to New Body."""

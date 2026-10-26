@@ -100,3 +100,38 @@ def test_pad_reverts_if_neither_direction_is_valid(sketch_env):
     # Should have reverted to the previous valid profile
     assert pad.Profile == (sketch, [""])
     assert pad.Reversed is False
+
+
+def test_sketch_repair_observer_auto_upgrades_single_region_with_open_wires(sketch_env):
+    """When native Pad is created on a 1-region sketch with open external-geometry wires,
+    _SketchRepairObserver upgrades Profile to ['InternalFace1'] and recovers 1-solid direction.
+    """
+    import fmf_bootstrap
+
+    obs = fmf_bootstrap._SketchRepairObserver()
+    sketch = sketch_env.sketch
+    pad = sketch_env.pad
+
+    open_wire = types.SimpleNamespace(isClosed=lambda: False)
+    closed_wire = types.SimpleNamespace(isClosed=lambda: True)
+    sketch.Shape = types.SimpleNamespace(Wires=[closed_wire, open_wire], Faces=[])
+    sketch.InternalShape = types.SimpleNamespace(Faces=[object()])
+
+    pad.Profile = (sketch, [])
+    pad.Reversed = False
+
+    # Simulate Spool Holder.FCStd: Reversed=False produces 2 disconnected solids,
+    # Reversed=True fuses cleanly into 1 solid.
+    def mock_recompute():
+        if pad.Reversed:
+            pad.Shape = types.SimpleNamespace(isNull=lambda: False, Solids=[object()])
+        else:
+            pad.Shape = types.SimpleNamespace(isNull=lambda: False, Solids=[object(), object()])
+
+    pad.recompute = mock_recompute
+
+    obs.slotChangedObject(pad, "Profile")
+
+    assert pad.Profile == (sketch, ["InternalFace1"])
+    assert pad.Reversed is True
+    assert len(pad.Shape.Solids) == 1

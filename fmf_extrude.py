@@ -144,15 +144,36 @@ def enhance_active_extrude(info: dict[str, Any] | None = None) -> bool:
     return False
 
 
-def _active_body(document: Any = None) -> Any:
-    """Find the active PartDesign::Body or the first body in document."""
+def _owning_body(profile_obj: Any, document: Any = None) -> Any | None:
+    """Return the PartDesign::Body that directly owns profile_obj, if any."""
+    if profile_obj is None:
+        return None
+    for parent in getattr(profile_obj, "InList", ()) or ():
+        if getattr(parent, "TypeId", "") == "PartDesign::Body":
+            return parent
+    if document is not None:
+        for obj in getattr(document, "Objects", ()) or ():
+            if getattr(obj, "TypeId", "") == "PartDesign::Body":
+                group = getattr(obj, "Group", ()) or ()
+                if profile_obj in group:
+                    return obj
+    return None
+
+
+def _active_body(document: Any = None, profile_obj: Any = None) -> Any:
+    """Find the owning PartDesign::Body for profile_obj, the active body, or the first body."""
     app = _get_app()
     gui = _get_gui()
     doc = document or (getattr(app, "ActiveDocument", None) if app else None)
     if doc is None:
         return None
 
-    # 1. Check active object in active view (standard FreeCAD PartDesign active body)
+    # 1. Prefer the body that directly owns the profile object
+    owner = _owning_body(profile_obj, doc)
+    if owner is not None:
+        return owner
+
+    # 2. Check active object in active view (standard FreeCAD PartDesign active body)
     active_view = (
         getattr(getattr(gui, "ActiveDocument", None), "ActiveView", None)
         if gui
@@ -166,16 +187,41 @@ def _active_body(document: Any = None) -> Any:
         except Exception:
             pass
 
-    # 2. Check doc.ActiveObject
+    # 3. Check doc.ActiveObject
     body = getattr(doc, "ActiveObject", None)
     if body and getattr(body, "TypeId", "") == "PartDesign::Body":
         return body
 
-    # 3. Check doc.Objects
+    # 4. Check doc.Objects
     for obj in getattr(doc, "Objects", []):
         if getattr(obj, "TypeId", "") == "PartDesign::Body":
             return obj
     return None
+
+
+def _normalize_profile_subs(profile_obj: Any, sub_elements: list[str] | None) -> list[str]:
+    """Normalize sketch sub-element list, upgrading open/multi-wire sketches to InternalFace1."""
+    subs = [str(s) for s in (sub_elements or []) if s is not None]
+    non_empty = [s for s in subs if s != ""]
+    if non_empty:
+        return non_empty
+
+    if profile_obj is not None and (
+        getattr(profile_obj, "TypeId", "").startswith("Sketcher::")
+        or hasattr(profile_obj, "Geometry")
+    ):
+        shape = getattr(profile_obj, "Shape", None)
+        internal = getattr(profile_obj, "InternalShape", None)
+        if shape is not None and internal is not None:
+            wires = getattr(shape, "Wires", []) or []
+            faces = getattr(shape, "Faces", []) or []
+            internal_faces = getattr(internal, "Faces", []) or []
+            has_open_or_multi_wires = len(wires) > 1 or any(
+                not getattr(w, "isClosed", lambda: True)() for w in wires
+            )
+            if len(faces) == 0 and len(internal_faces) > 0 and has_open_or_multi_wires:
+                return ["InternalFace1"]
+    return [""]
 
 
 def resolve_profile(
@@ -205,24 +251,10 @@ def resolve_profile(
 
         # Case A: SketchObject
         if getattr(obj, "TypeId", "").startswith("Sketcher::") or hasattr(obj, "Geometry"):
-            # Check for face sub-elements
             face_subs = [s for s in subs if s.startswith("InternalFace") or s.startswith("Face")]
             if face_subs:
                 return obj, face_subs
-
-            # If whole sketch selected without sub-elements:
-            # Check if external geometry / unclosed wires exist while InternalShape has valid faces
-            shape = getattr(obj, "Shape", None)
-            internal = getattr(obj, "InternalShape", None)
-            if shape is not None and internal is not None:
-                wires = getattr(shape, "Wires", [])
-                faces = getattr(shape, "Faces", [])
-                internal_faces = getattr(internal, "Faces", [])
-                if len(wires) > 1 and len(faces) == 0 and len(internal_faces) > 0:
-                    # Sketch has external geometry or unclosed wires; use InternalFace1
-                    return obj, ["InternalFace1"]
-
-            return obj, [""]
+            return obj, _normalize_profile_subs(obj, subs)
 
         # Case B: Face of a solid
         face_subs = [s for s in subs if s.startswith("Face")]
@@ -231,7 +263,67 @@ def resolve_profile(
 
     # Fallback to first selected object
     first = getattr(selection_ex[0], "Object", None)
-    return first, [""]
+    return first, _normalize_profile_subs(first, [""])
+
+
+def _extract_test_face(
+    profile_obj: Any,
+    sub_elements: list[str] | None,
+) -> tuple[Any | None, bool]:
+    """Extract a planar test face and whether it requires local-to-global Placement."""
+    sub_list = _normalize_profile_subs(profile_obj, sub_elements)
+    internal = getattr(profile_obj, "InternalShape", None)
+    if internal is not None and any(s.startswith("InternalFace") for s in sub_list):
+        int_faces = getattr(internal, "Faces", []) or []
+        if int_faces:
+            idx = 0
+            for s in sub_list:
+                if s.startswith("InternalFace"):
+                    suffix = s[len("InternalFace") :]
+                    if suffix.isdigit():
+                        idx = max(0, min(int(suffix) - 1, len(int_faces) - 1))
+                        break
+            target = int_faces[idx]
+            return (target.copy() if hasattr(target, "copy") else target), True
+
+    if hasattr(profile_obj, "Shape") and profile_obj.Shape is not None:
+        prof_shape = profile_obj.Shape
+        prof_faces = getattr(prof_shape, "Faces", []) or []
+        if prof_faces:
+            idx = 0
+            for s in sub_list:
+                if s.startswith("Face"):
+                    suffix = s[len("Face") :]
+                    if suffix.isdigit():
+                        idx = max(0, min(int(suffix) - 1, len(prof_faces) - 1))
+                        break
+            target = prof_faces[idx]
+            return (target.copy() if hasattr(target, "copy") else target), False
+
+        # Standard FreeCAD SketchObject has 0 Shape.Faces and 1+ closed Shape.Wires
+        prof_wires = getattr(prof_shape, "Wires", []) or []
+        closed_wires = [
+            w for w in prof_wires if getattr(w, "isClosed", lambda: False)()
+        ]
+        if closed_wires:
+            try:
+                import Part
+
+                made = Part.makeFace(closed_wires, "Part::FaceMakerBullseye")
+                made_faces = getattr(made, "Faces", []) or []
+                if made_faces:
+                    return made_faces[0], False
+            except Exception:
+                pass
+
+        # Fallback to InternalShape.Faces[0] if present
+        if internal is not None:
+            int_faces = getattr(internal, "Faces", []) or []
+            if int_faces:
+                target = int_faces[0]
+                return (target.copy() if hasattr(target, "copy") else target), True
+
+    return None, False
 
 
 def classify_operation(
@@ -243,6 +335,10 @@ def classify_operation(
 ) -> dict[str, Any]:
     """Classify the extrusion as join, cut, or new_body based on geometry."""
     app = _get_app()
+    if length < 0.0:
+        reversed_dir = not reversed_dir
+        length = abs(length)
+
     body_shape = getattr(target_body, "Shape", None) if target_body else None
     has_target_solids = (
         body_shape is not None
@@ -259,19 +355,7 @@ def classify_operation(
         }
 
     # Extract face for test extrusion
-    face = None
-    sub_list = sub_elements or [""]
-    internal = getattr(profile_obj, "InternalShape", None)
-    if internal is not None and any(s.startswith("InternalFace") for s in sub_list):
-        int_faces = getattr(internal, "Faces", [])
-        if int_faces:
-            face = int_faces[0].copy() if hasattr(int_faces[0], "copy") else int_faces[0]
-
-    if face is None and hasattr(profile_obj, "Shape"):
-        prof_shape = profile_obj.Shape
-        prof_faces = getattr(prof_shape, "Faces", [])
-        if prof_faces:
-            face = prof_faces[0].copy() if hasattr(prof_faces[0], "copy") else prof_faces[0]
+    face, needs_placement_transform = _extract_test_face(profile_obj, sub_elements)
 
     if face is None:
         return {
@@ -282,9 +366,9 @@ def classify_operation(
         }
 
     try:
-        # Placement alignment
+        # Placement alignment (only apply when face is in sketch-local InternalShape coordinates)
         pl = getattr(profile_obj, "Placement", None)
-        if pl is not None and hasattr(face, "Placement"):
+        if needs_placement_transform and pl is not None and hasattr(face, "Placement"):
             face.Placement = pl.multiply(face.Placement)
 
         # Normal vector
@@ -422,21 +506,27 @@ def smart_extrude(
         notify("Extrude", "No active document.", error=True)
         return {"status": "no-document"}
 
+    if length < 0.0:
+        reversed_dir = not reversed_dir
+        length = abs(length)
+
     if profile is None:
         profile_obj, sub_elements = resolve_profile(document=doc)
     else:
-        profile_obj, sub_elements = profile
+        profile_obj, raw_subs = profile
+        sub_elements = _normalize_profile_subs(profile_obj, raw_subs)
 
     if profile_obj is None:
         notify("Extrude", "Select a sketch or face to extrude.", error=True)
         return {"status": "no-selection"}
 
-    target_body = _active_body(doc)
+    target_body = _active_body(doc, profile_obj=profile_obj)
 
     effective_op = operation.lower()
     auto_reversed = False
+    was_auto = effective_op == "auto"
 
-    if effective_op == "auto":
+    if was_auto:
         cls_result = classify_operation(
             profile_obj=profile_obj,
             sub_elements=sub_elements,
@@ -448,6 +538,10 @@ def smart_extrude(
         if cls_result.get("auto_reverse", False):
             reversed_dir = not reversed_dir
             auto_reversed = True
+        # FreeCAD's PartDesign::Pocket uses an inverted profile normal (-normal when Reversed=False,
+        # +normal when Reversed=True), opposite to PartDesign::Pad.
+        if effective_op == "cut" and cls_result.get("confidence", 0.0) >= 0.8:
+            reversed_dir = not reversed_dir
 
     try:
         with transaction(doc, f"Smart Extrude ({effective_op.title()})"):
@@ -455,12 +549,18 @@ def smart_extrude(
                 # Create a new PartDesign::Body
                 new_body = doc.addObject("PartDesign::Body", "Body")
                 new_body.Label = "Body"
-                if hasattr(profile_obj, "isDerivedFrom") and profile_obj.isDerivedFrom(
-                    "Sketcher::SketchObject"
+                owning_body = _owning_body(profile_obj, doc)
+                if (
+                    owning_body is None
+                    and hasattr(profile_obj, "isDerivedFrom")
+                    and profile_obj.isDerivedFrom("Sketcher::SketchObject")
                 ):
-                    # If sketch was not in a body, move to new body
+                    # Only move sketch into new_body if it is not already owned by another Body
                     if hasattr(new_body, "addObject"):
-                        new_body.addObject(profile_obj)
+                        try:
+                            new_body.addObject(profile_obj)
+                        except Exception:
+                            pass
 
                 if hasattr(new_body, "newObject"):
                     feat = new_body.newObject("PartDesign::Pad", "Pad")
@@ -475,6 +575,35 @@ def smart_extrude(
                 if hasattr(feat, "recompute"):
                     feat.recompute()
                 doc.recompute()
+
+                # If profile_obj belongs to another Body in real FreeCAD, direct cross-body
+                # Pad reference yields 0 solids; bind via PartDesign::SubShapeBinder.
+                shape = getattr(feat, "Shape", None)
+                has_solids = (
+                    shape is not None
+                    and not getattr(shape, "isNull", lambda: False)()
+                    and len(getattr(shape, "Solids", ())) > 0
+                )
+                if (
+                    shape is not None
+                    and not has_solids
+                    and owning_body is not None
+                    and owning_body != new_body
+                    and hasattr(new_body, "newObject")
+                ):
+                    try:
+                        binder = new_body.newObject("PartDesign::SubShapeBinder", "Binder")
+                        clean_subs = tuple(s for s in sub_elements if s)
+                        binder.Support = [(profile_obj, clean_subs)]
+                        if hasattr(binder, "recompute"):
+                            binder.recompute()
+                        feat.Profile = (binder, ["Face1"])
+                        if hasattr(feat, "recompute"):
+                            feat.recompute()
+                        doc.recompute()
+                    except Exception:
+                        pass
+
                 notify("Extrude", f"Created new Body with Pad ({abs(length):.1f} mm).")
                 return {
                     "status": "ok",
@@ -485,6 +614,14 @@ def smart_extrude(
                 }
 
             elif effective_op == "cut":
+                prev_body_shape = getattr(target_body, "Shape", None)
+                prev_vol = (
+                    getattr(prev_body_shape, "Volume", 0.0)
+                    if prev_body_shape is not None
+                    and not getattr(prev_body_shape, "isNull", lambda: True)()
+                    else 0.0
+                )
+
                 if hasattr(target_body, "newObject"):
                     feat = target_body.newObject("PartDesign::Pocket", "Pocket")
                 else:
@@ -498,6 +635,42 @@ def smart_extrude(
                 if hasattr(feat, "recompute"):
                     feat.recompute()
                 doc.recompute()
+
+                # Verify that the Pocket produced a valid solid and reduced volume when prev_vol > 0
+                shape = getattr(feat, "Shape", None)
+                if shape is not None and hasattr(feat, "Reversed"):
+                    solids = getattr(shape, "Solids", ())
+                    new_vol = getattr(shape, "Volume", 0.0) if len(solids) > 0 else 0.0
+                    did_cut = len(solids) > 0 and (
+                        prev_vol <= 0.0 or new_vol < prev_vol - 1e-4
+                    )
+                    if not did_cut:
+                        feat.Reversed = not reversed_dir
+                        if hasattr(feat, "recompute"):
+                            feat.recompute()
+                        doc.recompute()
+                        flipped_shape = getattr(feat, "Shape", None)
+                        flipped_solids = (
+                            getattr(flipped_shape, "Solids", ())
+                            if flipped_shape is not None
+                            else ()
+                        )
+                        flipped_vol = (
+                            getattr(flipped_shape, "Volume", 0.0)
+                            if len(flipped_solids) > 0
+                            else 0.0
+                        )
+                        flipped_cut = len(flipped_solids) > 0 and (
+                            prev_vol <= 0.0 or flipped_vol < prev_vol - 1e-4
+                        )
+                        if flipped_cut:
+                            auto_reversed = True
+                            event("info", "extrude", "auto_reverse", "recovered_pocket_direction")
+                        else:
+                            feat.Reversed = reversed_dir
+                            if hasattr(feat, "recompute"):
+                                feat.recompute()
+                            doc.recompute()
 
                 notify("Extrude", f"Created Pocket cut ({abs(length):.1f} mm).")
                 return {
@@ -523,29 +696,34 @@ def smart_extrude(
                     feat.recompute()
                 doc.recompute()
 
-                # Guard against empty solid failure
+                # Guard against empty solid or disconnected multi-solid failure
                 shape = getattr(feat, "Shape", None)
-                if shape is not None:
-                    has_solids = (
-                        not getattr(shape, "isNull", lambda: False)()
-                        and len(getattr(shape, "Solids", ())) > 0
+                if shape is not None and hasattr(feat, "Reversed"):
+                    solids = (
+                        getattr(shape, "Solids", ())
+                        if not getattr(shape, "isNull", lambda: False)()
+                        else ()
                     )
-                    if not has_solids and hasattr(feat, "Reversed"):
+                    needs_recovery = len(solids) == 0 or len(solids) > 1
+                    if needs_recovery:
                         feat.Reversed = not reversed_dir
                         if hasattr(feat, "recompute"):
                             feat.recompute()
                         doc.recompute()
                         flipped_shape = getattr(feat, "Shape", None)
-                        flipped_has_solids = (
-                            flipped_shape is not None
+                        flipped_solids = (
+                            getattr(flipped_shape, "Solids", ())
+                            if flipped_shape is not None
                             and not getattr(flipped_shape, "isNull", lambda: True)()
-                            and len(getattr(flipped_shape, "Solids", ())) > 0
+                            else ()
                         )
-                        if flipped_has_solids:
+                        if len(flipped_solids) == 1 or (
+                            len(solids) == 0 and len(flipped_solids) > 0
+                        ):
                             auto_reversed = True
                             event("info", "extrude", "auto_reverse", "recovered_empty_solid")
                         else:
-                            # Revert if flipping didn't help
+                            # Revert if flipping didn't improve solid continuity
                             feat.Reversed = reversed_dir
                             if hasattr(feat, "recompute"):
                                 feat.recompute()

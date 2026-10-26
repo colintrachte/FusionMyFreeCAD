@@ -2130,8 +2130,9 @@ class _SketchRepairObserver:
         elif (
             prop == "Profile"
             and hasattr(obj, "isDerivedFrom")
-            and obj.isDerivedFrom("PartDesign::Pad")
+            and (obj.isDerivedFrom("PartDesign::Pad") or obj.isDerivedFrom("PartDesign::Pocket"))
         ):
+            self._updating = True
             try:
                 profile_tuple = getattr(obj, "Profile", None)
                 if (
@@ -2140,15 +2141,60 @@ class _SketchRepairObserver:
                     and len(profile_tuple) >= 2
                 ):
                     sketch_obj, sub_elements = profile_tuple[0], profile_tuple[1]
-                    if (
-                        sketch_obj
-                        and hasattr(sketch_obj, "InternalShape")
-                        and len(getattr(sketch_obj.InternalShape, "Faces", [])) > 1
-                        and (not sub_elements or sub_elements == [""] or sub_elements == ("",))
-                    ):
-                        sketch_obj.Visibility = True
+                    is_empty_subs = (
+                        not sub_elements or sub_elements == [""] or sub_elements == ("",)
+                    )
+                    if sketch_obj and hasattr(sketch_obj, "InternalShape") and is_empty_subs:
+                        int_faces = getattr(sketch_obj.InternalShape, "Faces", []) or []
+                        if len(int_faces) > 1:
+                            sketch_obj.Visibility = True
+                        elif len(int_faces) == 1:
+                            sk_shape = getattr(sketch_obj, "Shape", None)
+                            wires = getattr(sk_shape, "Wires", []) or []
+                            has_open_or_multi_wires = len(wires) > 1 or any(
+                                not getattr(w, "isClosed", lambda: True)() for w in wires
+                            )
+                            if has_open_or_multi_wires:
+                                obj.Profile = (sketch_obj, ["InternalFace1"])
+                                if hasattr(obj, "recompute"):
+                                    obj.recompute()
+                                doc = getattr(obj, "Document", None)
+                                if doc is not None and hasattr(doc, "recompute"):
+                                    doc.recompute()
+                                shape = getattr(obj, "Shape", None)
+                                if shape is not None and hasattr(obj, "Reversed"):
+                                    solids = (
+                                        getattr(shape, "Solids", ())
+                                        if not getattr(shape, "isNull", lambda: False)()
+                                        else ()
+                                    )
+                                    if len(solids) == 0 or len(solids) > 1:
+                                        prev_rev = getattr(obj, "Reversed", False)
+                                        obj.Reversed = not prev_rev
+                                        if hasattr(obj, "recompute"):
+                                            obj.recompute()
+                                        if doc is not None and hasattr(doc, "recompute"):
+                                            doc.recompute()
+                                        flipped_shape = getattr(obj, "Shape", None)
+                                        flipped_solids = (
+                                            getattr(flipped_shape, "Solids", ())
+                                            if flipped_shape is not None
+                                            and not getattr(flipped_shape, "isNull", lambda: True)()
+                                            else ()
+                                        )
+                                        if not (
+                                            len(flipped_solids) == 1
+                                            or (len(solids) == 0 and len(flipped_solids) > 0)
+                                        ):
+                                            obj.Reversed = prev_rev
+                                            if hasattr(obj, "recompute"):
+                                                obj.recompute()
+                                            if doc is not None and hasattr(doc, "recompute"):
+                                                doc.recompute()
             except Exception as error:
                 record_startup_failure("restore multi-region Pad profile visibility", error)
+            finally:
+                self._updating = False
 
 
 _sketch_edit_observer = None
@@ -2238,24 +2284,29 @@ class _PadSelectionObserver:
                     target_pad.recompute()
                     doc.recompute()
 
-                    # Guard against empty shape upon boolean fuse (e.g. Spool Holder.FCStd reversed)
+                    # Guard against empty or disconnected multi-solid shape upon boolean fuse
                     shape = getattr(target_pad, "Shape", None)
                     if shape is not None:
-                        has_solids = (
-                            not getattr(shape, "isNull", lambda: False)()
-                            and len(getattr(shape, "Solids", ())) > 0
+                        solids = (
+                            getattr(shape, "Solids", ())
+                            if not getattr(shape, "isNull", lambda: False)()
+                            else ()
                         )
-                        if not has_solids and hasattr(target_pad, "Reversed"):
+                        needs_recovery = len(solids) == 0 or len(solids) > 1
+                        if needs_recovery and hasattr(target_pad, "Reversed"):
                             target_pad.Reversed = not previous_reversed
                             target_pad.recompute()
                             doc.recompute()
                             flipped_shape = getattr(target_pad, "Shape", None)
-                            flipped_has_solids = (
-                                flipped_shape is not None
+                            flipped_solids = (
+                                getattr(flipped_shape, "Solids", ())
+                                if flipped_shape is not None
                                 and not getattr(flipped_shape, "isNull", lambda: True)()
-                                and len(getattr(flipped_shape, "Solids", ())) > 0
+                                else ()
                             )
-                            if flipped_has_solids:
+                            if len(flipped_solids) == 1 or (
+                                len(solids) == 0 and len(flipped_solids) > 0
+                            ):
                                 try:
                                     import fmf_common as diagnostics
 
@@ -2268,10 +2319,15 @@ class _PadSelectionObserver:
                                     )
                                 except Exception:
                                     pass
-                            else:
-                                # Revert if flipping also fails to produce a solid
+                            elif len(solids) == 0:
+                                # Revert if flipping also fails to produce any solid
                                 target_pad.Reversed = previous_reversed
                                 target_pad.Profile = previous_profile
+                                target_pad.recompute()
+                                doc.recompute()
+                            else:
+                                # Keep new profile in original direction if flipping didn't help
+                                target_pad.Reversed = previous_reversed
                                 target_pad.recompute()
                                 doc.recompute()
 

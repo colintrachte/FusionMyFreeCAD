@@ -20,6 +20,16 @@ def _get_gui() -> Any | None:
         return None
 
 
+def _get_qtwidgets() -> Any | None:
+    for mod_name in ("PySide", "PySide6", "PySide2"):
+        try:
+            mod = __import__(mod_name, fromlist=["QtWidgets"])
+            return getattr(mod, "QtWidgets", None)
+        except ImportError:
+            continue
+    return None
+
+
 @dataclass(frozen=True)
 class ChromeState:
     toolbars_hidden: bool = False
@@ -78,11 +88,11 @@ class ChromeController:
                     pass
 
         # 2. Ribbon dock and classic toolbars
-        from PySide import QtWidgets
+        qt_widgets = _get_qtwidgets()
 
         ribbon_dock = (
-            main_window.findChild(QtWidgets.QDockWidget, "Ribbon")
-            if hasattr(main_window, "findChild")
+            main_window.findChild(qt_widgets.QDockWidget, "Ribbon")
+            if qt_widgets is not None and hasattr(main_window, "findChild")
             else None
         )
         if ribbon_dock is not None:
