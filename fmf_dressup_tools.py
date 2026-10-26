@@ -580,6 +580,17 @@ def install_dressup_enhancers() -> None:
     ):
         _selection_observer = _DressUpSelectionObserver()
         gui.Selection.addObserver(_selection_observer)
+        try:
+            import fmf_lifecycle as lifecycle
+
+            lifecycle.register_observer(
+                "selection",
+                "dressup",
+                getattr(gui, "Selection", None),
+                _selection_observer,
+            )
+        except Exception:
+            pass
 
 
 def uninstall_dressup_enhancers() -> None:
@@ -606,6 +617,12 @@ def uninstall_dressup_enhancers() -> None:
     ):
         try:
             gui.Selection.removeObserver(_selection_observer)
+        except Exception:
+            pass
+        try:
+            import fmf_lifecycle as lifecycle
+
+            lifecycle.unregister_observer("selection", "dressup")
         except Exception:
             pass
         _selection_observer = None

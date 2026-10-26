@@ -1386,16 +1386,16 @@ def activate_owned_workbench(workbench):
     """Apply FMF chrome only while an FMF-owned workbench is active."""
     if not is_enabled() or not owned_workbenches_enabled():
         return
-    from PySide import QtWidgets
+    import fmf_chrome
 
-    main_window = Gui.getMainWindow()
-    ribbon = main_window.findChild(QtWidgets.QDockWidget, "Ribbon")
-    if ribbon is not None:
-        ribbon.show()
-        ribbon_widget = ribbon.widget() if hasattr(ribbon, "widget") else None
-        if ribbon_widget is not None and hasattr(ribbon_widget, "hideClassicToolbars"):
-            ribbon_widget.hideClassicToolbars()
-    main_window.menuBar().hide()
+    fmf_chrome.get_chrome_controller().apply(
+        fmf_chrome.ChromeState(
+            toolbars_hidden=True,
+            menubar_hidden=True,
+            ribbon_visible=True,
+            family_enabled=True,
+        )
+    )
 
 
 def set_ribbon_workbench_family(enabled):
@@ -1514,6 +1514,18 @@ def disable():
             problems.append("Runtime teardown: {}".format(error))
     dispose_native_action_registry()
     unregister_feature_observers()
+    try:
+        import fmf_chrome
+
+        fmf_chrome.get_chrome_controller().restore()
+    except Exception as error:
+        problems.append("Chrome restoration: {}".format(error))
+    try:
+        import fmf_persistence
+
+        fmf_persistence.flush_parameters(force=True)
+    except Exception as error:
+        problems.append("Parameter flush: {}".format(error))
     try:
         import fmf_viewport
 
@@ -2387,6 +2399,14 @@ def install_activation_monitor():
     _activation_parameter_group = App.ParamGet(PREFERENCE_ROOT)
     _activation_monitor = _ActivationPreferenceObserver()
     _activation_parameter_group.Attach(_activation_monitor)
+    try:
+        import fmf_lifecycle as lifecycle
+
+        lifecycle.register_observer(
+            "parameter", "activation", _activation_parameter_group, _activation_monitor
+        )
+    except Exception:
+        pass
 
 
 def uninstall_activation_monitor():
@@ -2396,6 +2416,12 @@ def uninstall_activation_monitor():
         return
     try:
         _activation_parameter_group.Detach(_activation_monitor)
+    except Exception:
+        pass
+    try:
+        import fmf_lifecycle as lifecycle
+
+        lifecycle.unregister_observer("parameter", "activation")
     except Exception:
         pass
     _activation_parameter_group = None
@@ -2527,12 +2553,32 @@ def register_commands():
     if _sketch_edit_observer is None and hasattr(Gui, "addDocumentObserver"):
         _sketch_edit_observer = _SketchEditWorkbenchObserver()
         Gui.addDocumentObserver(_sketch_edit_observer)
+        try:
+            import fmf_lifecycle as lifecycle
+
+            lifecycle.register_observer("gui", "sketch_edit", Gui, _sketch_edit_observer)
+        except Exception:
+            pass
     if _sketch_repair_observer is None and hasattr(App, "addDocumentObserver"):
         _sketch_repair_observer = _SketchRepairObserver()
         App.addDocumentObserver(_sketch_repair_observer)
+        try:
+            import fmf_lifecycle as lifecycle
+
+            lifecycle.register_observer("app", "sketch_repair", App, _sketch_repair_observer)
+        except Exception:
+            pass
     if _auto_created_document_observer is None and hasattr(App, "addDocumentObserver"):
         _auto_created_document_observer = _AutoCreatedDocumentObserver()
         App.addDocumentObserver(_auto_created_document_observer)
+        try:
+            import fmf_lifecycle as lifecycle
+
+            lifecycle.register_observer(
+                "app", "auto_created_doc", App, _auto_created_document_observer
+            )
+        except Exception:
+            pass
     if (
         _pad_selection_observer is None
         and hasattr(Gui, "Selection")
@@ -2540,6 +2586,14 @@ def register_commands():
     ):
         _pad_selection_observer = _PadSelectionObserver()
         Gui.Selection.addObserver(_pad_selection_observer)
+        try:
+            import fmf_lifecycle as lifecycle
+
+            lifecycle.register_observer(
+                "selection", "pad", getattr(Gui, "Selection", None), _pad_selection_observer
+            )
+        except Exception:
+            pass
 
     import fmf_datum_tools
     import fmf_dressup_tools
@@ -2570,18 +2624,36 @@ def unregister_feature_observers():
         except Exception:
             pass
         _sketch_edit_observer = None
+    try:
+        import fmf_lifecycle as lifecycle
+
+        lifecycle.unregister_observer("gui", "sketch_edit")
+    except Exception:
+        pass
     if _sketch_repair_observer is not None and hasattr(App, "removeDocumentObserver"):
         try:
             App.removeDocumentObserver(_sketch_repair_observer)
         except Exception:
             pass
         _sketch_repair_observer = None
+    try:
+        import fmf_lifecycle as lifecycle
+
+        lifecycle.unregister_observer("app", "sketch_repair")
+    except Exception:
+        pass
     if _auto_created_document_observer is not None and hasattr(App, "removeDocumentObserver"):
         try:
             App.removeDocumentObserver(_auto_created_document_observer)
         except Exception:
             pass
         _auto_created_document_observer = None
+    try:
+        import fmf_lifecycle as lifecycle
+
+        lifecycle.unregister_observer("app", "auto_created_doc")
+    except Exception:
+        pass
     if (
         _pad_selection_observer is not None
         and hasattr(Gui, "Selection")
@@ -2592,6 +2664,12 @@ def unregister_feature_observers():
         except Exception:
             pass
         _pad_selection_observer = None
+    try:
+        import fmf_lifecycle as lifecycle
+
+        lifecycle.unregister_observer("selection", "pad")
+    except Exception:
+        pass
     try:
         import fmf_dressup_tools
 
@@ -2616,6 +2694,13 @@ def unregister_feature_observers():
 
 
 _loaded = set()
+_vendor_provenance = {}
+
+
+def get_vendor_provenance():
+    """Return verified file paths of loaded or reused vendor modules."""
+    return dict(_vendor_provenance)
+
 
 # A standalone installation of either bundled add-on leaves these modules behind.
 # Reusing it avoids duplicate ribbon docks and search toolbars.
@@ -2665,6 +2750,10 @@ def load_vendor(name, directory):
         return
     if any(module in sys.modules for module in VENDOR_SENTINELS.get(name, ())):
         _loaded.add(name)
+        for sentinel in VENDOR_SENTINELS.get(name, ()):
+            mod = sys.modules.get(sentinel)
+            if mod is not None and hasattr(mod, "__file__"):
+                _vendor_provenance["{}:{}".format(name, sentinel)] = str(mod.__file__)
         App.Console.PrintMessage("FMF is using the already active {}.\n".format(name))
         diagnostics.event("info", "vendor", name, "reused")
         return
@@ -2679,6 +2768,7 @@ def load_vendor(name, directory):
         diagnostics.diagnostic_exception("vendor", name, error, initGui=init_gui)
         raise
     _loaded.add(name)
+    _vendor_provenance[name] = os.path.abspath(init_gui)
     diagnostics.event(
         "info",
         "vendor",

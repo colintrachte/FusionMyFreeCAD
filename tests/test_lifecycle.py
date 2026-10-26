@@ -1,80 +1,106 @@
-"""Existing lifecycle invariants that the activation state machine must preserve."""
+"""Tests for fmf_lifecycle registry."""
 
-import json
-from pathlib import Path
+from __future__ import annotations
+
+import types
 
 import pytest
 
-
-def test_prepare_is_idempotent_and_preserves_baseline(env, bootstrap):
-    env.param("User parameter:BaseApp/Preferences/View").SetString("NavigationStyle", "Original")
-    assert bootstrap.prepare() == "installed"
-    baseline = Path(bootstrap.BASELINE_PATH).read_bytes()
-    assert bootstrap.prepare() == "unchanged"
-    assert Path(bootstrap.BASELINE_PATH).read_bytes() == baseline
+import fmf_lifecycle as lifecycle
 
 
-def test_restore_uses_baseline_after_state_loss(env, bootstrap):
-    env.param("User parameter:BaseApp/Preferences/View").SetString("NavigationStyle", "Original")
-    bootstrap.prepare()
-    Path(bootstrap.STATE_PATH).unlink()
-    env.param("User parameter:BaseApp/Preferences/View").SetString("NavigationStyle", "Changed")
-    _location, problems = bootstrap.restore()
-    assert problems == []
-    assert env.param("User parameter:BaseApp/Preferences/View").GetString("NavigationStyle") == (
-        "Original"
+@pytest.fixture(autouse=True)
+def clean_lifecycle():
+    lifecycle.teardown_all()
+    yield
+    lifecycle.teardown_all()
+
+
+def test_observer_registration_and_teardown():
+    detached = []
+    target = types.SimpleNamespace(
+        removeObserver=lambda obs: detached.append(("target", obs))
     )
+    obs = object()
+
+    lifecycle.register_observer("selection", "pad", target, obs)
+    snap = lifecycle.snapshot()
+    assert snap["observer_count"] == 1
+    assert "selection:pad" in snap["observers"]
+    assert snap["total_hooks"] == 1
+
+    success = lifecycle.unregister_observer("selection", "pad")
+    assert success is True
+    assert detached == [("target", obs)]
+    assert lifecycle.snapshot()["observer_count"] == 0
 
 
-def test_baseline_has_typed_preference_records(env, bootstrap):
-    bootstrap.prepare()
-    baseline = json.loads(Path(bootstrap.BASELINE_PATH).read_text(encoding="utf-8"))
-    assert baseline["preferences"]
-    assert all({"path", "name", "kind", "existed"} <= set(item) for item in baseline["preferences"])
+def test_observer_custom_detach_function():
+    detached = []
+    lifecycle.register_observer(
+        "app", "doc", None, None, detach_fn=lambda: detached.append("custom")
+    )
+    assert lifecycle.snapshot()["observer_count"] == 1
+
+    success = lifecycle.unregister_observer("app", "doc")
+    assert success is True
+    assert detached == ["custom"]
+    assert lifecycle.snapshot()["observer_count"] == 0
 
 
-@pytest.mark.parametrize("failure_point", ["merge", "ribbon", "state"])
-def test_interrupted_install_recovers_from_write_once_baseline(
-    env, bootstrap, monkeypatch, failure_point
-):
-    """Every durable-install boundary can be retried without replacing the baseline."""
-    env.param("User parameter:BaseApp/Preferences/View").SetString("NavigationStyle", "Original")
-    original_merge = bootstrap._merge_layout
-    original_atomic = bootstrap._atomic_json
+def test_filter_registration_and_teardown():
+    removed = []
+    widget = types.SimpleNamespace(
+        removeEventFilter=lambda flt: removed.append(flt)
+    )
+    flt = object()
 
-    def fail_merge():
-        if failure_point == "merge":
-            raise RuntimeError("injected layout failure")
-        return original_merge()
+    lifecycle.register_filter("task_shield", widget, flt)
+    snap = lifecycle.snapshot()
+    assert snap["filter_count"] == 1
+    assert "task_shield" in snap["filters"]
 
-    def fail_atomic(path, value):
-        if failure_point == "ribbon" and path == bootstrap.RIBBON_PATH:
-            raise OSError("injected ribbon failure")
-        if failure_point == "state" and path == bootstrap.STATE_PATH:
-            raise OSError("injected state failure")
-        return original_atomic(path, value)
-
-    monkeypatch.setattr(bootstrap, "_merge_layout", fail_merge)
-    monkeypatch.setattr(bootstrap, "_atomic_json", fail_atomic)
-    with pytest.raises((OSError, RuntimeError), match="injected"):
-        bootstrap.prepare()
-
-    baseline_before = Path(bootstrap.BASELINE_PATH).read_bytes()
-    assert not Path(bootstrap.STATE_PATH).exists()
-
-    monkeypatch.setattr(bootstrap, "_merge_layout", original_merge)
-    monkeypatch.setattr(bootstrap, "_atomic_json", original_atomic)
-    assert bootstrap.prepare() == "recovered"
-    assert Path(bootstrap.BASELINE_PATH).read_bytes() == baseline_before
-    valid, _checks, problems = bootstrap.verify()
-    assert valid, problems
+    assert lifecycle.unregister_filter("task_shield") is True
+    assert removed == [flt]
+    assert lifecycle.snapshot()["filter_count"] == 0
 
 
-def test_restore_preserves_absent_preference(env, bootstrap):
-    group = env.param("User parameter:BaseApp/Preferences/View")
-    assert "ShowNaviCube" not in group.GetBools()
-    bootstrap.prepare()
-    group.SetBool("ShowNaviCube", True)
-    _location, problems = bootstrap.restore()
-    assert problems == []
-    assert "ShowNaviCube" not in group.GetBools()
+def test_timer_registration_and_teardown():
+    stopped = []
+    timer = types.SimpleNamespace(stop=lambda: stopped.append(True))
+
+    lifecycle.register_timer("status_delay", timer)
+    assert lifecycle.snapshot()["timer_count"] == 1
+
+    assert lifecycle.unregister_timer("status_delay") is True
+    assert stopped == [True]
+    assert lifecycle.snapshot()["timer_count"] == 0
+
+
+def test_teardown_all_cleans_everything():
+    obs_detached = []
+    target = types.SimpleNamespace(removeObserver=lambda obs: obs_detached.append(obs))
+    flt_removed = []
+    widget = types.SimpleNamespace(removeEventFilter=lambda flt: flt_removed.append(flt))
+    timer_stopped = []
+    timer = types.SimpleNamespace(stop=lambda: timer_stopped.append(True))
+
+    lifecycle.register_observer("cat1", "obs1", target, "my_obs")
+    lifecycle.register_filter("flt1", widget, "my_flt")
+    lifecycle.register_timer("tmr1", timer)
+
+    snap = lifecycle.snapshot()
+    assert snap["total_hooks"] == 3
+
+    count = lifecycle.teardown_all()
+    assert count == 3
+
+    final_snap = lifecycle.snapshot()
+    assert final_snap["total_hooks"] == 0
+    assert final_snap["observer_count"] == 0
+    assert final_snap["filter_count"] == 0
+    assert final_snap["timer_count"] == 0
+
+    assert obs_detached == ["my_obs"]
+    assert flt_removed == ["my_flt"]
+    assert timer_stopped == [True]

@@ -28,6 +28,17 @@ def _get_app():
         return None
 
 
+def _mark_dirty(app: Any) -> None:
+    try:
+        import fmf_persistence
+
+        fmf_persistence.mark_parameters_dirty()
+    except Exception:
+        save_fn = getattr(app, "saveParameter", None)
+        if callable(save_fn):
+            save_fn()
+
+
 def _get_gui():
     try:
         import FreeCADGui
@@ -132,8 +143,7 @@ def apply_studio_viewport(backup: bool = True) -> dict[str, Any]:
         if kind == "Int":
             nav_grp.SetInt(name, val)
 
-    if hasattr(app, "saveParameter"):
-        app.saveParameter()
+    _mark_dirty(app)
 
     # Redraw active view if present
     gui = _get_gui()
@@ -193,8 +203,7 @@ def restore_default_viewport() -> dict[str, Any]:
 
     backup_grp.SetBool("HasBackup", False)
 
-    if hasattr(app, "saveParameter"):
-        app.saveParameter()
+    _mark_dirty(app)
 
     gui = _get_gui()
     if gui and hasattr(gui, "ActiveDocument") and gui.ActiveDocument:
@@ -258,8 +267,7 @@ def apply_modern_zinc_theme(backup: bool = True) -> dict[str, Any]:
         # Set preference so it persists across restarts
         gen_grp = app.ParamGet(GENERAL_PARAM_PATH)
         gen_grp.SetString("StyleSheet", str(dest_file))
-        if hasattr(app, "saveParameter"):
-            app.saveParameter()
+        _mark_dirty(app)
 
     return {"status": "ok", "message": "Modern Zinc theme applied successfully"}
 
@@ -286,8 +294,7 @@ def restore_theme() -> dict[str, Any]:
         else:
             gen_grp.SetString("StyleSheet", "")
 
-    if hasattr(app, "saveParameter"):
-        app.saveParameter()
+    _mark_dirty(app)
 
     if gui and hasattr(gui, "getMainWindow"):
         mw = gui.getMainWindow()
