@@ -2284,6 +2284,12 @@ class _PadSelectionObserver:
                     raise
                 finally:
                     self._busy = False
+                    try:
+                        import fmf_extrude
+
+                        fmf_extrude.enhance_active_extrude()
+                    except Exception:
+                        pass
         except Exception as error:
             record_startup_failure("assign selected sketch region to Pad", error)
 

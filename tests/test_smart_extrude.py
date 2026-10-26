@@ -260,3 +260,64 @@ def test_smart_extrude_new_body_creates_body_and_pad(extrude_env):
     pad = res["feature"]
     assert pad.TypeId == "PartDesign::Pad"
     assert pad.Length == 20.0
+
+
+def test_enhance_active_extrude_signed_drag():
+    class MockSignal:
+        def __init__(self):
+            self.callbacks = []
+
+        def connect(self, cb):
+            self.callbacks.append(cb)
+
+        def emit(self, val):
+            for cb in self.callbacks:
+                cb(val)
+
+    class MockSpinBox:
+        def __init__(self):
+            self._min = 0.0
+            self.value = 10.0
+            self.valueChanged = MockSignal()
+
+        def minimum(self):
+            return self._min
+
+        def setMinimum(self, val):
+            self._min = val
+
+        def setValue(self, val):
+            self.value = val
+
+    class MockCheckBox:
+        def __init__(self):
+            self._checked = False
+
+        def isChecked(self):
+            return self._checked
+
+        def setChecked(self, checked):
+            self._checked = checked
+
+    sb = MockSpinBox()
+    cb = MockCheckBox()
+
+    info = {
+        "spinbox": sb,
+        "checkbox_reversed": cb,
+    }
+
+    ok = fmf_extrude.enhance_active_extrude(info)
+    assert ok is True
+    assert sb.minimum() < 0.0
+
+    # User drags backward past zero into negative distance
+    assert cb.isChecked() is False
+    sb.valueChanged.emit(-12.5)
+
+    # Signal hook toggles reversed direction and normalizes distance to positive
+    assert cb.isChecked() is True
+    assert sb.value == 12.5
+
+    # Second enhance call returns False (already hooked)
+    assert fmf_extrude.enhance_active_extrude(info) is False

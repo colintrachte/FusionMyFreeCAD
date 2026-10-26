@@ -36,6 +36,114 @@ def _get_gui() -> Any | None:
         return None
 
 
+def _get_qt() -> tuple[Any, Any, Any]:
+    try:
+        from PySide import QtCore, QtGui, QtWidgets
+
+        return QtCore, QtGui, QtWidgets
+    except ImportError:
+        try:
+            from PySide6 import QtCore, QtGui, QtWidgets
+
+            return QtCore, QtGui, QtWidgets
+        except ImportError:
+            try:
+                from PySide2 import QtCore, QtGui, QtWidgets
+
+                return QtCore, QtGui, QtWidgets
+            except ImportError:
+                return None, None, None
+
+
+def find_child(parent: Any, widget_type: Any, name: str) -> Any:
+    """Find a child widget by class type and objectName safely."""
+    if parent is None:
+        return None
+    if hasattr(parent, "findChild"):
+        try:
+            child = parent.findChild(widget_type, name)
+            if child is not None:
+                return child
+        except Exception:
+            pass
+    if hasattr(parent, "findChildren"):
+        try:
+            for child in parent.findChildren(widget_type):
+                if hasattr(child, "objectName") and child.objectName() == name:
+                    return child
+        except Exception:
+            pass
+    return None
+
+
+def get_active_extrude_info() -> dict[str, Any] | None:
+    """Detect whether a PartDesign Pad or Pocket task panel is currently active."""
+    gui = _get_gui()
+    _qt_core, _qt_gui, qt_widgets = _get_qt()
+    if gui is None or qt_widgets is None:
+        return None
+
+    main_window = gui.getMainWindow() if hasattr(gui, "getMainWindow") else None
+    if main_window is None:
+        return None
+
+    length_edit = find_child(main_window, qt_widgets.QWidget, "lengthEdit")
+    check_reversed = find_child(main_window, qt_widgets.QWidget, "checkBoxReversed")
+    length_edit2 = find_child(main_window, qt_widgets.QWidget, "lengthEdit2")
+
+    if length_edit is not None and getattr(length_edit, "isVisible", lambda: False)():
+        return {
+            "spinbox": length_edit,
+            "checkbox_reversed": check_reversed,
+            "spinbox2": length_edit2,
+        }
+    return None
+
+
+def enhance_active_extrude(info: dict[str, Any] | None = None) -> bool:
+    """Enable signed direction dragging and numeric input on the active extrude dialog."""
+    if info is None:
+        info = get_active_extrude_info()
+    if not info:
+        return False
+
+    spinbox = info.get("spinbox")
+    checkbox = info.get("checkbox_reversed")
+    if spinbox is None:
+        return False
+
+    # Expand minimum bounds to allow dragging past zero into negative values
+    if hasattr(spinbox, "minimum") and hasattr(spinbox, "setMinimum"):
+        try:
+            if spinbox.minimum() >= 0.0:
+                spinbox.setMinimum(-100000.0)
+        except Exception:
+            pass
+
+    # Hook value change so crossing zero flips reversed direction
+    if (
+        checkbox is not None
+        and hasattr(spinbox, "valueChanged")
+        and not getattr(spinbox, "_fmf_signed_hooked", False)
+    ):
+        try:
+            def _on_value_changed(val: float) -> None:
+                if val < 0.0:
+                    if hasattr(checkbox, "isChecked") and hasattr(checkbox, "setChecked"):
+                        checkbox.setChecked(not checkbox.isChecked())
+                    if hasattr(spinbox, "setValue"):
+                        spinbox.setValue(abs(val))
+
+            if hasattr(spinbox.valueChanged, "connect"):
+                spinbox.valueChanged.connect(_on_value_changed)
+            spinbox._fmf_signed_hooked = True
+            return True
+        except Exception:
+            pass
+
+    return False
+
+
 def _active_body(document: Any = None) -> Any:
     """Find the active PartDesign::Body or the first body in document."""
     app = _get_app()
