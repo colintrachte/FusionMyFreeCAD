@@ -637,12 +637,13 @@ def test_smart_extrude_is_first_button_in_create_section(layout, manifest, boots
 
 
 def test_smart_extrude_command_opens_interactive_edit_and_updates_tip(extrude_env):
-    """Activating FMF_SmartExtrude updates Body.Tip visibility and opens interactive edit mode."""
-    edited = []
+    """Activating FMF_SmartExtrude opens SmartExtrudeTaskPanel or executes in headless mode."""
+    shown_dialogs = []
     gui = extrude_env.env.gui
-    gui.ActiveDocument = types.SimpleNamespace(
-        ActiveView=None,
-        setEdit=lambda name: edited.append(name),
+    gui.Control = types.SimpleNamespace(
+        showDialog=lambda p: shown_dialogs.append(p),
+        activeDialog=lambda: None,
+        closeDialog=lambda: None,
     )
     extrude_env.sketch.Visibility = True
     gui.Selection.getSelectionEx = lambda: [
@@ -652,11 +653,74 @@ def test_smart_extrude_command_opens_interactive_edit_and_updates_tip(extrude_en
     cmd = fmf_extrude.SmartExtrudeCommand()
     cmd.Activated()
 
-    pads = [
-        o for o in extrude_env.doc.Objects if o.TypeId == "PartDesign::Pad"
-    ]
+    assert len(shown_dialogs) == 1
+    panel = shown_dialogs[0]
+    assert isinstance(panel, fmf_extrude.SmartExtrudeTaskPanel)
+
+    # When user accepts the task panel
+    ok = panel.accept()
+    assert ok is True
+
+    pads = [o for o in extrude_env.doc.Objects if o.TypeId == "PartDesign::Pad"]
     assert len(pads) == 1
     feat = pads[0]
     assert getattr(extrude_env.body, "Tip", None) is feat
     assert extrude_env.sketch.Visibility is False
-    assert edited == [feat.Name]
+
+
+def test_smart_extrude_session_interactive_workflow(extrude_env):
+    """SmartExtrudeSession dynamically reverses across zero and switches Join / Cut / New Body."""
+    doc = extrude_env.doc
+    body = extrude_env.body
+    sketch = extrude_env.sketch
+
+    body_shape = types.SimpleNamespace(
+        isNull=lambda: False,
+        Solids=[object()],
+        Volume=1000.0,
+    )
+    body_shape.distToShape = lambda prism: (0.0,)
+    body_shape.common = lambda prism: types.SimpleNamespace(
+        isNull=lambda: False,
+        Volume=200.0 if getattr(prism, "_is_neg", False) else 0.0,
+    )
+
+    def mock_fuse(prism):
+        if getattr(prism, "_is_neg", False):
+            return types.SimpleNamespace(Solids=[object(), object()])
+        return types.SimpleNamespace(Solids=[object()])
+
+    body_shape.fuse = mock_fuse
+    body.Shape = body_shape
+
+    def mock_extrude(vec):
+        return types.SimpleNamespace(
+            isNull=lambda: False,
+            Volume=250.0,
+            _is_neg=(vec.z < 0),
+        )
+
+    mock_face = types.SimpleNamespace(
+        extrude=mock_extrude,
+        normalAt=lambda u, v: MockVec(0, 0, 1),
+        Placement=types.SimpleNamespace(multiply=lambda p: p),
+    )
+    sketch.Shape = types.SimpleNamespace(Faces=[mock_face], Wires=[])
+    sketch.InternalShape = None
+
+    session = fmf_extrude.SmartExtrudeSession(document=doc, profile=(sketch, []))
+
+    # Positive distance (+10 mm) points outward and fuses cleanly -> Auto Join
+    session.set_signed_distance(10.0)
+    assert session.resolved_operation == "join"
+    assert session.target_body == body
+
+    # Dragging backwards past zero into negative distance (-10 mm) penetrates body -> Auto Cut
+    session.set_signed_distance(-10.0)
+    assert session.resolved_operation == "cut"
+    assert session.target_body == body
+
+    # Flip direction button toggles sign and re-evaluates
+    session.flip_direction()
+    assert session.signed_distance == 10.0
+    assert session.resolved_operation == "join"
