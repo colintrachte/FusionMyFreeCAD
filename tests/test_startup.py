@@ -20,7 +20,7 @@ from fake_freecad import (
 
 
 def _run_init_gui(env, bootstrap, monkeypatch, stub_vendors=True):
-    monkeypatch.setattr(bootstrap, "validate_enabled_ui", lambda: None)
+    monkeypatch.setattr(bootstrap, "register_startup_validation", lambda: None)
     if stub_vendors:
         monkeypatch.setattr(bootstrap, "load_vendor", lambda *_args: None)
         monkeypatch.setattr(bootstrap, "run_runtime", lambda: None)
@@ -30,7 +30,7 @@ def _run_init_gui(env, bootstrap, monkeypatch, stub_vendors=True):
 def test_init_gui_runs_from_freecads_function_scoped_exec(env, bootstrap, monkeypatch):
     """FreeCAD executes InitGui.py inside a loader method, not as an imported module."""
     env.param(bootstrap.PREFERENCE_ROOT).SetBool("UseOwnedWorkbenches", True)
-    monkeypatch.setattr(bootstrap, "validate_enabled_ui", lambda: None)
+    monkeypatch.setattr(bootstrap, "register_startup_validation", lambda: None)
     monkeypatch.setattr(bootstrap, "load_vendor", lambda *_args: None)
     monkeypatch.setattr(bootstrap, "run_runtime", lambda: None)
     source = (ROOT / "InitGui.py").read_text(encoding="utf-8")
@@ -646,19 +646,75 @@ def test_production_default_registers_owned_workbenches_on_startup(env, bootstra
     assert set(ribbon["authoritativeWorkbenches"]) == set(bootstrap.OWNED_TO_NATIVE_WORKBENCH)
 
 
-def test_enabled_ui_validation_rolls_back_an_invisible_ribbon(env, bootstrap, monkeypatch):
+def test_enabled_ui_validation_restores_native_chrome_without_disabling_fmf(
+    env, bootstrap, monkeypatch
+):
     recovery_calls = []
     monkeypatch.setattr(
         bootstrap, "_restore_native_ui_now", lambda: recovery_calls.append("native-ui")
     )
-    monkeypatch.setattr(bootstrap, "install_lifecycle_menu", lambda: recovery_calls.append("menu"))
 
     bootstrap.validate_enabled_ui()
     FakeTimer.pump()
 
-    assert bootstrap.is_enabled() is False
-    assert recovery_calls == ["native-ui", "menu"]
+    assert bootstrap.is_enabled() is True
+    assert recovery_calls == ["native-ui"]
     assert bootstrap.startup_failures()[0]["step"] == "enabled UI validation"
+
+
+def test_transition_builds_ribbon_before_validation(env, bootstrap, monkeypatch):
+    import fmf_transitions
+
+    env.active_workbench = "FMFDesignWorkbench"
+    recovery_calls = []
+    monkeypatch.setattr(
+        bootstrap, "_restore_native_ui_now", lambda: recovery_calls.append("native-ui")
+    )
+
+    fmf_transitions.install(env.main_window)
+
+    def build_ribbon(_name):
+        ribbon = env.pyside.QtWidgets.QDockWidget(object_name="Ribbon")
+        ribbon.show()
+        env.main_window.docks.append(ribbon)
+
+    fmf_transitions.register_phase("ribbon-initialize", build_ribbon, order=10)
+    bootstrap.register_startup_validation()
+
+    try:
+        fmf_transitions.request_current_transition()
+        FakeTimer.pump()
+
+        assert bootstrap.is_enabled() is True
+        assert recovery_calls == []
+        assert bootstrap.startup_failures() == []
+        assert "ui-validation" not in fmf_transitions.snapshot()["phases"]
+    finally:
+        fmf_transitions.uninstall()
+
+
+def test_failed_transition_validation_stays_registered_for_recovery(env, bootstrap, monkeypatch):
+    import fmf_transitions
+
+    env.active_workbench = "FMFDesignWorkbench"
+    recovery_calls = []
+    monkeypatch.setattr(
+        bootstrap, "_restore_native_ui_now", lambda: recovery_calls.append("native-ui")
+    )
+
+    fmf_transitions.install(env.main_window)
+    fmf_transitions.register_phase("ribbon-initialize", lambda _name: None, order=10)
+    bootstrap.register_startup_validation()
+
+    try:
+        fmf_transitions.request_current_transition()
+        FakeTimer.pump()
+
+        assert bootstrap.is_enabled() is True
+        assert recovery_calls == ["native-ui"]
+        assert "ui-validation" in fmf_transitions.snapshot()["phases"]
+    finally:
+        fmf_transitions.uninstall()
 
 
 def test_diagnostics_rotate_and_preserve_structured_events(env, bootstrap, monkeypatch, tmp_path):

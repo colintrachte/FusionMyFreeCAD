@@ -2,6 +2,26 @@
 
 All notable user-visible changes to FMF are recorded here.
 
+## 1.9.6 — 2026-11-09
+
+### Installation and startup recovery
+
+- Fixed a first-launch race that could validate FMF before the initial workbench transition had
+  built the Ribbon, causing 1.9.5 to disable itself immediately after installation.
+- Startup validation now runs after Ribbon initialization in the coordinated workbench-transition
+  pipeline and explicitly reconciles the current workbench once all phases are registered.
+- Missing or delayed Ribbon chrome now restores FreeCAD's native menu instead of persisting an FMF
+  disable. Validation remains available to confirm recovery on a later transition.
+- The native menu remains visible until the Ribbon dock is actually visible, including when a
+  previously requested chrome state is reapplied after Ribbon construction completes.
+
+### Upgrade notes
+
+- Replace the entire existing `Mod/FMF` folder with the `FMF-1.9.6` package; do not merge it with
+  1.9.5 or an older version.
+- Restart FreeCAD after updating. If 1.9.5 already disabled FMF, choose **FMF → Enable FMF** once;
+  manual `user.cfg` editing is not required.
+
 ## 1.9.5 — 2026-10-26
 
 ### UI Stability & Ribbon Lifecycle

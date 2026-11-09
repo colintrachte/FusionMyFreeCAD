@@ -63,8 +63,7 @@ class ChromeController:
         force: bool = False,
     ) -> bool:
         """Apply desired chrome state only if it differs from current state."""
-        if not force and self._current_state == desired:
-            return False
+        state_unchanged = not force and self._current_state == desired
 
         gui = self._gui_instance()
         if main_window is None and gui is not None and hasattr(gui, "getMainWindow"):
@@ -74,20 +73,9 @@ class ChromeController:
             self._current_state = desired
             return False
 
-        # 1. Menubar visibility
         prev = self._current_state
-        if force or prev is None or prev.menubar_hidden != desired.menubar_hidden:
-            menubar = main_window.menuBar() if hasattr(main_window, "menuBar") else None
-            if menubar is not None:
-                try:
-                    if desired.menubar_hidden:
-                        menubar.hide()
-                    else:
-                        menubar.show()
-                except (AttributeError, RuntimeError):
-                    pass
 
-        # 2. Ribbon dock and classic toolbars
+        # 1. Ribbon dock and classic toolbars
         qt_widgets = _get_qtwidgets()
 
         ribbon_dock = (
@@ -95,6 +83,30 @@ class ChromeController:
             if qt_widgets is not None and hasattr(main_window, "findChild")
             else None
         )
+        try:
+            ribbon_was_visible = bool(ribbon_dock is not None and ribbon_dock.isVisible())
+        except (AttributeError, RuntimeError):
+            ribbon_was_visible = False
+
+        menubar = main_window.menuBar() if hasattr(main_window, "menuBar") else None
+        if state_unchanged:
+            # The requested state may have been cached while Ribbon was still
+            # being constructed. Re-apply it when the dock's effective
+            # visibility changes so the native-menu fallback can hand off to
+            # Ribbon after startup settles.
+            ribbon_visibility_settled = ribbon_dock is None or (
+                ribbon_was_visible == desired.ribbon_visible
+            )
+            expected_menu_hidden = desired.menubar_hidden and ribbon_was_visible
+            try:
+                menu_visibility_settled = menubar is None or (
+                    (not menubar.isVisible()) == expected_menu_hidden
+                )
+            except (AttributeError, RuntimeError):
+                menu_visibility_settled = False
+            if ribbon_visibility_settled and menu_visibility_settled:
+                return False
+
         if ribbon_dock is not None:
             if force or prev is None or prev.ribbon_visible != desired.ribbon_visible:
                 try:
@@ -112,6 +124,26 @@ class ChromeController:
                         ribbon_widget.hideClassicToolbars()
                     except Exception:
                         pass
+
+        # 2. Menubar visibility: keep stock menubar visible as a safety fallback
+        # unless the Ribbon dock is confirmed present and visible.
+        try:
+            # ``isHidden() == False`` only means the widget was not explicitly
+            # hidden.  A dock can still be invisible because its parent is not
+            # shown or its layout has not settled, which is exactly the startup
+            # interval where native chrome must remain available.
+            ribbon_ready = bool(ribbon_dock is not None and ribbon_dock.isVisible())
+        except (AttributeError, RuntimeError):
+            ribbon_ready = False
+        if menubar is not None:
+            should_hide_menu = desired.menubar_hidden and ribbon_ready
+            try:
+                if should_hide_menu:
+                    menubar.hide()
+                else:
+                    menubar.show()
+            except (AttributeError, RuntimeError):
+                pass
 
         # 3. Ribbon workbench family
         if force or prev is None or prev.family_enabled != desired.family_enabled:

@@ -90,5 +90,7 @@ def run():
     QtCore.QTimer.singleShot(0, QtWidgets.QApplication.instance().quit)
 
 
-Gui.showMainWindow()
+main_window = Gui.getMainWindow()
+if main_window is not None and not main_window.isVisible():
+    main_window.show()
 run()

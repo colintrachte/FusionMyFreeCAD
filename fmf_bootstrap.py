@@ -2663,90 +2663,116 @@ def uninstall_activation_monitor():
     _activation_monitor = None
 
 
-def validate_enabled_ui():
+def register_startup_validation():
+    """Register startup UI validation as the final transition phase."""
+    import fmf_transitions
+
+    fmf_transitions.register_phase(
+        "ui-validation", _validate_enabled_ui_after_transition, order=900
+    )
+
+
+def validate_enabled_ui(workbench_name=None):
+    """Schedule UI validation for callers outside the transition coordinator."""
+    from PySide import QtCore
+
+    QtCore.QTimer.singleShot(0, lambda: _validate_enabled_ui_now(workbench_name))
+
+
+def _validate_enabled_ui_after_transition(workbench_name=None):
+    """Validate synchronously after earlier transition phases have completed."""
+    return _validate_enabled_ui_now(workbench_name)
+
+
+def _validate_enabled_ui_now(workbench_name=None):
     """Validate the chrome appropriate to the active owned or native workbench."""
-    from PySide import QtCore, QtWidgets
+    from PySide import QtWidgets
 
-    def validate():
-        import fmf_common as diagnostics
+    import fmf_common as diagnostics
 
-        main_window = Gui.getMainWindow()
-        ribbon = main_window.findChild(QtWidgets.QDockWidget, "Ribbon")
+    main_window = Gui.getMainWindow()
+    ribbon = main_window.findChild(QtWidgets.QDockWidget, "Ribbon")
 
-        def safe(function, default=None):
-            try:
-                return function()
-            except Exception:
-                return default
+    def safe(function, default=None):
+        try:
+            return function()
+        except Exception:
+            return default
 
-        active_workbench = safe(lambda: Gui.activeWorkbench().name(), "unknown")
-        central_widget = safe(lambda: main_window.centralWidget())
-        window_visible = safe(lambda: main_window.isVisible())
-        window_minimized = safe(lambda: main_window.isMinimized(), False)
-        snapshot = {
-            "activeWorkbench": active_workbench,
-            "windowFlags": safe(lambda: int(main_window.windowFlags())),
-            "windowVisible": window_visible,
-            "windowMinimized": window_minimized,
-            "menuVisible": safe(lambda: main_window.menuBar().isVisible()),
-            "centralWidgetVisible": bool(
-                central_widget and safe(lambda: central_widget.isVisible(), False)
-            ),
-            "ribbonPresent": ribbon is not None,
-            "ribbonVisible": bool(ribbon and safe(lambda: ribbon.isVisible(), False)),
-            "ribbonHeight": safe(lambda: ribbon.height()) if ribbon is not None else None,
-            "visibleToolbars": [
-                safe(lambda toolbar=toolbar: toolbar.objectName(), "unknown")
-                for toolbar in main_window.findChildren(QtWidgets.QToolBar)
-                if safe(lambda toolbar=toolbar: toolbar.isVisible(), False)
-            ],
-        }
-        # A hidden/background FreeCAD process cannot provide meaningful visual
-        # health evidence. In particular, automation may intentionally launch
-        # FreeCAD with a hidden top-level window. Do not turn a persistent user
-        # preference off based on that diagnostic-only state.
-        if window_visible is False or window_minimized:
-            failures = startup_failures()
-            state = "degraded" if failures else "validation_deferred"
-            diagnostics.event("info", "ui", "enabled validation", state, **snapshot)
-            diagnostics.set_status(state, startupFailures=failures, **snapshot)
-            return
+    active_workbench = safe(lambda: Gui.activeWorkbench().name(), workbench_name or "unknown")
+    central_widget = safe(lambda: main_window.centralWidget())
+    window_visible = safe(lambda: main_window.isVisible())
+    window_minimized = safe(lambda: main_window.isMinimized(), False)
+    snapshot = {
+        "activeWorkbench": active_workbench,
+        "windowFlags": safe(lambda: int(main_window.windowFlags())),
+        "windowVisible": window_visible,
+        "windowMinimized": window_minimized,
+        "menuVisible": safe(lambda: main_window.menuBar().isVisible()),
+        "centralWidgetVisible": bool(
+            central_widget and safe(lambda: central_widget.isVisible(), False)
+        ),
+        "ribbonPresent": ribbon is not None,
+        "ribbonVisible": bool(ribbon and safe(lambda: ribbon.isVisible(), False)),
+        "ribbonHeight": safe(lambda: ribbon.height()) if ribbon is not None else None,
+        "visibleToolbars": [
+            safe(lambda toolbar=toolbar: toolbar.objectName(), "unknown")
+            for toolbar in main_window.findChildren(QtWidgets.QToolBar)
+            if safe(lambda toolbar=toolbar: toolbar.isVisible(), False)
+        ],
+    }
+    # A hidden/background FreeCAD process cannot provide meaningful visual
+    # health evidence. In particular, automation may intentionally launch
+    # FreeCAD with a hidden top-level window.
+    if window_visible is False or window_minimized:
+        failures = startup_failures()
+        state = "degraded" if failures else "validation_deferred"
+        diagnostics.event("info", "ui", "enabled validation", state, **snapshot)
+        diagnostics.set_status(state, startupFailures=failures, **snapshot)
+        return
 
-        owned_active = fmf_workbench_for(active_workbench) in OWNED_TO_NATIVE_WORKBENCH
-        ribbon_usable = bool(
-            ribbon
-            and safe(lambda: ribbon.isVisible(), False)
-            and (safe(lambda: ribbon.height(), 0) or 0) > 0
-        )
-        native_usable = bool(
-            not owned_active
-            and safe(lambda: main_window.menuBar().isVisible(), False)
-            and central_widget
-            and safe(lambda: central_widget.isVisible(), False)
-        )
-        if (owned_active and ribbon_usable) or native_usable:
-            failures = startup_failures()
-            state = "degraded" if failures else "healthy"
-            diagnostics.event("info", "ui", "enabled validation", state, **snapshot)
-            diagnostics.set_status(state, startupFailures=failures, **snapshot)
-            return
+    owned_active = fmf_workbench_for(active_workbench) in OWNED_TO_NATIVE_WORKBENCH
+    ribbon_usable = bool(
+        ribbon
+        and safe(lambda: ribbon.isVisible(), False)
+        and (safe(lambda: ribbon.height(), 0) or 0) > 0
+    )
+    native_usable = bool(
+        not owned_active
+        and safe(lambda: main_window.menuBar().isVisible(), False)
+        and central_widget
+        and safe(lambda: central_widget.isVisible(), False)
+    )
+    if (owned_active and ribbon_usable) or native_usable:
+        failures = startup_failures()
+        state = "degraded" if failures else "healthy"
+        diagnostics.event("info", "ui", "enabled validation", state, **snapshot)
+        diagnostics.set_status(state, startupFailures=failures, **snapshot)
+        try:
+            import fmf_transitions
 
-        message = (
-            "The active workbench did not produce usable application chrome; "
-            "activation was rolled back"
-        )
-        App.Console.PrintError("FMF: {}.\n".format(message))
+            fmf_transitions.unregister_phase("ui-validation", _validate_enabled_ui_after_transition)
+        except Exception:
+            pass
+        return
+
+    message = (
+        "The active workbench did not produce usable application chrome; "
+        "native chrome was restored while FMF remains enabled"
+    )
+    App.Console.PrintWarning("FMF: {}.\n".format(message))
+    failures = startup_failures()
+    if not any(entry.get("step") == "enabled UI validation" for entry in failures):
         record_startup_failure("enabled UI validation", RuntimeError(message))
-        App.ParamGet(PREFERENCE_ROOT).SetBool("Enabled", False)
-        App.saveParameter()
-        diagnostics.event("error", "ui", "enabled validation", "rolled_back", **snapshot)
-        diagnostics.set_status("activation_rolled_back", reason=message, **snapshot)
-        _restore_native_ui_now()
-        install_lifecycle_menu()
-
-    # Ribbon construction is synchronous during InitGui, but FreeCAD applies
-    # final visibility only when the event loop begins.
-    QtCore.QTimer.singleShot(0, validate)
+        failures = startup_failures()
+    diagnostics.event("warning", "ui", "enabled validation", "native_fallback", **snapshot)
+    diagnostics.set_status(
+        "degraded",
+        reason=message,
+        startupFailures=failures,
+        **snapshot,
+    )
+    _restore_native_ui_now()
 
 
 class OpenDiagnosticsCommand:
@@ -3409,7 +3435,10 @@ def start():
                 os.path.join(ADDON_ROOT, "bundled-addons", "FreeCAD-Ribbon"),
             )
             _startup_step("UI mode synchronization", defer_ui_mode_sync)
-            _startup_step("enabled UI validation", validate_enabled_ui)
+            _startup_step("enabled UI validation", register_startup_validation)
+            import fmf_transitions
+
+            fmf_transitions.request_current_transition()
         else:
             _startup_step("native UI restoration", restore_disabled_native_ui)
     except BaseException as error:
